@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Forms Setup Guide — Cross-Functional Training Survey</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F5F4F0; color: #1a1a1a; padding: 2rem 1rem; }
+  .page { max-width: 720px; margin: 0 auto; }
+  h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+  .intro { font-size: 15px; color: #666; line-height: 1.6; margin-bottom: 2rem; }
+  .tabs { display: flex; gap: 0; margin-bottom: 1.5rem; border-bottom: 2px solid #E5E3F5; }
+  .tab { padding: 10px 22px; font-size: 14px; font-weight: 500; cursor: pointer; color: #888; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: all 0.15s; }
+  .tab.active { color: #534AB7; border-bottom-color: #534AB7; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+  .platform-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; padding: 4px 12px; border-radius: 20px; margin-bottom: 1rem; }
+  .badge-google { background: #E1F5EE; color: #0F6E56; }
+  .badge-ms { background: #E6F1FB; color: #185FA5; }
+  .step-block { background: #fff; border: 1px solid #E5E3F5; border-radius: 12px; padding: 1.2rem; margin-bottom: 1rem; }
+  .step-num { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: #534AB7; color: #fff; font-size: 11px; font-weight: 700; margin-right: 8px; flex-shrink: 0; }
+  .step-title { font-size: 14px; font-weight: 600; color: #1a1a1a; display: flex; align-items: center; margin-bottom: 10px; }
+  .step-body { font-size: 13px; color: #555; line-height: 1.7; padding-left: 32px; }
+  .q-block { background: #FAFAF8; border: 1px solid #F0EFF8; border-radius: 8px; padding: 10px 14px; margin: 6px 0; }
+  .q-label { font-size: 12px; font-weight: 700; color: #888; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px; }
+  .q-text { font-size: 13px; color: #1a1a1a; font-weight: 500; margin-bottom: 3px; }
+  .q-type { font-size: 11px; color: #534AB7; background: #EEEDFE; padding: 2px 8px; border-radius: 20px; display: inline-block; margin-bottom: 4px; }
+  .q-options { font-size: 12px; color: #666; margin-top: 4px; }
+  .q-options li { margin-left: 16px; margin-top: 2px; }
+  .tip { background: #EEEDFE; border-left: 3px solid #534AB7; border-radius: 0 8px 8px 0; padding: 10px 14px; margin: 10px 0; font-size: 13px; color: #3C3489; }
+  .tip strong { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 3px; color: #534AB7; }
+  .copy-btn { font-size: 12px; padding: 5px 12px; border: 1px solid #D8D6EE; background: #fff; border-radius: 6px; cursor: pointer; color: #534AB7; float: right; }
+  .section-divider { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #aaa; margin: 1.2rem 0 0.6rem; border-top: 1px solid #F0EFF8; padding-top: 1rem; }
+  ul { padding-left: 18px; }
+  li { margin-bottom: 4px; }
+  .url-box { background: #F5F4F0; border: 1px solid #E5E3F5; border-radius: 8px; padding: 10px 14px; font-size: 13px; font-family: monospace; color: #534AB7; margin-top: 6px; word-break: break-all; }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Forms setup guide</h1>
+  <p class="intro">Use this guide to recreate the cross-functional training survey in Google Forms or Microsoft Forms. Each question is listed with its type and answer options so you can copy them exactly.</p>
+
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab('google',this)">Google Forms</div>
+    <div class="tab" onclick="switchTab('ms',this)">Microsoft Forms</div>
+    <div class="tab" onclick="switchTab('custom',this)">Custom departments</div>
+  </div>
+
+  <!-- GOOGLE FORMS -->
+  <div id="tab-google" class="tab-content active">
+    <div class="platform-badge badge-google">● Google Forms</div>
+
+    <div class="step-block">
+      <div class="step-title"><span class="step-num">1</span>Create the form</div>
+      <div class="step-body">
+        Go to <strong>forms.google.com</strong> → click <em>+ Blank</em>.<br>
+        Set the title to: <strong>Cross-Functional Training Survey — [Q2 2025]</strong><br>
+        Add a description: <em>"Help us plan smarter training across teams. Takes 3–5 minutes."</em>
+        <div class="tip"><strong>Tip</strong>Enable "Collect email addresses" in Settings → Responses so you know who submitted.</div>
+      </div>
+    </div>
+
+    <div class="step-block">
+      <div class="step-title"><span class="step-num">2</span>Add section 1 — About you</div>
+      <div class="step-body">
+        Click <em>Add section</em> and title it <strong>About you</strong>.
+        <div class="q-block"><div class="q-label">Question 1</div><div class="q-text">Full name</div><div class="q-type">Short answer</div><div class="q-options">Mark as Required.</div></div>
+        <div class="q-block"><div class="q-label">Question 2</div><div class="q-text">Job title</div><div class="q-type">Short answer</div><div class="q-options">Mark as Required.</div></div>
+        <div class="q-block">
+          <div class="q-label">Question 3</div><div class="q-text">Your department</div><div class="q-type">Dropdown</div>
+          <div class="q-options">Options:<ul><li>Engineering</li><li>Product</li><li>Sales</li><li>Marketing</li><li>Finance</li><li>HR</li><li>Operations</li><li>Customer Success</li><li>Legal</li><li>Design</li><li>Data & Analytics</li><li>Supply Chain</li><li>IT</li><li>Strategy</li><li>Other</li></ul></div>
+        </div>
+        <div class="q-block">
+          <div class="q-label">Question 4</div><div class="q-text">Your role level</div><div class="q-type">Multiple choice</div>
+          <div class="q-options">Options:<ul><li>Employee / Individual Contributor</li><li>Team Lead</li><li>Manager</li><li>Senior Manager / Director</li><li>VP / Executive</li></ul></div>
+        </div>
+        <div class="q-block"><div class="q-label">Question 5</div><div class="q-text">Manager's name (for reporting)</div><div class="q-type">Short answer</div><div class="q-options">Optional.</div></div>
+      </div>
+    </div>
+
+    <div class="step-block">
+      <div class="step-title"><span class="step-num">3</span>Add section 2 — Training you want to receive</div>
+      <div class="step-body">
+        Click <em>Add section</em> → title it <strong>Training you want to receive</strong>.
+        <div class="q-block">
+          <div class="q-label">Question 6</div><div class="q-text">Which departments would you like to learn from?</div><div class="q-type">Checkboxes (multi-select)</div>
+          <div class="q-options">Options: Engineering, Product, Sales, Marketing, Finance, HR, Operations, Customer Success, Legal, Design, Data & Analytics, Supply Chain, IT, Strategy</div>
+        </div>
+        <div class="q-block"><div class="q-label">Question 7</div><div class="q-text">What specific skills or topics do you want to learn?</div><div class="q-type">Paragraph (long text)</div><div class="q-options">Optional. Add helper text: "e.g. data analytics basics, budgeting process, agile methodology..."</div></div>
+        <div class="q-block">
+          <div class="q-label">Question 8</div><div class="q-text">How urgent is this training for you?</div><div class="q-type">Multiple choice</div>
+          <div class="q-options">Options:<ul><li>Low — nice to have</li><li>Medium — this quarter</li><li>High — this month</li><li>Critical — ASAP</li></ul></div>
+        </div>
+        <div class="q-block">
+          <div class="q-label">Question 9</div><div class="q-text">Preferred training format</div><div class="q-type">Multiple choice</div>
+          <div class="q-options">Options:<ul><li>Workshop / group session</li><li>1-on-1 coaching</li><li>Job shadowing</li><li>Online / self-paced</li><li>Lunch & learn</li></ul></div>
+        </div>
+        <div class="q-block">
+          <div class="q-label">Question 10</div><div class="q-text">How many hours per month can you dedicate to learning?</div><div class="q-type">Multiple choice</div>
+          <div class="q-options">Options: 1–2 hrs &nbsp;|&nbsp; 3–5 hrs &nbsp;|&nbsp; 6–10 hrs &nbsp;|&nbsp; 10+ hrs</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="step-block">
+      <div class="step-title"><span class="step-num">4</span>Add section 3 — Training you can provide</div>
+      <div class="step-body">
+        Click <em>Add section</em> → title it <strong>Training you can provide</strong>.
+        <div class="q-block">
+          <div class="q-label">Question 11</div><div class="q-text">Which departments are you willing to train?</div><div class="q-type">Checkboxes (multi-select)</div>
+          <div class="q-options">Same options as Question 6. Include "None — I prefer not to train others" as a last option.</div>
+        </div>
+        <div class="q-block"><div class="q-label">Question 12</div><div class="q-text">What topics or skills can you train others on?</div><div class="q-type">Paragraph</div><div class="q-options">Required if Q11 ≠ "None". Add helper text: "e.g. SQL basics, campaign planning, financial modeling..."</div></div>
+        <div class="q-block">
+          <div class="q-label">Question 13</div><div class="q-text">Your confidence level as a trainer</div><div class="q-type">Multiple choice</div>
+          <div class="q-options">Options:<ul><li>Beginner — I can share the basics</li><li>Intermediate — comfortable teaching</li><li>Expert — deep subject matter knowledge</li></ul></div>
+        </div>
+        <div class="q-block">
+          <div class="q-label">Question 14</div><div class="q-text">Hours per month you can dedicate to training others</div><div class="q-type">Multiple choice</div>
+          <div class="q-options">Options: 1–2 hrs &nbsp;|&nbsp; 3–5 hrs &nbsp;|&nbsp; 6–10 hrs &nbsp;|&nbsp; 10+ hrs</div>
+        </div>
+        <div class="q-block"><div class="q-label">Question 15</div><div class="q-text">Who else in your department would you recommend as a trainer?</div><div class="q-type">Short answer</div><div class="q-options">Optional.</div></div>
+        <div class="q-block"><div class="q-label">Question 16</div><div class="q-text">Any additional comments, suggestions, or scheduling preferences?</div><div class="q-type">Paragraph</div><div class="q-options">Optional.</div></div>
+      </div>
+    </div>
+
+    <div class="step-block">
+      <div class="step-title"><span class="step-num">5</span>Share & collect responses</div>
+      <div class="step-body">
+        <ul>
+          <li>Click <strong>Send</strong> → copy the link → shorten it using the "Shorten URL" checkbox.</li>
+          <li>Paste the link in a company-wide email or Slack message.</li>
+          <li>To view results: go to the <strong>Responses</strong> tab → click the Google Sheets icon to export all responses to a spreadsheet for easy filtering and sorting.</li>
+        </ul>
+        <div class="tip"><strong>Pro tip</strong>Go to Settings → Presentation → add a confirmation message: "Thank you! Your manager will follow up within 5 business days."</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MICROSOFT FORMS -->
+  <div id="tab-ms" class="tab-content">
+    <div class="platform-badge badge-ms">● Microsoft Forms</div>
+
+    <div class="step-block">
+      <div class="step-title"><span class="step-num">1</span>Create the form</div>
+      <div class="step-body">
+        Go to <strong>forms.office.com</strong> → click <em>New Form</em>.<br>
+        Title it: <strong>Cross-Functional Training Survey — [Q2 2025]</strong><br>
+        Click the paint palette to choose your company's theme color.
+        <div class="tip"><strong>Tip</strong>Click the "..." menu → Settings → enable "Record name" to capture the respondent's Microsoft 365 identity automatically (saves asking for name/email).</div>
+      </div>
+    </div>
+
+    <div class="step-block">
+      <div class="step-title"><span class="step-num">2</span>Add questions — same as Google Forms</div>
+      <div class="step-body">
+        Use the same 16 questions listed in the Google Forms tab. In Microsoft Forms the equivalent question types are:
+        <ul style="margin-top:8px">
+          <li><strong>Short answer</strong> → <em>Text</em> (toggle "Long answer" off)</li>
+          <li><strong>Paragraph</strong> → <em>Text</em> (toggle "Long answer" on)</li>
+          <li><strong>Multiple choice</strong> → <em>Choice</em> (set to single select)</li>
+          <li><strong>Checkboxes</strong> → <em>Choice</em> (enable "Multiple answers")</li>
+          <li><strong>Dropdown</strong> → <em>Choice</em> → enable "Drop-down list"</li>
+        </ul>
+        <div class="tip"><strong>Branching</strong>In Microsoft Forms you can add branching: if Q11 = "None — I prefer not to train others", skip to the final comments question. Click the "..." on a question → Add branching.</div>
+      </div>
+    </div>
+
+    <div class="step-block">
+      <div class="step-title"><span class="step-num">3</span>Group into sections</div>
+      <div class="step-body">
+        Click <em>Add new</em> → <em>Section</em> to break the form into three parts matching the HTML survey: <em>About you</em>, <em>Training needs</em>, <em>Training you can offer</em>. This creates a paginated experience like the HTML version.
+      </div>
+    </div>
+
+    <div class="step-block">
+      <div class="step-title"><span class="step-num">4</span>Share & analyze</div>
+      <div class="step-body">
+        <ul>
+          <li>Click <strong>Share</strong> → copy link → send via Outlook or Teams.</li>
+          <li>To restrict to your organization only: under Share settings choose <em>"Only people in my organization can respond."</em></li>
+          <li>To export: go to <strong>Responses</strong> → click <em>Open in Excel</em> for a live-synced spreadsheet.</li>
+          <li>You can also connect responses to a Power Automate flow to notify managers automatically when their team member submits.</li>
+        </ul>
+        <div class="tip"><strong>Power Automate integration</strong>Create a flow: trigger = "When a new response is submitted to Microsoft Forms" → action = send an email to the respondent's manager with a summary of their answers.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CUSTOM DEPARTMENTS -->
+  <div id="tab-custom" class="tab-content">
+    <div class="platform-badge" style="background:#FAEEDA;color:#854F0B">● Customization guide</div>
+
+    <div class="step-block">
+      <div class="step-title"><span class="step-num">1</span>Change company name and branding</div>
+      <div class="step-body">
+        In <code>cross_functional_training_survey.html</code>, find the line:<br>
+        <div class="url-box">&lt;div class="logo"&gt;Your Company&lt;/div&gt;</div>
+        Replace <strong>Your Company</strong> with your actual company name. Change the color <code>#534AB7</code> to your brand primary color throughout the file.
+      </div>
+    </div>
+
+    <div class="step-block">
+      <div class="step-title"><span class="step-num">2</span>Add or remove departments</div>
+      <div class="step-body">
+        Find the two <code>&lt;div class="dept-grid"&gt;</code> sections (one for "learn from", one for "train"). Add items like:
+        <div class="url-box">&lt;div class="dept-item" onclick="toggleDept(this)"&gt;&lt;input type="checkbox"&gt;Your Department&lt;/div&gt;</div>
+        To remove a department, simply delete its <code>&lt;div class="dept-item"&gt;</code> line. Also update the <code>&lt;select id="dept"&gt;</code> dropdown in Step 1 to match.
+      </div>
+    </div>
+
+    <div class="step-block">
+      <div class="step-title"><span class="step-num">3</span>Add a custom question</div>
+      <div class="step-body">
+        Inside any <code>&lt;div class="card"&gt;</code> block, add a new field:
+        <div class="url-box">&lt;div class="field"&gt;<br>&nbsp;&nbsp;&lt;label&gt;Your question here&lt;/label&gt;<br>&nbsp;&nbsp;&lt;input type="text" id="custom1" placeholder="Respondent types here"&gt;<br>&lt;/div&gt;</div>
+        For a dropdown, replace the input with a <code>&lt;select&gt;</code> containing <code>&lt;option&gt;</code> tags.
+      </div>
+    </div>
+
+    <div class="step-block">
+      <div class="step-title"><span class="step-num">4</span>Collect responses (no backend needed)</div>
+      <div class="step-body">
+        The HTML file is static — it doesn't save responses by default. To collect them, choose one of these approaches:
+        <ul style="margin-top:8px">
+          <li><strong>Formspree (free):</strong> Add <code>action="https://formspree.io/f/YOUR_ID"</code> to the form tag and wrap fields in a real <code>&lt;form&gt;</code>. Responses arrive by email.</li>
+          <li><strong>Google Apps Script:</strong> POST the form data to a Google Sheets webhook on submit.</li>
+          <li><strong>SharePoint / intranet embed:</strong> Host the HTML file in SharePoint and embed it as a web part — or simply send the file as an email attachment.</li>
+          <li><strong>Easiest option:</strong> Use the Google Forms or Microsoft Forms version for data collection, and the HTML file purely for embedding on your intranet as a visual reference.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+function switchTab(id, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + id).classList.add('active');
+}
+</script>
+</body>
+</html>

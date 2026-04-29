@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cross-Functional Training Survey</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F5F4F0; color: #1a1a1a; min-height: 100vh; padding: 2rem 1rem; }
+  .page { max-width: 660px; margin: 0 auto; }
+  .header { text-align: center; margin-bottom: 2rem; }
+  .header .logo { display: inline-block; background: #534AB7; color: #fff; font-size: 13px; font-weight: 600; letter-spacing: 0.08em; padding: 5px 14px; border-radius: 20px; margin-bottom: 1rem; text-transform: uppercase; }
+  .header h1 { font-size: 26px; font-weight: 600; color: #1a1a1a; margin-bottom: 8px; }
+  .header p { font-size: 15px; color: #666; line-height: 1.6; }
+  .progress-wrap { margin-bottom: 1.5rem; }
+  .progress-meta { display: flex; justify-content: space-between; font-size: 13px; color: #888; margin-bottom: 6px; }
+  .progress-bar { height: 4px; background: #E0DFF8; border-radius: 4px; }
+  .progress-fill { height: 100%; background: #534AB7; border-radius: 4px; transition: width 0.4s ease; }
+  .card { background: #fff; border: 1px solid #E5E3F5; border-radius: 14px; padding: 1.5rem; margin-bottom: 1rem; }
+  .card-title { font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: #9B98CC; margin-bottom: 1.2rem; }
+  .field { margin-bottom: 1.1rem; }
+  .field:last-child { margin-bottom: 0; }
+  label { display: block; font-size: 14px; font-weight: 500; color: #1a1a1a; margin-bottom: 6px; }
+  label .hint { font-weight: 400; color: #888; font-size: 13px; }
+  input[type="text"], input[type="email"], select, textarea {
+    width: 100%; padding: 10px 12px; font-size: 14px; font-family: inherit;
+    border: 1px solid #D8D6EE; border-radius: 8px; background: #FAFAF8; color: #1a1a1a;
+    outline: none; transition: border-color 0.15s, box-shadow 0.15s;
+  }
+  input:focus, select:focus, textarea:focus { border-color: #534AB7; box-shadow: 0 0 0 3px rgba(83,74,183,0.12); background: #fff; }
+  textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media(max-width: 480px) { .row { grid-template-columns: 1fr; } }
+  .dept-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+  @media(max-width: 480px) { .dept-grid { grid-template-columns: 1fr; } }
+  .dept-item { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border: 1px solid #E5E3F5; border-radius: 8px; cursor: pointer; font-size: 14px; color: #333; transition: all 0.15s; user-select: none; }
+  .dept-item:hover { border-color: #AFA9EC; background: #FAFAF8; }
+  .dept-item.selected { border-color: #534AB7; background: #EEEDFE; color: #3C3489; font-weight: 500; }
+  .dept-item input[type="checkbox"] { width: 15px; height: 15px; flex-shrink: 0; accent-color: #534AB7; pointer-events: none; }
+  .pills { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .pill { padding: 8px 16px; border: 1px solid #E5E3F5; border-radius: 20px; font-size: 13px; cursor: pointer; color: #555; background: #fff; transition: all 0.15s; white-space: nowrap; }
+  .pill:hover { border-color: #AFA9EC; }
+  .pill.selected { border-color: #534AB7; background: #EEEDFE; color: #3C3489; font-weight: 500; }
+  .btn-row { display: flex; justify-content: flex-end; gap: 10px; margin-top: 1.5rem; }
+  .btn-back { padding: 10px 20px; font-size: 14px; font-family: inherit; border: 1px solid #D8D6EE; background: #fff; border-radius: 8px; cursor: pointer; color: #555; transition: background 0.15s; }
+  .btn-back:hover { background: #F5F4F0; }
+  .btn-next { padding: 10px 28px; font-size: 14px; font-family: inherit; font-weight: 600; background: #534AB7; color: #fff; border: none; border-radius: 8px; cursor: pointer; transition: background 0.15s; }
+  .btn-next:hover { background: #3C3489; }
+  .step-hidden { display: none; }
+  .success { text-align: center; padding: 2.5rem 1.5rem; }
+  .success .check { width: 56px; height: 56px; background: #EEEDFE; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 1.2rem; font-size: 22px; }
+  .success h2 { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+  .success p { font-size: 14px; color: #666; line-height: 1.6; }
+  .success .btn-next { margin-top: 1.4rem; display: inline-block; }
+  .required { color: #D85A30; margin-left: 2px; }
+  .error-msg { font-size: 12px; color: #D85A30; margin-top: 4px; display: none; }
+  .error-msg.show { display: block; }
+  input.error, select.error, textarea.error { border-color: #D85A30; }
+  .divider { height: 1px; background: #F0EFF8; margin: 1rem 0; }
+  .custom-field-wrap { border: 1px dashed #D8D6EE; border-radius: 8px; padding: 1rem; margin-top: 8px; }
+  .custom-field-wrap .add-field-btn { font-size: 13px; color: #534AB7; background: none; border: none; cursor: pointer; padding: 4px 0; }
+  .custom-field-wrap .add-field-btn:hover { text-decoration: underline; }
+  .extra-field { display: flex; gap: 8px; margin-top: 8px; }
+  .extra-field input { flex: 1; }
+  .extra-field button { flex-shrink: 0; padding: 8px 12px; font-size: 13px; border: 1px solid #F0CECE; color: #D85A30; background: #fff; border-radius: 8px; cursor: pointer; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <div class="logo">Your Company</div>
+    <h1>Cross-Functional Training Survey</h1>
+    <p>Help us plan smarter training across teams. This takes 3–5 minutes and your responses will shape our next training cycle.</p>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-meta">
+      <span id="step-label">Step 1 of 3 — About you</span>
+      <span id="step-pct">33%</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="prog" style="width:33%"></div></div>
+  </div>
+
+  <!-- STEP 1 -->
+  <div id="step1">
+    <div class="card">
+      <div class="card-title">Your information</div>
+      <div class="row">
+        <div class="field">
+          <label>Full name <span class="required">*</span></label>
+          <input type="text" id="name" placeholder="e.g. Sarah Ahmed">
+          <div class="error-msg" id="err-name">Please enter your name.</div>
+        </div>
+        <div class="field">
+          <label>Job title <span class="required">*</span></label>
+          <input type="text" id="job-title" placeholder="e.g. Senior Analyst">
+          <div class="error-msg" id="err-title">Please enter your job title.</div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Department <span class="required">*</span></label>
+          <select id="dept">
+            <option value="">Select department...</option>
+            <option>Engineering</option>
+            <option>Product</option>
+            <option>Sales</option>
+            <option>Marketing</option>
+            <option>Finance</option>
+            <option>HR</option>
+            <option>Operations</option>
+            <option>Customer Success</option>
+            <option>Legal</option>
+            <option>Design</option>
+            <option>Data & Analytics</option>
+            <option>Supply Chain</option>
+            <option>IT</option>
+            <option>Strategy</option>
+            <option>Other</option>
+          </select>
+          <div class="error-msg" id="err-dept">Please select your department.</div>
+        </div>
+        <div class="field">
+          <label>Role level <span class="required">*</span></label>
+          <select id="role">
+            <option value="">Select role...</option>
+            <option>Employee / Individual Contributor</option>
+            <option>Team Lead</option>
+            <option>Manager</option>
+            <option>Senior Manager / Director</option>
+            <option>VP / Executive</option>
+          </select>
+          <div class="error-msg" id="err-role">Please select your role.</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Work email <span class="required">*</span></label>
+        <input type="email" id="email" placeholder="your@company.com">
+        <div class="error-msg" id="err-email">Please enter a valid email.</div>
+      </div>
+      <div class="field">
+        <label>Manager's name <span class="hint">(optional — for reporting)</span></label>
+        <input type="text" id="manager" placeholder="e.g. James Park">
+      </div>
+    </div>
+    <div class="btn-row"><button class="btn-next" onclick="goStep(2)">Continue →</button></div>
+  </div>
+
+  <!-- STEP 2 -->
+  <div id="step2" class="step-hidden">
+    <div class="card">
+      <div class="card-title">Training you want to receive</div>
+      <div class="field">
+        <label>Which departments would you like to learn from? <span class="hint">(select all that apply)</span></label>
+        <div class="dept-grid" id="learn-grid">
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Engineering</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Product</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Sales</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Marketing</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Finance</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">HR</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Operations</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Customer Success</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Legal</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Design</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Data & Analytics</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Supply Chain</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">IT</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Strategy</div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="field">
+        <label>What specific skills or topics do you want to learn? <span class="hint">(optional)</span></label>
+        <textarea id="learn-topics" placeholder="e.g. data analytics basics, budgeting process, agile methodology, customer journey mapping..."></textarea>
+      </div>
+      <div class="field">
+        <label>How urgent is this training?</label>
+        <div class="pills" id="urgency-pills">
+          <div class="pill" onclick="selectPill(this,'urgency')">Low — nice to have</div>
+          <div class="pill" onclick="selectPill(this,'urgency')">Medium — this quarter</div>
+          <div class="pill" onclick="selectPill(this,'urgency')">High — this month</div>
+          <div class="pill" onclick="selectPill(this,'urgency')">Critical — ASAP</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Preferred training format</label>
+        <div class="pills" id="format-pills">
+          <div class="pill" onclick="selectPill(this,'format')">Workshop / group session</div>
+          <div class="pill" onclick="selectPill(this,'format')">1-on-1 coaching</div>
+          <div class="pill" onclick="selectPill(this,'format')">Job shadowing</div>
+          <div class="pill" onclick="selectPill(this,'format')">Online / self-paced</div>
+          <div class="pill" onclick="selectPill(this,'format')">Lunch & learn</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>How many hours per month can you dedicate to learning?</label>
+        <div class="pills" id="learn-hrs-pills">
+          <div class="pill" onclick="selectPill(this,'learn-hrs')">1–2 hrs</div>
+          <div class="pill" onclick="selectPill(this,'learn-hrs')">3–5 hrs</div>
+          <div class="pill" onclick="selectPill(this,'learn-hrs')">6–10 hrs</div>
+          <div class="pill" onclick="selectPill(this,'learn-hrs')">10+ hrs</div>
+        </div>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-back" onclick="goStep(1)">← Back</button>
+      <button class="btn-next" onclick="goStep(3)">Continue →</button>
+    </div>
+  </div>
+
+  <!-- STEP 3 -->
+  <div id="step3" class="step-hidden">
+    <div class="card">
+      <div class="card-title">Training you can provide</div>
+      <div class="field">
+        <label>Which departments are you willing to train? <span class="hint">(select all that apply)</span></label>
+        <div class="dept-grid" id="teach-grid">
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Engineering</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Product</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Sales</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Marketing</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Finance</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">HR</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Operations</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Customer Success</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Legal</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Design</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Data & Analytics</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Supply Chain</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">IT</div>
+          <div class="dept-item" onclick="toggleDept(this)"><input type="checkbox">Strategy</div>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="field">
+        <label>What topics or skills can you train others on? <span class="required">*</span> <span class="hint">(if you selected departments above)</span></label>
+        <textarea id="teach-topics" placeholder="e.g. SQL and data visualization, campaign planning, financial modeling, onboarding process..."></textarea>
+      </div>
+      <div class="field">
+        <label>Your confidence level as a trainer</label>
+        <div class="pills" id="confidence-pills">
+          <div class="pill" onclick="selectPill(this,'confidence')">Beginner — I can share basics</div>
+          <div class="pill" onclick="selectPill(this,'confidence')">Intermediate — comfortable teaching</div>
+          <div class="pill" onclick="selectPill(this,'confidence')">Expert — deep subject matter knowledge</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Hours per month you can dedicate to training others</label>
+        <div class="pills" id="teach-hrs-pills">
+          <div class="pill" onclick="selectPill(this,'teach-hrs')">1–2 hrs</div>
+          <div class="pill" onclick="selectPill(this,'teach-hrs')">3–5 hrs</div>
+          <div class="pill" onclick="selectPill(this,'teach-hrs')">6–10 hrs</div>
+          <div class="pill" onclick="selectPill(this,'teach-hrs')">10+ hrs</div>
+        </div>
+      </div>
+      <div class="field">
+        <label>Who would you recommend as a trainer in your department? <span class="hint">(optional)</span></label>
+        <input type="text" id="recommend" placeholder="Name(s) and their area of expertise">
+      </div>
+      <div class="divider"></div>
+      <div class="field">
+        <label>Any additional comments, suggestions, or scheduling preferences? <span class="hint">(optional)</span></label>
+        <textarea id="comments" placeholder="e.g. specific pairing preferences, goals for this quarter, team priorities..."></textarea>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn-back" onclick="goStep(2)">← Back</button>
+      <button class="btn-next" onclick="submitForm()">Submit Survey ✓</button>
+    </div>
+  </div>
+
+  <!-- SUCCESS -->
+  <div id="success" class="step-hidden card success">
+    <div class="check">✓</div>
+    <h2>Survey submitted — thank you!</h2>
+    <p>Your responses have been recorded.<br>Your manager and the HR / L&D team will follow up with next steps within 5 business days.</p>
+    <br>
+    <p style="font-size:13px;color:#aaa;">Response ID: <span id="resp-id"></span></p>
+    <button class="btn-next" style="display:inline-block;margin-top:1rem" onclick="resetForm()">Submit another response</button>
+  </div>
+</div>
+
+<script>
+  const steps = ['step1','step2','step3','success'];
+  const selections = {};
+
+  function goStep(n) {
+    if (n === 2 && !validateStep1()) return;
+    steps.forEach((id,i) => {
+      document.getElementById(id).classList.toggle('step-hidden', i !== n-1);
+    });
+    const labels = ['Step 1 of 3 — About you','Step 2 of 3 — Training needs','Step 3 of 3 — Training you can offer'];
+    const pcts = ['33%','66%','100%'];
+    if (n <= 3) {
+      document.getElementById('step-label').textContent = labels[n-1];
+      document.getElementById('step-pct').textContent = pcts[n-1];
+      document.getElementById('prog').style.width = pcts[n-1];
+      document.querySelector('.progress-wrap').style.display = 'block';
+    } else {
+      document.querySelector('.progress-wrap').style.display = 'none';
+    }
+    window.scrollTo({top: 0, behavior: 'smooth'});
+  }
+
+  function validateStep1() {
+    let ok = true;
+    const checks = [
+      ['name','err-name', v => v.trim().length > 0],
+      ['job-title','err-title', v => v.trim().length > 0],
+      ['dept','err-dept', v => v !== ''],
+      ['role','err-role', v => v !== ''],
+      ['email','err-email', v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)],
+    ];
+    checks.forEach(([id, errId, test]) => {
+      const el = document.getElementById(id);
+      const err = document.getElementById(errId);
+      const val = el.value;
+      if (!test(val)) {
+        el.classList.add('error');
+        err.classList.add('show');
+        ok = false;
+      } else {
+        el.classList.remove('error');
+        err.classList.remove('show');
+      }
+    });
+    return ok;
+  }
+
+  function toggleDept(el) {
+    const cb = el.querySelector('input[type="checkbox"]');
+    cb.checked = !cb.checked;
+    el.classList.toggle('selected', cb.checked);
+  }
+
+  function selectPill(el, key) {
+    const container = el.closest('.pills');
+    container.querySelectorAll('.pill').forEach(p => p.classList.remove('selected'));
+    el.classList.add('selected');
+    selections[key] = el.textContent;
+  }
+
+  function submitForm() {
+    document.getElementById('resp-id').textContent = 'TRN-' + Date.now().toString(36).toUpperCase();
+    goStep(4);
+  }
+
+  function resetForm() {
+    document.querySelectorAll('input[type="text"], input[type="email"], textarea').forEach(el => el.value = '');
+    document.querySelectorAll('select').forEach(el => el.selectedIndex = 0);
+    document.querySelectorAll('.dept-item').forEach(el => {
+      el.classList.remove('selected');
+      el.querySelector('input').checked = false;
+    });
+    document.querySelectorAll('.pill').forEach(el => el.classList.remove('selected'));
+    goStep(1);
+  }
+</script>
+</body>
+</html>

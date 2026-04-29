@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Training Dashboard — Manager View</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #F5F4F0; color: #1a1a1a; min-height: 100vh; }
+  .topbar { background: #fff; border-bottom: 1px solid #E5E3F5; padding: 0 2rem; display: flex; align-items: center; gap: 1rem; height: 56px; }
+  .topbar .logo { background: #534AB7; color: #fff; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; padding: 4px 12px; border-radius: 20px; text-transform: uppercase; }
+  .topbar h1 { font-size: 15px; font-weight: 600; color: #1a1a1a; }
+  .topbar .badge { background: #EEEDFE; color: #534AB7; font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+  .topbar .spacer { flex: 1; }
+  .topbar .export-btn { font-size: 13px; padding: 7px 16px; border: 1px solid #D8D6EE; border-radius: 8px; background: #fff; cursor: pointer; color: #534AB7; font-weight: 500; }
+  .main { padding: 1.5rem 2rem; max-width: 1200px; margin: 0 auto; }
+  .metrics { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 1.5rem; }
+  .metric { background: #fff; border: 1px solid #E5E3F5; border-radius: 12px; padding: 1rem 1.2rem; }
+  .metric .label { font-size: 12px; color: #888; margin-bottom: 6px; }
+  .metric .val { font-size: 26px; font-weight: 600; color: #1a1a1a; }
+  .metric .sub { font-size: 12px; color: #aaa; margin-top: 2px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem; }
+  .card { background: #fff; border: 1px solid #E5E3F5; border-radius: 14px; padding: 1.25rem; }
+  .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
+  .card-title { font-size: 14px; font-weight: 600; color: #1a1a1a; }
+  .card-sub { font-size: 12px; color: #aaa; }
+  .filter-row { display: flex; gap: 8px; margin-bottom: 1rem; flex-wrap: wrap; }
+  .filter-pill { padding: 6px 14px; border: 1px solid #E5E3F5; border-radius: 20px; font-size: 13px; cursor: pointer; color: #555; background: #fff; transition: all 0.15s; }
+  .filter-pill:hover { border-color: #AFA9EC; }
+  .filter-pill.active { border-color: #534AB7; background: #EEEDFE; color: #3C3489; font-weight: 500; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #aaa; padding: 8px 10px; border-bottom: 1px solid #F0EFF8; }
+  td { padding: 10px 10px; border-bottom: 1px solid #F7F6FE; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: #FAFAF8; }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .person-cell { display: flex; align-items: center; gap: 8px; }
+  .person-name { font-weight: 500; font-size: 13px; }
+  .person-role { font-size: 11px; color: #aaa; }
+  .dept-tag { display: inline-block; font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; }
+  .tag-eng { background: #E6F1FB; color: #185FA5; }
+  .tag-prod { background: #EEEDFE; color: #534AB7; }
+  .tag-sales { background: #E1F5EE; color: #0F6E56; }
+  .tag-mkt { background: #FAEEDA; color: #854F0B; }
+  .tag-fin { background: #EAF3DE; color: #3B6D11; }
+  .tag-hr { background: #FBEAF0; color: #993556; }
+  .tag-ops { background: #F1EFE8; color: #5F5E5A; }
+  .tag-cs { background: #E1F5EE; color: #085041; }
+  .tag-des { background: #FAECE7; color: #993C1D; }
+  .tag-data { background: #EEEDFE; color: #3C3489; }
+  .urgency-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+  .urg-low { background: #639922; }
+  .urg-med { background: #BA7517; }
+  .urg-high { background: #D85A30; }
+  .urg-crit { background: #E24B4A; }
+  .match-score { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 20px; }
+  .match-high { background: #E1F5EE; color: #0F6E56; }
+  .match-med { background: #FAEEDA; color: #854F0B; }
+  .match-low { background: #F1EFE8; color: #5F5E5A; }
+  .heat-wrap { overflow-x: auto; }
+  .heat-table { border-collapse: collapse; font-size: 12px; min-width: 560px; }
+  .heat-table th { font-size: 11px; font-weight: 600; color: #888; padding: 6px 10px; text-align: center; }
+  .heat-table .row-label { text-align: left; font-weight: 500; color: #555; padding: 6px 12px; white-space: nowrap; }
+  .heat-cell { width: 46px; height: 36px; text-align: center; font-size: 12px; font-weight: 600; border-radius: 6px; }
+  .h0 { background: #F5F4F0; color: #ccc; }
+  .h1 { background: #D3D1C7; color: #5F5E5A; }
+  .h2 { background: #AFA9EC; color: #3C3489; }
+  .h3 { background: #7F77DD; color: #fff; }
+  .h4 { background: #534AB7; color: #fff; }
+  .legend { display: flex; align-items: center; gap: 12px; font-size: 12px; color: #888; margin-top: 10px; }
+  .legend-swatch { width: 14px; height: 14px; border-radius: 3px; display: inline-block; }
+  .action-btn { font-size: 12px; padding: 5px 12px; border: 1px solid #E5E3F5; border-radius: 6px; background: #fff; cursor: pointer; color: #534AB7; font-weight: 500; }
+  .action-btn:hover { background: #EEEDFE; border-color: #AFA9EC; }
+  @media(max-width: 700px) { .metrics { grid-template-columns: 1fr 1fr; } .grid2 { grid-template-columns: 1fr; } .topbar { padding: 0 1rem; } .main { padding: 1rem; } }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">Dashboard</div>
+  <h1>Cross-Functional Training</h1>
+  <div class="badge">Manager View</div>
+  <div class="spacer"></div>
+  <select style="font-size:13px;padding:6px 10px;border:1px solid #D8D6EE;border-radius:8px;background:#fff;color:#555;cursor:pointer;">
+    <option>Q2 2025 Cycle</option>
+    <option>Q1 2025 Cycle</option>
+    <option>Q4 2024 Cycle</option>
+  </select>
+  <button class="export-btn" onclick="alert('Export feature: connect to your data backend to enable CSV/PDF export.')">↓ Export</button>
+</div>
+
+<div class="main">
+
+  <!-- Metrics -->
+  <div class="metrics">
+    <div class="metric"><div class="label">Responses received</div><div class="val">47</div><div class="sub">of 62 sent</div></div>
+    <div class="metric"><div class="label">Training matches found</div><div class="val">31</div><div class="sub">trainer ↔ learner pairs</div></div>
+    <div class="metric"><div class="label">Critical urgency requests</div><div class="val">8</div><div class="sub">need immediate action</div></div>
+    <div class="metric"><div class="label">Depts with trainers available</div><div class="val">9</div><div class="sub">out of 10 departments</div></div>
+  </div>
+
+  <!-- Filters -->
+  <div class="filter-row" id="dept-filters">
+    <span style="font-size:13px;color:#aaa;line-height:2;margin-right:4px;">Filter:</span>
+    <div class="filter-pill active" onclick="filterDept(this,'all')">All departments</div>
+    <div class="filter-pill" onclick="filterDept(this,'Engineering')">Engineering</div>
+    <div class="filter-pill" onclick="filterDept(this,'Product')">Product</div>
+    <div class="filter-pill" onclick="filterDept(this,'Sales')">Sales</div>
+    <div class="filter-pill" onclick="filterDept(this,'Marketing')">Marketing</div>
+    <div class="filter-pill" onclick="filterDept(this,'Finance')">Finance</div>
+    <div class="filter-pill" onclick="filterDept(this,'HR')">HR</div>
+    <div class="filter-pill" onclick="filterDept(this,'Operations')">Operations</div>
+  </div>
+
+  <!-- Heat map + matches -->
+  <div class="grid2">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Training demand heatmap</div>
+          <div class="card-sub">Rows = who wants to learn · Columns = from which dept</div>
+        </div>
+      </div>
+      <div class="heat-wrap">
+        <table class="heat-table">
+          <thead>
+            <tr>
+              <th style="text-align:left">Wants to learn ↓ / From →</th>
+              <th>Eng</th><th>Prod</th><th>Sales</th><th>Mkt</th><th>Fin</th><th>HR</th><th>Ops</th><th>Des</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td class="row-label">Engineering</td><td class="heat-cell h0">—</td><td class="heat-cell h3">6</td><td class="heat-cell h1">2</td><td class="heat-cell h2">4</td><td class="heat-cell h1">1</td><td class="heat-cell h0">0</td><td class="heat-cell h1">2</td><td class="heat-cell h2">3</td></tr>
+            <tr><td class="row-label">Product</td><td class="heat-cell h4">8</td><td class="heat-cell h0">—</td><td class="heat-cell h3">5</td><td class="heat-cell h2">4</td><td class="heat-cell h1">2</td><td class="heat-cell h1">1</td><td class="heat-cell h1">2</td><td class="heat-cell h3">6</td></tr>
+            <tr><td class="row-label">Sales</td><td class="heat-cell h2">3</td><td class="heat-cell h3">5</td><td class="heat-cell h0">—</td><td class="heat-cell h4">7</td><td class="heat-cell h2">4</td><td class="heat-cell h1">2</td><td class="heat-cell h1">1</td><td class="heat-cell h0">0</td></tr>
+            <tr><td class="row-label">Marketing</td><td class="heat-cell h2">4</td><td class="heat-cell h2">4</td><td class="heat-cell h3">6</td><td class="heat-cell h0">—</td><td class="heat-cell h1">2</td><td class="heat-cell h0">1</td><td class="heat-cell h0">0</td><td class="heat-cell h3">5</td></tr>
+            <tr><td class="row-label">Finance</td><td class="heat-cell h1">1</td><td class="heat-cell h2">3</td><td class="heat-cell h2">4</td><td class="heat-cell h1">2</td><td class="heat-cell h0">—</td><td class="heat-cell h2">3</td><td class="heat-cell h3">5</td><td class="heat-cell h0">0</td></tr>
+            <tr><td class="row-label">Operations</td><td class="heat-cell h3">5</td><td class="heat-cell h2">3</td><td class="heat-cell h1">2</td><td class="heat-cell h1">1</td><td class="heat-cell h3">6</td><td class="heat-cell h1">2</td><td class="heat-cell h0">—</td><td class="heat-cell h0">1</td></tr>
+          </tbody>
+        </table>
+        <div class="legend">
+          <span>Demand:</span>
+          <span><span class="legend-swatch" style="background:#F5F4F0;border:1px solid #ddd"></span> 0</span>
+          <span><span class="legend-swatch" style="background:#D3D1C7"></span> 1–2</span>
+          <span><span class="legend-swatch" style="background:#AFA9EC"></span> 3–4</span>
+          <span><span class="legend-swatch" style="background:#7F77DD"></span> 5–6</span>
+          <span><span class="legend-swatch" style="background:#534AB7"></span> 7+</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Top training matches</div>
+        <div class="card-sub">Best trainer–learner pairs</div>
+      </div>
+      <table>
+        <thead><tr><th>Trainer</th><th>Learner dept</th><th>Topic</th><th>Fit</th><th></th></tr></thead>
+        <tbody id="matches-table">
+          <tr>
+            <td><div class="person-cell"><div class="avatar" style="background:#E6F1FB;color:#185FA5">AK</div><div><div class="person-name">Ali Karimov</div><div class="person-role">Engineering</div></div></div></td>
+            <td><span class="dept-tag tag-prod">Product</span></td>
+            <td>API basics</td>
+            <td><span class="match-score match-high">★ High</span></td>
+            <td><button class="action-btn">Pair</button></td>
+          </tr>
+          <tr>
+            <td><div class="person-cell"><div class="avatar" style="background:#FAEEDA;color:#854F0B">SC</div><div><div class="person-name">Sara Chen</div><div class="person-role">Finance</div></div></div></td>
+            <td><span class="dept-tag tag-ops">Operations</span></td>
+            <td>Budgeting & forecasting</td>
+            <td><span class="match-score match-high">★ High</span></td>
+            <td><button class="action-btn">Pair</button></td>
+          </tr>
+          <tr>
+            <td><div class="person-cell"><div class="avatar" style="background:#E1F5EE;color:#0F6E56">MP</div><div><div class="person-name">Maria Patel</div><div class="person-role">Marketing</div></div></div></td>
+            <td><span class="dept-tag tag-sales">Sales</span></td>
+            <td>Campaign strategy</td>
+            <td><span class="match-score match-high">★ High</span></td>
+            <td><button class="action-btn">Pair</button></td>
+          </tr>
+          <tr>
+            <td><div class="person-cell"><div class="avatar" style="background:#EEEDFE;color:#534AB7">JN</div><div><div class="person-name">James Nguyen</div><div class="person-role">Product</div></div></div></td>
+            <td><span class="dept-tag tag-eng">Engineering</span></td>
+            <td>Roadmap & prioritization</td>
+            <td><span class="match-score match-med">◆ Medium</span></td>
+            <td><button class="action-btn">Pair</button></td>
+          </tr>
+          <tr>
+            <td><div class="person-cell"><div class="avatar" style="background:#FBEAF0;color:#993556">LR</div><div><div class="person-name">Layla Rashid</div><div class="person-role">HR</div></div></div></td>
+            <td><span class="dept-tag tag-fin">Finance</span></td>
+            <td>Compensation structure</td>
+            <td><span class="match-score match-med">◆ Medium</span></td>
+            <td><button class="action-btn">Pair</button></td>
+          </tr>
+          <tr>
+            <td><div class="person-cell"><div class="avatar" style="background:#FAECE7;color:#993C1D">DW</div><div><div class="person-name">David Wu</div><div class="person-role">Design</div></div></div></td>
+            <td><span class="dept-tag tag-mkt">Marketing</span></td>
+            <td>Brand & visual design</td>
+            <td><span class="match-score match-med">◆ Medium</span></td>
+            <td><button class="action-btn">Pair</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Requests table -->
+  <div class="card" style="margin-bottom:1rem">
+    <div class="card-header">
+      <div>
+        <div class="card-title">All training requests</div>
+        <div class="card-sub">Sorted by urgency — click a row to view full response</div>
+      </div>
+      <input type="text" placeholder="Search by name or department..." style="width:220px;font-size:13px;padding:7px 12px;border:1px solid #D8D6EE;border-radius:8px" oninput="filterTable(this.value)">
+    </div>
+    <table id="requests-table">
+      <thead>
+        <tr>
+          <th>Employee</th>
+          <th>Department</th>
+          <th>Wants to learn from</th>
+          <th>Can train</th>
+          <th>Urgency</th>
+          <th>Format</th>
+          <th>Hrs/mo</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr data-dept="Engineering">
+          <td><div class="person-cell"><div class="avatar" style="background:#E6F1FB;color:#185FA5">AK</div><div><div class="person-name">Ali Karimov</div><div class="person-role">Sr. Engineer</div></div></div></td>
+          <td><span class="dept-tag tag-eng">Engineering</span></td>
+          <td>Product, Marketing</td>
+          <td>Sales, HR, Ops</td>
+          <td><span class="urgency-dot urg-crit"></span>Critical</td>
+          <td>1-on-1</td>
+          <td>3–5</td>
+          <td><span class="match-score match-high" style="font-size:11px">Matched</span></td>
+        </tr>
+        <tr data-dept="Finance">
+          <td><div class="person-cell"><div class="avatar" style="background:#FAEEDA;color:#854F0B">SC</div><div><div class="person-name">Sara Chen</div><div class="person-role">Finance Manager</div></div></div></td>
+          <td><span class="dept-tag tag-fin">Finance</span></td>
+          <td>Operations, Sales</td>
+          <td>Engineering, Product</td>
+          <td><span class="urgency-dot urg-crit"></span>Critical</td>
+          <td>Workshop</td>
+          <td>6–10</td>
+          <td><span class="match-score match-high" style="font-size:11px">Matched</span></td>
+        </tr>
+        <tr data-dept="Marketing">
+          <td><div class="person-cell"><div class="avatar" style="background:#E1F5EE;color:#0F6E56">MP</div><div><div class="person-name">Maria Patel</div><div class="person-role">Mkt Lead</div></div></div></td>
+          <td><span class="dept-tag tag-mkt">Marketing</span></td>
+          <td>Sales, Engineering</td>
+          <td>HR, Finance</td>
+          <td><span class="urgency-dot urg-high"></span>High</td>
+          <td>Group session</td>
+          <td>3–5</td>
+          <td><span class="match-score match-high" style="font-size:11px">Matched</span></td>
+        </tr>
+        <tr data-dept="Product">
+          <td><div class="person-cell"><div class="avatar" style="background:#EEEDFE;color:#534AB7">JN</div><div><div class="person-name">James Nguyen</div><div class="person-role">Product Manager</div></div></div></td>
+          <td><span class="dept-tag tag-prod">Product</span></td>
+          <td>Engineering, Design</td>
+          <td>Marketing, Sales</td>
+          <td><span class="urgency-dot urg-high"></span>High</td>
+          <td>1-on-1</td>
+          <td>1–2</td>
+          <td><span class="match-score match-med" style="font-size:11px">Pending</span></td>
+        </tr>
+        <tr data-dept="HR">
+          <td><div class="person-cell"><div class="avatar" style="background:#FBEAF0;color:#993556">LR</div><div><div class="person-name">Layla Rashid</div><div class="person-role">HR Specialist</div></div></div></td>
+          <td><span class="dept-tag tag-hr">HR</span></td>
+          <td>Finance, Legal</td>
+          <td>Operations</td>
+          <td><span class="urgency-dot urg-high"></span>High</td>
+          <td>Self-paced</td>
+          <td>3–5</td>
+          <td><span class="match-score match-med" style="font-size:11px">Pending</span></td>
+        </tr>
+        <tr data-dept="Design">
+          <td><div class="person-cell"><div class="avatar" style="background:#FAECE7;color:#993C1D">DW</div><div><div class="person-name">David Wu</div><div class="person-role">Senior Designer</div></div></div></td>
+          <td><span class="dept-tag tag-des">Design</span></td>
+          <td>Marketing, Product</td>
+          <td>Engineering, HR</td>
+          <td><span class="urgency-dot urg-med"></span>Medium</td>
+          <td>Lunch & learn</td>
+          <td>1–2</td>
+          <td><span class="match-score match-med" style="font-size:11px">Pending</span></td>
+        </tr>
+        <tr data-dept="Sales">
+          <td><div class="person-cell"><div class="avatar" style="background:#E1F5EE;color:#085041">RB</div><div><div class="person-name">Rania Bashir</div><div class="person-role">Account Executive</div></div></div></td>
+          <td><span class="dept-tag tag-sales">Sales</span></td>
+          <td>Finance, Marketing</td>
+          <td>Customer Success</td>
+          <td><span class="urgency-dot urg-med"></span>Medium</td>
+          <td>Workshop</td>
+          <td>3–5</td>
+          <td><span class="match-score match-low" style="font-size:11px;background:#F1EFE8;color:#5F5E5A">Unmatched</span></td>
+        </tr>
+        <tr data-dept="Operations">
+          <td><div class="person-cell"><div class="avatar" style="background:#F1EFE8;color:#5F5E5A">TM</div><div><div class="person-name">Tom Mills</div><div class="person-role">Ops Analyst</div></div></div></td>
+          <td><span class="dept-tag tag-ops">Operations</span></td>
+          <td>Finance, Engineering</td>
+          <td>Supply Chain</td>
+          <td><span class="urgency-dot urg-low"></span>Low</td>
+          <td>Self-paced</td>
+          <td>1–2</td>
+          <td><span class="match-score match-low" style="font-size:11px;background:#F1EFE8;color:#5F5E5A">Unmatched</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+function filterDept(el, dept) {
+  document.querySelectorAll('.filter-pill').forEach(p => p.classList.remove('active'));
+  el.classList.add('active');
+  document.querySelectorAll('#requests-table tbody tr').forEach(row => {
+    row.style.display = (dept === 'all' || row.dataset.dept === dept) ? '' : 'none';
+  });
+}
+
+function filterTable(val) {
+  const q = val.toLowerCase();
+  document.querySelectorAll('#requests-table tbody tr').forEach(row => {
+    row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+</script>
+</body>
+</html>
