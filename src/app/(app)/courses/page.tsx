@@ -35,7 +35,7 @@ export default async function CoursesPage() {
     <>
       <PageHeader
         title="Courses"
-        description="Nammy.me course directory and how they map to gap codes."
+        description="Course directory and how they map to gap codes."
       />
 
       <Card className="mb-6">

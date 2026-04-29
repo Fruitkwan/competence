@@ -48,7 +48,7 @@ export function AppNav({ role }: { role: string }) {
         <GraduationCap className="h-6 w-6 text-primary" />
         <div className="leading-tight">
           <div className="text-sm font-semibold">Dhofar Global</div>
-          <div className="text-[11px] text-muted-foreground">Training Matrix</div>
+          <div className="text-[11px] text-muted-foreground">Performance Hub</div>
         </div>
       </div>
       {NAV.map((item) => {

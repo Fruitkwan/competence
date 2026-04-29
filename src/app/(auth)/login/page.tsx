@@ -64,7 +64,7 @@ function LoginInner() {
           <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground">
             <GraduationCap className="h-6 w-6" />
           </div>
-          <CardTitle>Dhofar Global — Training Matrix</CardTitle>
+          <CardTitle>Dhofar Global — Competence Hub</CardTitle>
           <CardDescription>
             {mode === "signup"
               ? "Create your account"
