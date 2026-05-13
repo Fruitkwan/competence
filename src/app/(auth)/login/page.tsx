@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
-import { GraduationCap, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
+import Image from "next/image";
 
 export default function LoginPage() {
   return (
@@ -61,16 +62,16 @@ function LoginInner() {
     <div className="min-h-screen flex items-center justify-center p-6 bg-muted/30">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            <GraduationCap className="h-6 w-6" />
+          <div className="mx-auto mb-2 flex h-14 w-14 items-center justify-center">
+            <Image src="/logo.jpg" alt="Dhofar Global" width={48} height={48} priority />
           </div>
-          <CardTitle>Dhofar Global — Competence Hub</CardTitle>
+          <CardTitle>Dhofar Global — Performance Hub</CardTitle>
           <CardDescription>
             {mode === "signup"
               ? "Create your account"
               : mode === "magic"
-              ? "Passwordless sign-in"
-              : "Sign in to continue"}
+                ? "Passwordless sign-in"
+                : "Sign in to continue"}
           </CardDescription>
         </CardHeader>
         <CardContent>

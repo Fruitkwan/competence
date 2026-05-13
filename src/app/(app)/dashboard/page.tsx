@@ -19,15 +19,35 @@ type AppraisalFullRow = {
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const { data: rows } = await supabase
+
+  // Determine logged-in user's role and employee_id
+  const { data: { user } } = await supabase.auth.getUser();
+  let role = "employee";
+  let employeeId: string | null = null;
+  let userName = "";
+  if (user) {
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, employee_id, full_name")
+      .eq("id", user.id)
+      .single();
+    role = profile?.role ?? "employee";
+    employeeId = profile?.employee_id ?? null;
+    userName = profile?.full_name ?? "";
+  }
+
+  const isEmployee = role === "employee";
+
+  // Fetch appraisals — employees only see their own
+  let query = supabase
     .from("appraisal_full")
     .select("id,employee_id,priority,gap,current_avg,cluster,country_code,status,overdue");
+  if (isEmployee && employeeId) {
+    query = query.eq("employee_id", employeeId);
+  }
+  const { data: rows } = await query;
 
   const all = (rows ?? []) as AppraisalFullRow[];
-  // Latest per employee only — the view returns all appraisals; Dashboard
-  // in Excel considers each employee once. Dedupe by employee_id, keeping rows
-  // with the most recent created_at (not fetched here; picking last is fine as
-  // Supabase orders by pk insertion; accept all for aggregates).
   const byEmp = new Map<string, AppraisalFullRow>();
   for (const r of all) byEmp.set(r.employee_id, r);
   const latest = Array.from(byEmp.values());
@@ -89,8 +109,12 @@ export default async function DashboardPage() {
   return (
     <>
       <PageHeader
-        title="Dashboard"
-        description="Live view of gaps, priorities, and training progress."
+        title={isEmployee ? `My Dashboard` : "Dashboard"}
+        description={
+          isEmployee
+            ? `Personal competency overview for ${userName || "you"}.`
+            : "Live view of gaps, priorities, and training progress."
+        }
       />
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-5">

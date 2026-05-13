@@ -176,6 +176,12 @@ export type Database = {
           full_name: string | null;
           role: "admin" | "manager" | "employee" | "executive";
           employee_id: string | null;
+          manager_id: string | null;
+          department_id: string | null;
+          job_title: string | null;
+          country_code: string | null;
+          cluster: string | null;
+          is_active: boolean;
           created_at: string;
           updated_at: string;
         };
@@ -185,6 +191,12 @@ export type Database = {
           full_name?: string | null;
           role?: "admin" | "manager" | "employee" | "executive";
           employee_id?: string | null;
+          manager_id?: string | null;
+          department_id?: string | null;
+          job_title?: string | null;
+          country_code?: string | null;
+          cluster?: string | null;
+          is_active?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
         Relationships: [];
@@ -203,6 +215,189 @@ export type Database = {
         };
         Insert: never;
         Update: never;
+        Relationships: [];
+      };
+      employee_courses: {
+        Row: {
+          id: string;
+          employee_id: string;
+          course_id: string;
+          status: "Enrolled" | "In Progress" | "Completed" | "Dropped";
+          enrolled_at: string;
+          started_at: string | null;
+          completed_at: string | null;
+          score: number | null;
+          certificate_url: string | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          employee_id: string;
+          course_id: string;
+          status?: "Enrolled" | "In Progress" | "Completed" | "Dropped";
+          enrolled_at?: string;
+          started_at?: string | null;
+          completed_at?: string | null;
+          score?: number | null;
+          certificate_url?: string | null;
+          notes?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["employee_courses"]["Insert"]>;
+        Relationships: [];
+      };
+      departments: {
+        Row: {
+          id: string;
+          name: string;
+          parent_id: string | null;
+          head_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          parent_id?: string | null;
+          head_id?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["departments"]["Insert"]>;
+        Relationships: [];
+      };
+      appraisal_cycles: {
+        Row: {
+          id: string;
+          name: string;
+          type: "annual" | "bi_annual" | "quarterly" | "probation";
+          start_date: string;
+          end_date: string;
+          objective_deadline: string | null;
+          self_assessment_deadline: string | null;
+          manager_assessment_deadline: string | null;
+          calibration_deadline: string | null;
+          status: "draft" | "objective_setting" | "assessment" | "calibration" | "review" | "closed";
+          scoring_rubric: Record<string, number>;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          type?: "annual" | "bi_annual" | "quarterly" | "probation";
+          start_date: string;
+          end_date: string;
+          objective_deadline?: string | null;
+          self_assessment_deadline?: string | null;
+          manager_assessment_deadline?: string | null;
+          calibration_deadline?: string | null;
+          status?: "draft" | "objective_setting" | "assessment" | "calibration" | "review" | "closed";
+          scoring_rubric?: Record<string, number>;
+          created_by?: string | null;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["appraisal_cycles"]["Insert"]>;
+        Relationships: [];
+      };
+      org_kpis: {
+        Row: {
+          id: string;
+          cycle_id: string;
+          title: string;
+          description: string | null;
+          level: "organization" | "department" | "team";
+          department_id: string | null;
+          weight: number;
+          target_value: string | null;
+          created_by: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          cycle_id: string;
+          title: string;
+          description?: string | null;
+          level: "organization" | "department" | "team";
+          department_id?: string | null;
+          weight?: number;
+          target_value?: string | null;
+          created_by?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["org_kpis"]["Insert"]>;
+        Relationships: [];
+      };
+      cycle_objectives: {
+        Row: {
+          id: string;
+          cycle_id: string;
+          employee_id: string;
+          kpi_id: string | null;
+          title: string;
+          description: string | null;
+          success_criteria: string | null;
+          weight: number;
+          status: "draft" | "submitted" | "revision_requested" | "approved" | "rejected";
+          approved_by: string | null;
+          approved_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          cycle_id: string;
+          employee_id: string;
+          kpi_id?: string | null;
+          title: string;
+          description?: string | null;
+          success_criteria?: string | null;
+          weight?: number;
+          status?: "draft" | "submitted" | "revision_requested" | "approved" | "rejected";
+          approved_by?: string | null;
+          approved_at?: string | null;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["cycle_objectives"]["Insert"]>;
+        Relationships: [];
+      };
+      objective_comments: {
+        Row: {
+          id: string;
+          objective_id: string;
+          author_id: string;
+          body: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          objective_id: string;
+          author_id: string;
+          body: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["objective_comments"]["Insert"]>;
+        Relationships: [];
+      };
+      notifications: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: string;
+          title: string;
+          body: string | null;
+          link: string | null;
+          read: boolean;
+          metadata: Record<string, unknown>;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type: string;
+          title: string;
+          body?: string | null;
+          link?: string | null;
+          read?: boolean;
+          metadata?: Record<string, unknown>;
+        };
+        Update: Partial<Database["public"]["Tables"]["notifications"]["Insert"]>;
         Relationships: [];
       };
     };

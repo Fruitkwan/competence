@@ -12,6 +12,13 @@ const DEMO_EMPLOYEES = [
 
 export default async function NewPerformanceAppraisalPage() {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user?.id)
+    .single();
+
   const { data: employees } = await supabase
     .from("employees")
     .select("employee_id, full_name, job_title")
@@ -25,7 +32,11 @@ export default async function NewPerformanceAppraisalPage() {
         title="New Performance Appraisal"
         description="Complete the Dhofar Global two-way performance appraisal (N1 & N2)."
       />
-      <PerformanceAppraisalFormWizard employees={empList} />
+      <PerformanceAppraisalFormWizard 
+        employees={empList} 
+        currentUserRole={profile?.role || "employee"}
+        currentUserId={user?.id || ""}
+      />
     </>
   );
 }

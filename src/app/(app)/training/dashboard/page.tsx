@@ -22,12 +22,12 @@ const METRICS = [
 ];
 
 const FILTER_DEPTS = [
-  "All departments", "Engineering", "Product", "Sales",
+  "All departments", "IT", "Product", "Sales",
   "Marketing", "Finance", "HR", "Operations",
 ];
 
 /* --- Heatmap data --- */
-const HEAT_DEPTS = ["Engineering", "Product", "Sales", "Marketing", "Finance", "Operations"];
+const HEAT_DEPTS = ["IT", "Product", "Sales", "Marketing", "Finance", "Operations"];
 const HEAT_ROWS = [
   [null, 6, 2, 4, 1, 2],
   [8, null, 5, 4, 2, 2],
@@ -39,10 +39,10 @@ const HEAT_ROWS = [
 
 /* --- Matches data --- */
 const MATCHES = [
-  { initials: "AK", name: "Ali Karimov", deptFrom: "Engineering", learnDept: "Product", topic: "API basics", fit: "High", avatarBg: "bg-blue-100 text-blue-700" },
+  { initials: "AK", name: "Ali Karimov", deptFrom: "IT", learnDept: "Product", topic: "API basics", fit: "High", avatarBg: "bg-blue-100 text-blue-700" },
   { initials: "SC", name: "Sara Chen", deptFrom: "Finance", learnDept: "Operations", topic: "Budgeting & forecasting", fit: "High", avatarBg: "bg-amber-100 text-amber-700" },
   { initials: "MP", name: "Maria Patel", deptFrom: "Marketing", learnDept: "Sales", topic: "Campaign strategy", fit: "High", avatarBg: "bg-emerald-100 text-emerald-700" },
-  { initials: "JN", name: "James Nguyen", deptFrom: "Product", learnDept: "Engineering", topic: "Roadmap & prioritization", fit: "Medium", avatarBg: "bg-violet-100 text-violet-700" },
+  { initials: "JN", name: "James Nguyen", deptFrom: "Product", learnDept: "IT", topic: "Roadmap & prioritization", fit: "Medium", avatarBg: "bg-violet-100 text-violet-700" },
   { initials: "LR", name: "Layla Rashid", deptFrom: "HR", learnDept: "Finance", topic: "Compensation structure", fit: "Medium", avatarBg: "bg-pink-100 text-pink-700" },
   { initials: "DW", name: "David Wu", deptFrom: "Design", learnDept: "Marketing", topic: "Brand & visual design", fit: "Medium", avatarBg: "bg-orange-100 text-orange-700" },
 ];
@@ -79,18 +79,18 @@ interface RequestRow {
 }
 
 const REQUESTS: RequestRow[] = [
-  { initials: "AK", name: "Ali Karimov", role: "Sr. Engineer", dept: "Engineering", learnFrom: "Product, Marketing", canTrain: "Sales, HR, Ops", urgency: "Critical", format: "1-on-1", hrs: "3–5", status: "Matched", avatarBg: "bg-blue-100 text-blue-700" },
+  { initials: "AK", name: "Ali Karimov", role: "Sr. Engineer", dept: "IT", learnFrom: "Product, Marketing", canTrain: "Sales, HR, Ops", urgency: "Critical", format: "1-on-1", hrs: "3–5", status: "Matched", avatarBg: "bg-blue-100 text-blue-700" },
   { initials: "SC", name: "Sara Chen", role: "Finance Manager", dept: "Finance", learnFrom: "Operations, Sales", canTrain: "Engineering, Product", urgency: "Critical", format: "Workshop", hrs: "6–10", status: "Matched", avatarBg: "bg-amber-100 text-amber-700" },
-  { initials: "MP", name: "Maria Patel", role: "Mkt Lead", dept: "Marketing", learnFrom: "Sales, Engineering", canTrain: "HR, Finance", urgency: "High", format: "Group session", hrs: "3–5", status: "Matched", avatarBg: "bg-emerald-100 text-emerald-700" },
-  { initials: "JN", name: "James Nguyen", role: "Product Manager", dept: "Product", learnFrom: "Engineering, Design", canTrain: "Marketing, Sales", urgency: "High", format: "1-on-1", hrs: "1–2", status: "Pending", avatarBg: "bg-violet-100 text-violet-700" },
+  { initials: "MP", name: "Maria Patel", role: "Mkt Lead", dept: "Marketing", learnFrom: "Sales, IT", canTrain: "HR, Finance", urgency: "High", format: "Group session", hrs: "3–5", status: "Matched", avatarBg: "bg-emerald-100 text-emerald-700" },
+  { initials: "JN", name: "James Nguyen", role: "Product Manager", dept: "Product", learnFrom: "IT, Design", canTrain: "Marketing, Sales", urgency: "High", format: "1-on-1", hrs: "1–2", status: "Pending", avatarBg: "bg-violet-100 text-violet-700" },
   { initials: "LR", name: "Layla Rashid", role: "HR Specialist", dept: "HR", learnFrom: "Finance, Legal", canTrain: "Operations", urgency: "High", format: "Self-paced", hrs: "3–5", status: "Pending", avatarBg: "bg-pink-100 text-pink-700" },
   { initials: "DW", name: "David Wu", role: "Senior Designer", dept: "Design", learnFrom: "Marketing, Product", canTrain: "Engineering, HR", urgency: "Medium", format: "Lunch & learn", hrs: "1–2", status: "Pending", avatarBg: "bg-orange-100 text-orange-700" },
   { initials: "RB", name: "Rania Bashir", role: "Account Executive", dept: "Sales", learnFrom: "Finance, Marketing", canTrain: "Customer Success", urgency: "Medium", format: "Workshop", hrs: "3–5", status: "Unmatched", avatarBg: "bg-emerald-100 text-emerald-700" },
-  { initials: "TM", name: "Tom Mills", role: "Ops Analyst", dept: "Operations", learnFrom: "Finance, Engineering", canTrain: "Supply Chain", urgency: "Low", format: "Self-paced", hrs: "1–2", status: "Unmatched", avatarBg: "bg-muted text-muted-foreground" },
+  { initials: "TM", name: "Tom Mills", role: "Ops Analyst", dept: "Operations", learnFrom: "Finance, IT", canTrain: "Supply Chain", urgency: "Low", format: "Self-paced", hrs: "1–2", status: "Unmatched", avatarBg: "bg-muted text-muted-foreground" },
 ];
 
 const DEPT_TAG: Record<string, string> = {
-  Engineering: "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400",
+  IT: "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400",
   Product: "bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-400",
   Sales: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400",
   Marketing: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400",
