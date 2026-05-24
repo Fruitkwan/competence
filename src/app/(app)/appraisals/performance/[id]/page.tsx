@@ -2,12 +2,14 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { PerformanceAppraisalFormWizard } from "@/components/performance-appraisal/performance-appraisal-form";
+import type { PerformanceAppraisalForm } from "@/lib/supabase/performance-appraisal-types";
 
 export default async function EditPerformanceAppraisalPage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
+  const { id } = await params;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
@@ -19,11 +21,10 @@ export default async function EditPerformanceAppraisalPage({
     .eq("id", user.id)
     .single();
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: appraisal } = await (supabase as any)
+  const { data: appraisal } = await supabase
     .from("performance_appraisals")
     .select("*")
-    .eq("id", params.id)
+    .eq("id", id)
     .single();
 
   if (!appraisal) return notFound();
@@ -41,7 +42,7 @@ export default async function EditPerformanceAppraisalPage({
       />
       <PerformanceAppraisalFormWizard
         employees={employees || []}
-        initial={appraisal as any}
+        initial={appraisal as unknown as PerformanceAppraisalForm}
         currentUserRole={profile?.role || "employee"}
         currentUserId={user.id}
       />

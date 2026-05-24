@@ -5,11 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
-import { PageHeader } from "@/components/page-header";
 import { RatingSelect, RatingScaleReference } from "./rating-select";
 import { CompetencyRow } from "./competency-row";
 import { GoalRowEditor } from "./goal-row";
@@ -28,12 +26,10 @@ import type {
 } from "@/lib/supabase/performance-appraisal-types";
 import {
   emptyPerformanceAppraisal,
+  emptyCompetency,
   emptyGoal,
   emptyDevPlan,
   emptyNextGoal,
-  CORE_COMPETENCIES,
-  LEADERSHIP_COMPETENCIES,
-  VALUES_COMPETENCIES,
   APPRAISAL_TYPES,
   RATING_LABELS,
   RECOMMENDED_ACTIONS,
@@ -41,6 +37,12 @@ import {
 import { saveAppraisal } from "@/lib/actions/appraisals";
 
 type Employee = { employee_id: string; full_name: string; job_title: string };
+type RoleBenchmark = {
+  role_title: string;
+  department: string;
+  competencies: { name: string; description: string | null; behavioral_indicators: string | null }[];
+  kpis: { title: string; measure: string | null; target: string | null }[];
+};
 
 const STEPS = [
   "Employee Information",
@@ -57,12 +59,13 @@ export function PerformanceAppraisalFormWizard({
   employees,
   initial,
   currentUserRole = "employee",
-  currentUserId,
+  roleBenchmarks = [],
 }: {
   employees: Employee[];
   initial?: PerformanceAppraisalForm;
   currentUserRole?: string;
   currentUserId?: string;
+  roleBenchmarks?: RoleBenchmark[];
 }) {
   const [form, setForm] = useState<PerformanceAppraisalForm>(
     initial ?? emptyPerformanceAppraisal()
@@ -85,6 +88,38 @@ export function PerformanceAppraisalFormWizard({
   const isFinal = form.status === "Final";
   const isHR = currentUserRole === "admin";
   const canEditCalibration = isHR && !isFinal;
+  const benchmarkByRole = new Map(roleBenchmarks.map((benchmark) => [benchmark.role_title, benchmark]));
+  const coreCompetencyNames = Object.keys(form.core_competencies);
+  const leadershipNames = Object.keys(form.leadership);
+  const valuesNames = Object.keys(form.values_culture);
+
+  function applyEmployeeBenchmark(employeeId: string) {
+    const employee = employees.find((item) => item.employee_id === employeeId);
+    const benchmark = employee ? benchmarkByRole.get(employee.job_title) : null;
+
+    if (!benchmark) {
+      patch({ employee_id: employeeId });
+      return;
+    }
+
+    const roleCompetencies = Object.fromEntries(
+      benchmark.competencies.map((competency) => [competency.name, emptyCompetency()])
+    );
+    const roleGoals = benchmark.kpis.slice(0, 6).map((kpi) => ({
+      ...emptyGoal(),
+      objective: kpi.title,
+      kpi: kpi.measure ?? kpi.title,
+      target: kpi.target ?? "",
+    }));
+
+    patch({
+      employee_id: employeeId,
+      department: benchmark.department,
+      document_ref: `Role benchmark: ${benchmark.role_title}`,
+      core_competencies: Object.keys(roleCompetencies).length ? roleCompetencies : form.core_competencies,
+      goals: roleGoals.length ? roleGoals : form.goals,
+    });
+  }
 
   async function handleSave() {
     let nextStatus = form.status || "Draft";
@@ -109,7 +144,7 @@ export function PerformanceAppraisalFormWizard({
       } else {
         toast.success(`Appraisal saved as ${nextStatus}.`);
         if (result.data) {
-          patch(result.data); // Update with server response (e.g. ID, created_at)
+          patch(result.data as unknown as Partial<PerformanceAppraisalForm>); // Update with server response (e.g. ID, created_at)
         }
       }
     });
@@ -186,7 +221,7 @@ export function PerformanceAppraisalFormWizard({
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Employee" required>
-                <NativeSelect value={form.employee_id} onChange={(v) => patch({ employee_id: v })} placeholder="Select employee...">
+                <NativeSelect value={form.employee_id} onChange={applyEmployeeBenchmark} placeholder="Select employee...">
                   {employees.map((e) => (
                     <option key={e.employee_id} value={e.employee_id}>
                       {e.employee_id} — {e.full_name} ({e.job_title})
@@ -257,7 +292,7 @@ export function PerformanceAppraisalFormWizard({
             <CardDescription>Weight: 30% — Rate each competency independently. Both N1 and N2 provide a rating.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {CORE_COMPETENCIES.map((c) => (
+            {coreCompetencyNames.map((c) => (
               <CompetencyRow key={c} name={c} entry={form.core_competencies[c]} onChange={(u) => updateComp("core_competencies", c, u)} />
             ))}
           </CardContent>
@@ -277,7 +312,7 @@ export function PerformanceAppraisalFormWizard({
               <Label className="text-sm">This section applies to this employee</Label>
             </div>
             {form.leadership_applicable ? (
-              LEADERSHIP_COMPETENCIES.map((c) => (
+              leadershipNames.map((c) => (
                 <CompetencyRow key={c} name={c} entry={form.leadership[c]} onChange={(u) => updateComp("leadership", c, u)} />
               ))
             ) : (
@@ -295,7 +330,7 @@ export function PerformanceAppraisalFormWizard({
             <CardDescription>Weight: 10% — How consistently the employee demonstrates core values.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {VALUES_COMPETENCIES.map((c) => (
+            {valuesNames.map((c) => (
               <CompetencyRow key={c} name={c} entry={form.values_culture[c]} onChange={(u) => updateComp("values_culture", c, u)} />
             ))}
           </CardContent>

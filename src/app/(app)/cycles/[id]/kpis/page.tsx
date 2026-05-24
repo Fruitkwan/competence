@@ -1,9 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { KpiFormSection } from "./kpi-form-section";
+import { SeedKpisSection } from "./seed-kpis-section";
 
 export default async function CycleKpisPage({
   params,
@@ -42,6 +43,31 @@ export default async function CycleKpisPage({
     .from("departments")
     .select("id, name")
     .order("name");
+
+  const [{ data: roleProfiles }, { data: roleTemplates }] = await Promise.all([
+    supabase
+      .from("job_profiles")
+      .select("title, department")
+      .eq("active", true)
+      .order("department")
+      .order("title"),
+    supabase
+      .from("role_kpi_templates")
+      .select("role_title")
+      .eq("active", true),
+  ]);
+
+  const templateCounts = new Map<string, number>();
+  for (const template of roleTemplates ?? []) {
+    templateCounts.set(template.role_title, (templateCounts.get(template.role_title) ?? 0) + 1);
+  }
+  const roleOptions = (roleProfiles ?? [])
+    .map((role) => ({
+      title: role.title,
+      department: role.department,
+      template_count: templateCounts.get(role.title) ?? 0,
+    }))
+    .filter((role) => role.template_count > 0);
 
   const levelColors: Record<string, string> = {
     organization: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
@@ -98,10 +124,13 @@ export default async function CycleKpisPage({
         </div>
 
         <div>
-          <KpiFormSection
-            cycleId={id}
-            departments={departments ?? []}
-          />
+          <div className="space-y-4">
+            <SeedKpisSection cycleId={id} roles={roleOptions} />
+            <KpiFormSection
+              cycleId={id}
+              departments={departments ?? []}
+            />
+          </div>
         </div>
       </div>
     </>

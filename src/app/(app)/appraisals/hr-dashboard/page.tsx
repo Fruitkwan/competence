@@ -9,6 +9,21 @@ import { CheckCircle2, ClipboardCheck, AlertCircle, BarChart } from "lucide-reac
 import { HRDashboardCharts } from "./hr-dashboard-charts";
 import { RATING_LABELS } from "@/lib/supabase/performance-appraisal-types";
 
+type DashboardAppraisal = {
+  id: string;
+  employee_id: string;
+  appraisal_type: string | null;
+  status: string;
+  calibrated_rating: number | null;
+  final_rating: number | null;
+  total_weighted_score: number | null;
+  created_at: string;
+  employees?: {
+    full_name?: string | null;
+    department?: string | null;
+  } | null;
+};
+
 export default async function HRDashboardPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -26,8 +41,7 @@ export default async function HRDashboardPage() {
   }
 
   // Fetch all appraisals for the dashboard
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: appraisals } = await (supabase as any)
+  const { data: appraisalsRaw } = await supabase
     .from("performance_appraisals")
     .select(`
       id,
@@ -41,11 +55,12 @@ export default async function HRDashboardPage() {
       employees!performance_appraisals_employee_id_fkey (full_name, department)
     `)
     .order("created_at", { ascending: false });
+  const appraisals = (appraisalsRaw ?? []) as unknown as DashboardAppraisal[];
 
-  const totalAppraisals = appraisals?.length || 0;
-  const pendingCalibration = appraisals?.filter(a => a.status === "N2 Complete") || [];
-  const finalAppraisals = appraisals?.filter(a => a.status === "Final") || [];
-  const inProgress = appraisals?.filter(a => a.status === "Draft" || a.status === "N1 Complete") || [];
+  const totalAppraisals = appraisals.length;
+  const pendingCalibration = appraisals.filter((a) => a.status === "N2 Complete");
+  const finalAppraisals = appraisals.filter((a) => a.status === "Final");
+  const inProgress = appraisals.filter((a) => a.status === "Draft" || a.status === "N1 Complete");
 
   // Data for charts
   const statusData = [
@@ -55,7 +70,7 @@ export default async function HRDashboardPage() {
   ];
 
   const ratingCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-  finalAppraisals.forEach(a => {
+  finalAppraisals.forEach((a) => {
     const rating = a.calibrated_rating || a.final_rating;
     if (rating && rating >= 1 && rating <= 5) {
       ratingCounts[rating as 1|2|3|4|5]++;
@@ -147,9 +162,7 @@ export default async function HRDashboardPage() {
                 </thead>
                 <tbody className="[&_tr:last-child]:border-0">
                   {pendingCalibration.map((appraisal) => {
-                    // @ts-ignore - joined table data
                     const empName = appraisal.employees?.full_name || appraisal.employee_id;
-                    // @ts-ignore
                     const dept = appraisal.employees?.department || "—";
                     
                     return (

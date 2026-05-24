@@ -12,14 +12,13 @@ import {
   ShieldCheck,
   ClipboardList,
   LayoutDashboard,
-  FileText,
   FileCheck2,
   UserPlus,
   Target,
   Building2,
   UserCog,
   Bell,
-  Sparkles,
+  Upload,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -68,6 +67,7 @@ const NAV: NavItem[] = [
 
   // Admin only
   { href: "/admin/users", label: "User Management", icon: UserCog, iconColor: "#ef4444", divider: true, dividerLabel: "Administration", roles: ["admin"] }, // red-500
+  { href: "/admin/employees/import", label: "Import Employees", icon: Upload, iconColor: "#14b8a6", roles: ["admin"] }, // teal-500
   { href: "/admin/departments", label: "Departments", icon: Building2, iconColor: "#818cf8", roles: ["admin"] }, // indigo-400
   { href: "/admin/audit", label: "Audit Log", icon: ShieldCheck, iconColor: "#64748b", roles: ["admin"] }, // slate-500
 ];

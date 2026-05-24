@@ -16,7 +16,7 @@ export default async function NewPerformanceAppraisalPage() {
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
-    .eq("id", user?.id)
+    .eq("id", user?.id ?? "")
     .single();
 
   const { data: employees } = await supabase
@@ -25,6 +25,52 @@ export default async function NewPerformanceAppraisalPage() {
     .order("employee_id");
 
   const empList = employees?.length ? employees : DEMO_EMPLOYEES;
+  const roleTitles = [...new Set(empList.map((employee) => employee.job_title).filter(Boolean))];
+  const [{ data: profiles }, { data: roleCompetencies }, { data: roleKpis }] = roleTitles.length
+    ? await Promise.all([
+        supabase
+          .from("job_profiles")
+          .select("title, department")
+          .in("title", roleTitles),
+        supabase
+          .from("role_competencies")
+          .select("role_title, competency_id, sort_order")
+          .in("role_title", roleTitles)
+          .eq("applicable", true)
+          .order("sort_order"),
+        supabase
+          .from("role_kpi_templates")
+          .select("role_title, title, measure, target, sort_order")
+          .in("role_title", roleTitles)
+          .eq("active", true)
+          .order("sort_order"),
+      ])
+    : [{ data: [] }, { data: [] }, { data: [] }];
+
+  const competencyIds = roleCompetencies?.map((item) => item.competency_id) ?? [];
+  const { data: competencies } = competencyIds.length
+    ? await supabase
+        .from("competencies")
+        .select("id, name, description, behavioral_indicators")
+        .in("id", competencyIds)
+    : { data: [] };
+
+  const competencyById = new Map((competencies ?? []).map((item) => [item.id, item]));
+  const roleBenchmarks = (profiles ?? []).map((role) => ({
+    role_title: role.title,
+    department: role.department,
+    competencies: (roleCompetencies ?? [])
+      .filter((item) => item.role_title === role.title)
+      .map((item) => competencyById.get(item.competency_id))
+      .filter((item): item is NonNullable<typeof item> => Boolean(item)),
+    kpis: (roleKpis ?? [])
+      .filter((item) => item.role_title === role.title)
+      .map((item) => ({
+        title: item.title,
+        measure: item.measure,
+        target: item.target,
+      })),
+  }));
 
   return (
     <>
@@ -36,6 +82,7 @@ export default async function NewPerformanceAppraisalPage() {
         employees={empList} 
         currentUserRole={profile?.role || "employee"}
         currentUserId={user?.id || ""}
+        roleBenchmarks={roleBenchmarks}
       />
     </>
   );
