@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -76,7 +79,11 @@ export function NotificationBell({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="relative inline-flex h-9 w-9 items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none">
+      <DropdownMenuTrigger
+        render={
+          <Button variant="ghost" size="icon" className="relative" aria-label="Notifications" />
+        }
+      >
         <Bell className="h-4 w-4" />
         {count > 0 && (
           <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
@@ -85,23 +92,25 @@ export function NotificationBell({
         )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" side="bottom" sideOffset={8} className="w-80">
-        <DropdownMenuLabel className="flex items-center justify-between">
-          <span>Notifications</span>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="flex items-center justify-between">
+            <span>Notifications</span>
+            {count > 0 && (
+              <span className="text-xs font-normal text-muted-foreground">
+                {count} unread
+              </span>
+            )}
+          </DropdownMenuLabel>
           {count > 0 && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                handleMarkAllRead();
-              }}
+            <DropdownMenuItem
               disabled={isPending}
-              className="text-xs font-normal text-muted-foreground hover:text-foreground"
+              onClick={handleMarkAllRead}
+              className="text-xs text-muted-foreground"
             >
               Mark all read
-            </button>
+            </DropdownMenuItem>
           )}
-        </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
         {items.length === 0 ? (
           <div className="px-3 py-6 text-center text-sm text-muted-foreground">
@@ -109,35 +118,33 @@ export function NotificationBell({
           </div>
         ) : (
           <>
-            {items.slice(0, 8).map((n) => (
-              <DropdownMenuItem
-                key={n.id}
-                className={cn(!n.read && "bg-accent/30")}
-                onClick={() => handleClick(n)}
-              >
-                <span className="mt-0.5 text-base leading-none shrink-0">
-                  {NOTIFICATION_ICONS[n.type] ?? "🔔"}
-                </span>
-                <div className="flex-1 space-y-0.5 min-w-0">
-                  <div className="text-sm font-medium leading-tight truncate">
-                    {n.title}
-                  </div>
-                  {n.body && (
-                    <div className="text-xs text-muted-foreground line-clamp-2">
-                      {n.body}
+            <DropdownMenuGroup>
+              {items.slice(0, 8).map((n) => (
+                <DropdownMenuItem
+                  key={n.id}
+                  className={cn(!n.read && "bg-accent/30")}
+                  onClick={() => handleClick(n)}
+                >
+                  <span className="mt-0.5 shrink-0 text-base leading-none">
+                    {NOTIFICATION_ICONS[n.type] ?? "🔔"}
+                  </span>
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <div className="truncate text-sm font-medium leading-tight">{n.title}</div>
+                    {n.body && (
+                      <div className="line-clamp-2 text-xs text-muted-foreground">{n.body}</div>
+                    )}
+                    <div className="text-[10px] text-muted-foreground/60">
+                      {timeAgo(n.created_at)}
                     </div>
-                  )}
-                  <div className="text-[10px] text-muted-foreground/60">
-                    {timeAgo(n.created_at)}
                   </div>
-                </div>
-                {!n.read && (
-                  <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
-                )}
-              </DropdownMenuItem>
-            ))}
+                  {!n.read && (
+                    <span className="mt-1 h-2 w-2 shrink-0 rounded-full bg-blue-500" />
+                  )}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push("/notifications")}>
+            <DropdownMenuItem render={<Link href="/notifications" className="w-full" />}>
               <span className="flex w-full justify-center text-xs font-medium text-muted-foreground">
                 View all notifications
               </span>

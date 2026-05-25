@@ -1,29 +1,33 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { PageHeader } from "@/components/page-header";
-import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  RoleDetailView,
+  type RoleCompetencyView,
+  type RoleKpiView,
+  type RoleProfileView,
+} from "@/components/roles/role-detail-view";
 
 export default async function RoleDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ title: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const { title: encodedTitle } = await params;
+  const { tab } = await searchParams;
   const title = decodeURIComponent(encodedTitle);
   const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  const { data: userProfile } = user
+    ? await supabase.from("profiles").select("role").eq("id", user.id).single()
+    : { data: null };
+
+  const canEdit = userProfile?.role === "admin";
 
   const { data: profile } = await supabase
     .from("job_profiles")
@@ -33,7 +37,13 @@ export default async function RoleDetailPage({
 
   if (!profile) notFound();
 
-  const [{ data: roleCompetencies }, { data: kpis }] = await Promise.all([
+  const [
+    { data: roleCompetencies },
+    { data: kpis },
+    { data: levels },
+    { data: catalogCompetencies },
+    { data: departments },
+  ] = await Promise.all([
     supabase
       .from("role_competencies")
       .select("competency_id, category, required_level, weight, sort_order")
@@ -42,10 +52,13 @@ export default async function RoleDetailPage({
       .order("sort_order"),
     supabase
       .from("role_kpi_templates")
-      .select("title, measure, target, review_frequency, default_weight, sort_order")
+      .select("id, title, measure, target, review_frequency, default_weight, sort_order")
       .eq("role_title", title)
       .eq("active", true)
       .order("sort_order"),
+    supabase.from("competency_levels").select("label").order("numeric_value"),
+    supabase.from("competencies").select("id, name, category").order("name"),
+    supabase.from("departments").select("name").order("name"),
   ]);
 
   const competencyIds = roleCompetencies?.map((item) => item.competency_id) ?? [];
@@ -58,147 +71,56 @@ export default async function RoleDetailPage({
 
   const competencyById = new Map((competencies ?? []).map((item) => [item.id, item]));
 
+  const profileView: RoleProfileView = {
+    title: profile.title,
+    department: profile.department,
+    reports_to: profile.reports_to,
+    role_purpose: profile.role_purpose,
+    geographic_scope: profile.geographic_scope,
+    responsibilities: profile.responsibilities,
+    authority: profile.authority,
+    qualifications: profile.qualifications,
+  };
+
+  const competencyViews: RoleCompetencyView[] = (roleCompetencies ?? []).map((link) => {
+    const competency = competencyById.get(link.competency_id);
+    return {
+      competency_id: link.competency_id,
+      category: link.category,
+      required_level: link.required_level,
+      weight: link.weight,
+      name: competency?.name ?? "Unknown competency",
+      description: competency?.description ?? null,
+      behavioral_indicators: competency?.behavioral_indicators ?? null,
+    };
+  });
+
+  const kpiViews: RoleKpiView[] = (kpis ?? []).map((kpi) => ({
+    id: kpi.id,
+    title: kpi.title,
+    measure: kpi.measure,
+    target: kpi.target,
+    review_frequency: kpi.review_frequency,
+    default_weight: kpi.default_weight,
+  }));
+
+  const departmentNames = [
+    ...new Set([
+      ...(departments ?? []).map((item) => item.name),
+      profile.department,
+    ]),
+  ].sort((a, b) => a.localeCompare(b));
+
   return (
-    <>
-      <div className="mb-4">
-        <Link href="/roles" className={cn(buttonVariants({ variant: "ghost", size: "sm" }))}>
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to roles
-        </Link>
-      </div>
-
-      <PageHeader
-        title={profile.title}
-        description={profile.role_purpose ?? "Role benchmark details imported from the Dhofar Global documents."}
-      />
-
-      <div className="grid gap-4 md:grid-cols-3">
-        <InfoCard label="Department" value={profile.department} />
-        <InfoCard label="Reports To" value={profile.reports_to ?? "—"} />
-        <InfoCard label="Geographic Scope" value={profile.geographic_scope ?? "—"} />
-      </div>
-
-      <div className="mt-6 grid gap-6 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Role Competencies</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {roleCompetencies?.length ? (
-              roleCompetencies.map((link) => {
-                const competency = competencyById.get(link.competency_id);
-                return (
-                  <div key={link.competency_id} className="rounded-lg border p-4">
-                    <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                      <h3 className="font-medium">{competency?.name ?? "Unknown competency"}</h3>
-                      <Badge variant="outline">{link.required_level ?? "Competent"}</Badge>
-                    </div>
-                    {competency?.description && (
-                      <p className="text-sm text-muted-foreground">{competency.description}</p>
-                    )}
-                    {competency?.behavioral_indicators && (
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        Indicator: {competency.behavioral_indicators}
-                      </p>
-                    )}
-                  </div>
-                );
-              })
-            ) : (
-              <p className="text-sm text-muted-foreground">No role competencies imported yet.</p>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>KPI Templates</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>KPI</TableHead>
-                  <TableHead>Target</TableHead>
-                  <TableHead>Frequency</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {kpis?.length ? (
-                  kpis.map((kpi) => (
-                    <TableRow key={kpi.title}>
-                      <TableCell>
-                        <div className="font-medium">{kpi.title}</div>
-                        {kpi.measure && (
-                          <div className="text-xs text-muted-foreground">{kpi.measure}</div>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground">{kpi.target ?? "—"}</TableCell>
-                      <TableCell>{kpi.review_frequency ?? "—"}</TableCell>
-                    </TableRow>
-                  ))
-                ) : (
-                  <TableRow>
-                    <TableCell colSpan={3} className="py-8 text-center text-muted-foreground">
-                      No KPI templates imported yet.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      </div>
-
-      {(profile.responsibilities.length > 0 || Object.keys(profile.qualifications).length > 0) && (
-        <div className="mt-6 grid gap-6 lg:grid-cols-2">
-          <ListCard title="Responsibilities" items={profile.responsibilities} />
-          <Card>
-            <CardHeader>
-              <CardTitle>Qualifications</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                {typeof profile.qualifications.experience === "string" && profile.qualifications.experience
-                  ? profile.qualifications.experience
-                  : "No detailed qualifications imported yet."}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-    </>
-  );
-}
-
-function InfoCard({ label, value }: { label: string; value: string }) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="text-sm text-muted-foreground">{label}</div>
-        <div className="mt-1 font-medium">{value}</div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ListCard({ title, items }: { title: string; items: string[] }) {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {items.length ? (
-          <ul className="space-y-2 text-sm text-muted-foreground">
-            {items.map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-muted-foreground">No details imported yet.</p>
-        )}
-      </CardContent>
-    </Card>
+    <RoleDetailView
+      profile={profileView}
+      competencies={competencyViews}
+      kpis={kpiViews}
+      defaultTab={tab}
+      canEdit={canEdit}
+      levels={(levels ?? []).map((item) => item.label)}
+      catalogCompetencies={catalogCompetencies ?? []}
+      departments={departmentNames}
+    />
   );
 }

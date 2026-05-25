@@ -1,35 +1,34 @@
 "use client";
 
-import { useTransition } from "react";
+import { useRef, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Loader2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
+import { createDepartment } from "@/lib/actions/departments";
 
 export function DepartmentFormSection() {
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
 
-  async function handleSubmit(formData: FormData) {
-    const name = formData.get("name") as string;
-    if (!name.trim()) {
-      toast.error("Department name is required");
-      return;
-    }
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    const name = String(formData.get("name") ?? "");
 
     startTransition(async () => {
-      const supabase = createClient();
-      const { error } = await supabase.from("departments").insert({ name: name.trim() });
-      if (error) {
-        if (error.code === "23505") toast.error("Department already exists");
-        else toast.error(error.message);
-      } else {
-        toast.success("Department created");
-        router.refresh();
+      const result = await createDepartment(name);
+      if (result.error) {
+        toast.error(result.error);
+        return;
       }
+      toast.success("Department created");
+      formRef.current?.reset();
+      router.refresh();
     });
   }
 
@@ -39,13 +38,23 @@ export function DepartmentFormSection() {
         <CardTitle className="text-base">Add Department</CardTitle>
       </CardHeader>
       <CardContent>
-        <form action={handleSubmit} className="space-y-3">
+        <form ref={formRef} onSubmit={handleSubmit} className="space-y-3">
           <div className="space-y-2">
             <Label htmlFor="dept-name">Name *</Label>
             <Input id="dept-name" name="name" placeholder="e.g. Engineering" required />
           </div>
           <Button type="submit" disabled={isPending} className="w-full">
-            {isPending ? "Creating…" : "Add Department"}
+            {isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating…
+              </>
+            ) : (
+              <>
+                <Plus className="mr-2 h-4 w-4" />
+                Add Department
+              </>
+            )}
           </Button>
         </form>
       </CardContent>
