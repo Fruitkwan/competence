@@ -34,43 +34,229 @@ type NavItem = {
   dividerLabel?: string;
 };
 
+/**
+ * Nav order follows how people work:
+ * Dashboard → Performance cycle → People → Training → Notifications → Admin
+ */
 const NAV: NavItem[] = [
-  // Everyone sees dashboard
-  { href: "/dashboard", label: "Dashboard", icon: BarChart3, iconColor: "#3b82f6" }, // blue-500
+  // ── Everyone ──────────────────────────────────────────────────────────────
+  {
+    href: "/dashboard",
+    label: "Dashboard",
+    icon: BarChart3,
+    iconColor: "#3b82f6",
+  },
 
-  // Employee sees own objectives + performance + courses + training feedback
-  { href: "/objectives", label: "My Objectives", icon: Target, iconColor: "#10b981", roles: ["employee"] }, // emerald-500
-  { href: "/appraisals/performance", label: "My Performance", icon: FileCheck2, iconColor: "#6366f1", roles: ["employee"] }, // indigo-500
-  { href: "/training/my-courses", label: "My Courses", icon: BookOpen, iconColor: "#f59e0b", roles: ["employee"] }, // amber-500
-  { href: "/training/survey", label: "Training Feedback", icon: ClipboardList, iconColor: "#8b5cf6", roles: ["employee"] }, // violet-500
+  // ── Employee self-service ───────────────────────────────────────────────────
+  {
+    href: "/objectives",
+    label: "My Objectives",
+    icon: Target,
+    iconColor: "#10b981",
+    roles: ["employee"],
+  },
+  {
+    href: "/appraisals/performance",
+    label: "My Performance",
+    icon: FileCheck2,
+    iconColor: "#6366f1",
+    roles: ["employee"],
+  },
+  {
+    href: "/training/my-courses",
+    label: "My Courses",
+    icon: BookOpen,
+    iconColor: "#f59e0b",
+    roles: ["employee"],
+  },
+  {
+    href: "/training/survey",
+    label: "Training Feedback",
+    icon: ClipboardList,
+    iconColor: "#8b5cf6",
+    roles: ["employee"],
+  },
 
-  // Manager + Admin + Executive — Cycle & Objective management
-  { href: "/cycles", label: "Cycles", icon: CalendarClock, iconColor: "#f97316", divider: true, dividerLabel: "Performance", roles: ["admin", "manager", "executive"] }, // orange-500
-  { href: "/objectives/review", label: "Review Objectives", icon: Target, iconColor: "#06b6d4", roles: ["admin", "manager"] }, // cyan-500
-  { href: "/employees", label: "Employees", icon: Users, iconColor: "#ec4899", roles: ["admin", "manager", "executive"] }, // pink-500
-  { href: "/appraisals", label: "Appraisals", icon: ClipboardCheck, iconColor: "#a855f7", roles: ["admin", "manager", "executive"] }, // purple-500
-  { href: "/appraisals/performance", label: "Performance Appraisal", icon: FileCheck2, iconColor: "#14b8a6", roles: ["admin", "manager", "executive"] }, // teal-500
-  { href: "/appraisals/hr-dashboard", label: "HR Dashboard", icon: LayoutDashboard, iconColor: "#3b82f6", roles: ["admin"] }, // blue-500
-  { href: "/admin/employees", label: "Employee Management", icon: Users, iconColor: "#f43f5e", roles: ["admin"] }, // rose-500
-  { href: "/roles", label: "Role Benchmark", icon: Briefcase, iconColor: "#f43f5e", roles: ["admin", "manager", "executive"] }, // rose-500
-  { href: "/courses", label: "Courses", icon: BookOpen, iconColor: "#eab308", roles: ["admin", "manager", "executive"] }, // yellow-500
-  { href: "/rollout", label: "Rollout Plan", icon: CalendarClock, iconColor: "#0ea5e9", roles: ["admin", "manager"] }, // sky-500
+  // ── Performance cycle (manager / HR / executive) ────────────────────────────
+  {
+    href: "/appraisals/hr-dashboard",
+    label: "HR Dashboard",
+    icon: LayoutDashboard,
+    iconColor: "#3b82f6",
+    divider: true,
+    dividerLabel: "Performance",
+    roles: ["admin"],
+  },
+  {
+    href: "/cycles",
+    label: "Cycles",
+    icon: CalendarClock,
+    iconColor: "#f97316",
+    divider: true,
+    dividerLabel: "Performance",
+    roles: ["manager", "executive"],
+  },
+  {
+    href: "/cycles",
+    label: "Cycles",
+    icon: CalendarClock,
+    iconColor: "#f97316",
+    roles: ["admin"],
+  },
+  {
+    href: "/objectives/review",
+    label: "Review Objectives",
+    icon: Target,
+    iconColor: "#06b6d4",
+    roles: ["admin", "manager"],
+  },
+  {
+    href: "/appraisals",
+    label: "Skills Appraisals",
+    icon: ClipboardCheck,
+    iconColor: "#a855f7",
+    roles: ["admin", "manager", "executive"],
+  },
+  {
+    href: "/appraisals/performance",
+    label: "Performance Appraisals",
+    icon: FileCheck2,
+    iconColor: "#14b8a6",
+    roles: ["admin", "manager", "executive"],
+  },
+  {
+    href: "/rollout",
+    label: "Rollout Plan",
+    icon: CalendarClock,
+    iconColor: "#0ea5e9",
+    roles: ["admin", "manager"],
+  },
 
-  // Training section — manager + admin
-  { href: "/training/assign", label: "Assign Courses", icon: UserPlus, iconColor: "#84cc16", divider: true, dividerLabel: "Training", roles: ["admin", "manager"] }, // lime-500
-  { href: "/training/survey", label: "Training Survey", icon: ClipboardList, iconColor: "#d946ef", roles: ["admin", "manager"] }, // fuchsia-500
-  { href: "/training/dashboard", label: "Training Dashboard", icon: LayoutDashboard, iconColor: "#60a5fa", roles: ["admin", "manager"] }, // blue-400
+  // ── People ──────────────────────────────────────────────────────────────────
+  {
+    href: "/employees",
+    label: "Employee Directory",
+    icon: Users,
+    iconColor: "#ec4899",
+    divider: true,
+    dividerLabel: "People",
+    roles: ["manager", "executive"],
+  },
+  {
+    href: "/admin/employees",
+    label: "Employee Directory",
+    icon: Users,
+    iconColor: "#ec4899",
+    divider: true,
+    dividerLabel: "People",
+    roles: ["admin"],
+  },
+  {
+    href: "/roles",
+    label: "Role Benchmark",
+    icon: Briefcase,
+    iconColor: "#f43f5e",
+    roles: ["admin", "manager", "executive"],
+  },
 
+  // ── Training & development ──────────────────────────────────────────────────
+  {
+    href: "/courses",
+    label: "Course Catalog",
+    icon: BookOpen,
+    iconColor: "#eab308",
+    divider: true,
+    dividerLabel: "Training",
+    roles: ["admin", "manager", "executive"],
+  },
+  {
+    href: "/training/assign",
+    label: "Assign Courses",
+    icon: UserPlus,
+    iconColor: "#84cc16",
+    roles: ["admin", "manager"],
+  },
+  {
+    href: "/training/dashboard",
+    label: "Training Dashboard",
+    icon: LayoutDashboard,
+    iconColor: "#60a5fa",
+    roles: ["admin", "manager"],
+  },
+  {
+    href: "/training/survey",
+    label: "Training Survey",
+    icon: ClipboardList,
+    iconColor: "#d946ef",
+    roles: ["admin", "manager"],
+  },
 
-  // Notifications — everyone
-  { href: "/notifications", label: "Notifications", icon: Bell, iconColor: "#fbbf24", divider: true, dividerLabel: "Notifications" }, // amber-400
+  // ── Notifications ───────────────────────────────────────────────────────────
+  {
+    href: "/notifications",
+    label: "Notifications",
+    icon: Bell,
+    iconColor: "#fbbf24",
+    divider: true,
+    dividerLabel: "Inbox",
+  },
 
-  // Admin only
-  { href: "/admin/users", label: "User Management", icon: UserCog, iconColor: "#ef4444", divider: true, dividerLabel: "Administration", roles: ["admin"] }, // red-500
-  { href: "/admin/employees/import", label: "Import Employees", icon: Upload, iconColor: "#14b8a6", roles: ["admin"] }, // teal-500
-  { href: "/admin/departments", label: "Departments", icon: Building2, iconColor: "#818cf8", roles: ["admin"] }, // indigo-400
-  { href: "/admin/audit", label: "Audit Log", icon: ShieldCheck, iconColor: "#64748b", roles: ["admin"] }, // slate-500
+  // ── Administration (HR admin only) ──────────────────────────────────────────
+  {
+    href: "/admin/users",
+    label: "User Management",
+    icon: UserCog,
+    iconColor: "#ef4444",
+    divider: true,
+    dividerLabel: "Administration",
+    roles: ["admin"],
+  },
+  {
+    href: "/admin/employees/import",
+    label: "Import Employees",
+    icon: Upload,
+    iconColor: "#14b8a6",
+    roles: ["admin"],
+  },
+  {
+    href: "/admin/departments",
+    label: "Departments",
+    icon: Building2,
+    iconColor: "#818cf8",
+    roles: ["admin"],
+  },
+  {
+    href: "/admin/audit",
+    label: "Audit Log",
+    icon: ShieldCheck,
+    iconColor: "#64748b",
+    roles: ["admin"],
+  },
 ];
+
+function isActive(pathname: string, href: string): boolean {
+  if (pathname === href) return true;
+  if (href === "/dashboard") return false;
+
+  if (href === "/appraisals") {
+    return (
+      pathname.startsWith("/appraisals/") &&
+      !pathname.startsWith("/appraisals/performance") &&
+      !pathname.startsWith("/appraisals/hr-dashboard")
+    );
+  }
+  if (href === "/appraisals/performance") {
+    return pathname.startsWith("/appraisals/performance");
+  }
+  if (href === "/admin/employees") {
+    return (
+      pathname === "/admin/employees" ||
+      (pathname.startsWith("/admin/employees/") &&
+        !pathname.startsWith("/admin/employees/import"))
+    );
+  }
+  return pathname.startsWith(`${href}/`);
+}
 
 export function AppNav({ role }: { role: string }) {
   const pathname = usePathname();
@@ -84,17 +270,12 @@ export function AppNav({ role }: { role: string }) {
         </div>
       </div>
       {NAV.map((item) => {
-        // Role-gating: if roles array is defined, user must match one
         if (item.roles && !item.roles.includes(role)) return null;
 
         const Icon = item.icon;
-        const active =
-          pathname === item.href ||
-          (item.href !== "/dashboard" &&
-            item.href !== "/appraisals" &&
-            pathname.startsWith(item.href));
+        const active = isActive(pathname, item.href);
         return (
-          <div key={item.href + (item.roles?.join() ?? "")}>
+          <div key={`${item.href}-${item.roles?.join(",") ?? "all"}`}>
             {item.divider && (
               <div className="mb-1 mt-3 border-t px-3 pt-3 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
                 {item.dividerLabel ?? ""}
@@ -106,10 +287,13 @@ export function AppNav({ role }: { role: string }) {
                 "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors",
                 active
                   ? "bg-accent text-accent-foreground font-medium"
-                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
               )}
             >
-              <Icon className="h-4 w-4" style={{ color: item.iconColor || 'inherit' }} />
+              <Icon
+                className="h-4 w-4 shrink-0"
+                style={{ color: item.iconColor || "inherit" }}
+              />
               <span>{item.label}</span>
             </Link>
           </div>

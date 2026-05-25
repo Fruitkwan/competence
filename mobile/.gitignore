@@ -1,0 +1,38 @@
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+.pub-cache/
+.pub/
+.fvm/
+.fvmrc
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Secrets
+.env
+.env.local
+*.keystore
+*.jks
+key.properties
+
+# Firebase config (do not commit; provided per-developer)
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+lib/firebase_options.dart
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated
+ios/Pods/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+android/.gradle/
+android/local.properties
