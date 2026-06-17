@@ -229,6 +229,7 @@ export type Database = {
           employee_id: string;
           full_name: string;
           job_title: string;
+          department?: string | null;
           country_code: string | null;
           manager_name: string | null;
           email: string | null;
@@ -249,6 +250,7 @@ export type Database = {
           employee_id: string;
           full_name: string;
           job_title: string;
+          department?: string | null;
           country_code?: string | null;
           manager_name?: string | null;
           email?: string | null;

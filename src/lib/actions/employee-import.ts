@@ -7,6 +7,7 @@ import type { Database } from "@/lib/supabase/types";
 
 type EmployeeInsert = Database["public"]["Tables"]["employees"]["Insert"];
 type EmployeeRow = Database["public"]["Tables"]["employees"]["Row"];
+type SupabaseClient = Awaited<ReturnType<typeof createClient>>;
 
 type ParsedEmployee = EmployeeInsert & {
   employee_id: string;
@@ -112,11 +113,12 @@ export async function applyEmployeeBasisImport(formData: FormData) {
   }));
 
   if (upserts.length) {
-    const { error: upsertError } = await supabase
-      .from("employees")
-      .upsert(upserts, { onConflict: "employee_id" });
+    const { error: upsertError } = await upsertEmployeesWithDepartmentFallback(supabase, upserts);
 
     if (upsertError) return { error: upsertError.message, preview };
+
+    const syncError = await syncImportedDepartments(supabase, upserts);
+    if (syncError) return { error: syncError, preview };
   }
 
   if (deactivateMissing && preview.deactivatedEmployees.length) {
@@ -138,6 +140,9 @@ export async function applyEmployeeBasisImport(formData: FormData) {
   revalidatePath("/admin/employees");
   revalidatePath("/admin/employees/import");
   revalidatePath("/employees");
+  revalidatePath("/dashboard");
+  revalidatePath("/training/assign");
+  revalidatePath("/training/dashboard");
 
   return {
     success: true,
@@ -237,6 +242,7 @@ function mapBasisRow(row: Record<string, unknown>): ParsedEmployee {
     employee_id: text(row["Employee Code"]),
     full_name: text(row["Employee Name as in Passport"]),
     job_title: text(row["Designation"]),
+    department: departmentFromRow(row),
     country_code: mapCountry(text(row["Country"])),
     manager_name: nullableText(row["Reporting Manager"]),
     grade: nullableText(row["Grade"]),
@@ -297,7 +303,6 @@ function changedFields(current: EmployeeRow, next: ParsedEmployee) {
   const fields: (keyof ParsedEmployee)[] = [
     "full_name",
     "job_title",
-    "country_code",
     "manager_name",
     "grade",
     "grade_band",
@@ -305,8 +310,133 @@ function changedFields(current: EmployeeRow, next: ParsedEmployee) {
     "joining_date",
     "manager_position",
   ];
+  if (Object.prototype.hasOwnProperty.call(current, "department")) fields.splice(2, 0, "department");
+  fields.splice(3, 0, "country_code");
 
   return fields.filter((field) => (current[field] ?? null) !== (next[field] ?? null));
+}
+
+async function upsertEmployeesWithDepartmentFallback(
+  supabase: SupabaseClient,
+  employees: ParsedEmployee[]
+) {
+  const result = await supabase
+    .from("employees")
+    .upsert(employees, { onConflict: "employee_id" });
+
+  if (!result.error || result.error.code !== "PGRST204") return result;
+  if (!employees.some((employee) => employee.department)) return result;
+
+  return supabase
+    .from("employees")
+    .upsert(employees.map(stripEmployeeDepartment), { onConflict: "employee_id" });
+}
+
+function stripEmployeeDepartment(employee: ParsedEmployee) {
+  const employeeWithoutDepartment = { ...employee };
+  delete employeeWithoutDepartment.department;
+  return employeeWithoutDepartment;
+}
+
+async function syncImportedDepartments(supabase: SupabaseClient, employees: ParsedEmployee[]) {
+  const employeesWithDepartment = employees.filter((employee) => Boolean(employee.department));
+  if (!employeesWithDepartment.length) return null;
+
+  const departmentNames = uniqueByNormalized(
+    employeesWithDepartment.map((employee) => employee.department).filter((name): name is string => Boolean(name))
+  );
+
+  const { data: existingDepartments, error: departmentsError } = await supabase
+    .from("departments")
+    .select("id, name");
+  if (departmentsError) return departmentsError.message;
+
+  const departmentIdByName = new Map(
+    (existingDepartments ?? []).map((department) => [normalizeKey(department.name), department.id])
+  );
+  const missingDepartments = departmentNames.filter((name) => !departmentIdByName.has(normalizeKey(name)));
+
+  if (missingDepartments.length) {
+    const { error: insertError } = await supabase
+      .from("departments")
+      .upsert(missingDepartments.map((name) => ({ name })), { onConflict: "name", ignoreDuplicates: true });
+    if (insertError) return insertError.message;
+
+    const { data: refreshedDepartments, error: refreshedError } = await supabase
+      .from("departments")
+      .select("id, name");
+    if (refreshedError) return refreshedError.message;
+
+    departmentIdByName.clear();
+    for (const department of refreshedDepartments ?? []) {
+      departmentIdByName.set(normalizeKey(department.name), department.id);
+    }
+  }
+
+  const importedIds = employeesWithDepartment.map((employee) => employee.employee_id);
+  const { data: profiles, error: profileError } = await supabase
+    .from("profiles")
+    .select("id, employee_id")
+    .in("employee_id", importedIds);
+  if (profileError) return profileError.message;
+
+  const profileByEmployeeId = new Map(
+    (profiles ?? [])
+      .filter((profile): profile is { id: string; employee_id: string } => Boolean(profile.employee_id))
+      .map((profile) => [profile.employee_id, profile])
+  );
+
+  for (const employee of employeesWithDepartment) {
+    const profile = profileByEmployeeId.get(employee.employee_id);
+    const departmentId = employee.department ? departmentIdByName.get(normalizeKey(employee.department)) : null;
+    if (!profile || !departmentId) continue;
+
+    const { error } = await supabase
+      .from("profiles")
+      .update({
+        department_id: departmentId,
+        cluster: employee.department,
+        full_name: employee.full_name,
+        job_title: employee.job_title,
+        country_code: employee.country_code ?? null,
+      })
+      .eq("id", profile.id);
+
+    if (error) return error.message;
+  }
+
+  return null;
+}
+
+function departmentFromRow(row: Record<string, unknown>) {
+  const department = nullableText(
+    row["Department"] ??
+      row["Dept"] ??
+      row["Department Name"] ??
+      row["Function"] ??
+      row["Business Unit"] ??
+      row["Division"] ??
+      row["Section"] ??
+      row["Organization Unit"] ??
+      row["Organizational Unit"]
+  );
+  return department;
+}
+
+function uniqueByNormalized(values: string[]) {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+  for (const value of values) {
+    const normalized = normalizeKey(value);
+    if (seen.has(normalized)) continue;
+    seen.add(normalized);
+    unique.push(value);
+  }
+  return unique;
+}
+
+function normalizeKey(value: string) {
+  return value.replace(/\s+/g, " ").trim().toLowerCase();
 }
 
 function text(value: unknown) {

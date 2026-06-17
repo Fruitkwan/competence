@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { BookOpen, CheckCircle2, Clock, PlayCircle, XCircle } from "lucide-react";
 import { CertificateUpload } from "@/components/training/certificate-upload";
+import { formatCourseDevelops } from "@/lib/course-format";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
   Completed: { label: "Completed", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400", icon: CheckCircle2 },
@@ -134,11 +135,7 @@ export default async function MyCoursesPage() {
                       <TableCell>
                         {c.courses?.develops ? (
                           <Badge variant="outline" className="text-xs">
-                            {c.courses.develops === "K" ? "Knowledge" :
-                             c.courses.develops === "S" ? "Skill" :
-                             c.courses.develops === "B" ? "Behaviour" :
-                             c.courses.develops === "D" ? "Desire" :
-                             c.courses.develops === "A" ? "Attitude" : c.courses.develops}
+                            {formatCourseDevelops(c.courses.develops)}
                           </Badge>
                         ) : "—"}
                       </TableCell>

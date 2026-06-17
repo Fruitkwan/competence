@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Edit2, Upload } from "lucide-react";
 import { EmployeeDialog } from "./employee-dialog";
 import { DeleteEmployeeButton } from "./delete-employee-button";
+import { ResetEmployeesButton } from "./reset-employees-button";
 import { cn } from "@/lib/utils";
 
 export const metadata = {
@@ -104,6 +105,7 @@ export default async function EmployeesPage({
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <ResetEmployeesButton employeeCount={allEmployees.length} />
           <Link href="/admin/employees/import" className={cn(buttonVariants({ variant: "outline" }))}>
             <Upload className="mr-2 h-4 w-4" />
             Import Basis File

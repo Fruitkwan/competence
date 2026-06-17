@@ -68,9 +68,9 @@ export async function upsertEmployee(data: EmployeeInput, isEdit: boolean) {
 
     revalidatePath("/admin/employees");
     return { success: true, data: result };
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Failed to upsert employee:", err);
-    return { error: err.message || "Failed to save employee" };
+    return { error: err instanceof Error ? err.message : "Failed to save employee" };
   }
 }
 
@@ -106,7 +106,111 @@ export async function deleteEmployee(employee_id: string) {
 
     revalidatePath("/admin/employees");
     return { success: true };
-  } catch (err: any) {
-    return { error: err.message || "Failed to delete employee" };
+  } catch (err: unknown) {
+    return { error: err instanceof Error ? err.message : "Failed to delete employee" };
   }
+}
+
+export async function resetEmployeeData() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: "Not authenticated" };
+  }
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+
+  if (profile?.role !== "admin") {
+    return { error: "Unauthorized. HR Access required." };
+  }
+
+  const results = {
+    skillGaps: 0,
+    employeeCourses: 0,
+    appraisals: 0,
+    performanceAppraisals: 0,
+    employees: 0,
+    importBatches: 0,
+  };
+
+  const deleteSteps = [
+    {
+      label: "skill gaps",
+      run: () => supabase.from("skill_gaps").delete({ count: "exact" }).neq("employee_id", ""),
+      countKey: "skillGaps" as const,
+    },
+    {
+      label: "employee courses",
+      run: () => supabase.from("employee_courses").delete({ count: "exact" }).neq("employee_id", ""),
+      countKey: "employeeCourses" as const,
+    },
+    {
+      label: "competency appraisals",
+      run: () => supabase.from("appraisals").delete({ count: "exact" }).neq("employee_id", ""),
+      countKey: "appraisals" as const,
+    },
+    {
+      label: "performance appraisals",
+      run: () => supabase.from("performance_appraisals").delete({ count: "exact" }).neq("employee_id", ""),
+      countKey: "performanceAppraisals" as const,
+    },
+  ];
+
+  for (const step of deleteSteps) {
+    const { error, count } = await step.run();
+    if (error) return { error: `Could not clear ${step.label}: ${error.message}` };
+    results[step.countKey] = count ?? 0;
+  }
+
+  const { error: profileError } = await supabase
+    .from("profiles")
+    .update({
+      employee_id: null,
+      department_id: null,
+      job_title: null,
+      country_code: null,
+      cluster: null,
+    })
+    .or("employee_id.not.is.null,department_id.not.is.null,job_title.not.is.null,country_code.not.is.null,cluster.not.is.null");
+
+  if (profileError) {
+    return { error: `Could not unlink profiles from employees: ${profileError.message}` };
+  }
+
+  const { error: employeeError, count: employeeCount } = await supabase
+    .from("employees")
+    .delete({ count: "exact" })
+    .neq("employee_id", "");
+
+  if (employeeError) {
+    return { error: `Could not clear employees: ${employeeError.message}` };
+  }
+  results.employees = employeeCount ?? 0;
+
+  const { error: batchError, count: batchCount } = await supabase
+    .from("employee_import_batches")
+    .delete({ count: "exact" })
+    .not("id", "is", null);
+
+  if (batchError) {
+    return { error: `Could not clear employee import history: ${batchError.message}` };
+  }
+  results.importBatches = batchCount ?? 0;
+
+  revalidatePath("/admin/employees");
+  revalidatePath("/admin/employees/import");
+  revalidatePath("/employees");
+  revalidatePath("/dashboard");
+  revalidatePath("/appraisals");
+  revalidatePath("/training/assign");
+  revalidatePath("/training/dashboard");
+
+  return { success: true, counts: results };
 }

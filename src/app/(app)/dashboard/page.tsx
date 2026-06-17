@@ -17,6 +17,29 @@ type AppraisalFullRow = {
   overdue: boolean;
 };
 
+type DepartmentRow = {
+  id: string;
+  name: string;
+};
+
+type ProfileDepartmentRow = {
+  employee_id: string | null;
+  department_id: string | null;
+  cluster: string | null;
+};
+
+type EmployeeDirectoryRow = {
+  employee_id: string;
+  job_title: string | null;
+  department?: string | null;
+  country_code: string | null;
+};
+
+type JobProfileRow = {
+  title: string;
+  department: string | null;
+};
+
 export default async function DashboardPage() {
   const supabase = await createClient();
 
@@ -24,15 +47,19 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser();
   let role = "employee";
   let employeeId: string | null = null;
+  let userDepartmentId: string | null = null;
+  let userCluster: string | null = null;
   let userName = "";
   if (user) {
     const { data: profile } = await supabase
       .from("profiles")
-      .select("role, employee_id, full_name")
+      .select("role, employee_id, full_name, department_id, cluster")
       .eq("id", user.id)
       .single();
     role = profile?.role ?? "employee";
     employeeId = profile?.employee_id ?? null;
+    userDepartmentId = profile?.department_id ?? null;
+    userCluster = profile?.cluster ?? null;
     userName = profile?.full_name ?? "";
   }
 
@@ -45,12 +72,29 @@ export default async function DashboardPage() {
   if (isEmployee && employeeId) {
     query = query.eq("employee_id", employeeId);
   }
-  const { data: rows } = await query;
+  let employeeQuery = supabase
+    .from("employees")
+    .select("*")
+    .eq("active", true);
+  if (isEmployee && employeeId) {
+    employeeQuery = employeeQuery.eq("employee_id", employeeId);
+  }
+  const [{ data: rows }, { data: departments }, { data: profiles }, { data: employees }, { data: jobProfiles }] = await Promise.all([
+    query,
+    supabase.from("departments").select("id, name").order("name"),
+    supabase.from("profiles").select("employee_id, department_id, cluster"),
+    employeeQuery,
+    supabase.from("job_profiles").select("title, department"),
+  ]);
 
   const all = (rows ?? []) as AppraisalFullRow[];
   const byEmp = new Map<string, AppraisalFullRow>();
   for (const r of all) byEmp.set(r.employee_id, r);
   const latest = Array.from(byEmp.values());
+  const latestByEmployeeId = new Map(latest.map((r) => [r.employee_id, r]));
+  const employeeRows = (employees ?? []) as EmployeeDirectoryRow[];
+  const employeeById = new Map(employeeRows.map((employee) => [employee.employee_id, employee]));
+  const employeeIds = new Set(employeeRows.map((employee) => employee.employee_id));
 
   const total = latest.length;
   const high = latest.filter((r) => r.priority === "HIGH").length;
@@ -60,14 +104,43 @@ export default async function DashboardPage() {
   const completed = latest.filter((r) => r.status === "Completed").length;
   const completion = total > 0 ? completed / total : 0;
 
+  const departmentRows = (departments ?? []) as DepartmentRow[];
+  const departmentNameById = new Map(departmentRows.map((d) => [d.id, d.name]));
+  const profileByEmployeeId = new Map(
+    ((profiles ?? []) as ProfileDepartmentRow[])
+      .filter((p): p is ProfileDepartmentRow & { employee_id: string } => Boolean(p.employee_id))
+      .map((p) => [p.employee_id, p])
+  );
+  const jobProfileDepartmentByTitle = new Map(
+    ((jobProfiles ?? []) as JobProfileRow[])
+      .filter((profile) => Boolean(profile.title && profile.department))
+      .map((profile) => [profile.title, profile.department as string])
+  );
+  const userDepartmentName = userDepartmentId ? departmentNameById.get(userDepartmentId) : null;
+  const seededDepartmentNames = isEmployee
+    ? [userDepartmentName ?? userCluster ?? (employeeId ? departmentForEmployee(employeeId) : null)].filter(
+        (name): name is string => Boolean(name)
+      )
+    : departmentRows.map((d) => d.name);
+
   const clusterMap = new Map<
     string,
-    { count: number; sumScore: number; sumGap: number; high: number; medium: number; low: number }
+    { count: number; assessed: number; sumScore: number; sumGap: number; high: number; medium: number; low: number }
   >();
-  for (const r of latest) {
-    const k = r.cluster ?? "—";
-    const c = clusterMap.get(k) ?? { count: 0, sumScore: 0, sumGap: 0, high: 0, medium: 0, low: 0 };
+  for (const name of seededDepartmentNames) {
+    clusterMap.set(name, { count: 0, assessed: 0, sumScore: 0, sumGap: 0, high: 0, medium: 0, low: 0 });
+  }
+  for (const employee of employeeRows) {
+    const k = departmentForEmployee(employee.employee_id);
+    const c = clusterMap.get(k) ?? { count: 0, assessed: 0, sumScore: 0, sumGap: 0, high: 0, medium: 0, low: 0 };
     c.count++;
+    clusterMap.set(k, c);
+  }
+  for (const r of latest) {
+    const k = departmentForEmployee(r.employee_id, r);
+    const c = clusterMap.get(k) ?? { count: 0, assessed: 0, sumScore: 0, sumGap: 0, high: 0, medium: 0, low: 0 };
+    if (!employeeIds.has(r.employee_id)) c.count++;
+    c.assessed++;
     c.sumScore += Number(r.current_avg ?? 0);
     c.sumGap += Number(r.gap ?? 0);
     if (r.priority === "HIGH") c.high++;
@@ -78,8 +151,8 @@ export default async function DashboardPage() {
   const clusterRows = Array.from(clusterMap.entries()).map(([name, c]) => ({
     name,
     count: c.count,
-    avgScore: c.count ? c.sumScore / c.count : 0,
-    avgGap: c.count ? c.sumGap / c.count : 0,
+    avgScore: c.assessed ? c.sumScore / c.assessed : 0,
+    avgGap: c.assessed ? c.sumGap / c.assessed : 0,
     high: c.high,
     medium: c.medium,
     low: c.low,
@@ -87,12 +160,27 @@ export default async function DashboardPage() {
 
   const countryMap = new Map<
     string,
-    { count: number; sumGap: number; high: number; completed: number }
+    { count: number; assessed: number; sumGap: number; high: number; completed: number }
   >();
-  for (const r of latest) {
-    const k = r.country_code ?? "—";
-    const c = countryMap.get(k) ?? { count: 0, sumGap: 0, high: 0, completed: 0 };
+  for (const employee of employeeRows) {
+    const appraisal = latestByEmployeeId.get(employee.employee_id);
+    const k = employee.country_code ?? appraisal?.country_code ?? "—";
+    const c = countryMap.get(k) ?? { count: 0, assessed: 0, sumGap: 0, high: 0, completed: 0 };
     c.count++;
+    if (appraisal) {
+      c.assessed++;
+      c.sumGap += Number(appraisal.gap ?? 0);
+      if (appraisal.priority === "HIGH") c.high++;
+      if (appraisal.status === "Completed") c.completed++;
+    }
+    countryMap.set(k, c);
+  }
+  for (const r of latest) {
+    if (employeeIds.has(r.employee_id)) continue;
+    const k = r.country_code ?? "—";
+    const c = countryMap.get(k) ?? { count: 0, assessed: 0, sumGap: 0, high: 0, completed: 0 };
+    c.count++;
+    c.assessed++;
     c.sumGap += Number(r.gap ?? 0);
     if (r.priority === "HIGH") c.high++;
     if (r.status === "Completed") c.completed++;
@@ -101,10 +189,23 @@ export default async function DashboardPage() {
   const countryRows = Array.from(countryMap.entries()).map(([name, c]) => ({
     name,
     count: c.count,
-    avgGap: c.count ? c.sumGap / c.count : 0,
+    avgGap: c.assessed ? c.sumGap / c.assessed : 0,
     high: c.high,
     completion: c.count ? c.completed / c.count : 0,
   }));
+
+  function departmentForEmployee(employeeIdValue: string, appraisal?: AppraisalFullRow) {
+    const employee = employeeById.get(employeeIdValue);
+    const profile = profileByEmployeeId.get(employeeIdValue);
+    return (
+      cleanDepartment(employee?.department) ??
+      (profile?.department_id ? departmentNameById.get(profile.department_id) : null) ??
+      cleanDepartment(profile?.cluster) ??
+      cleanDepartment(employee?.job_title ? jobProfileDepartmentByTitle.get(employee.job_title) : null) ??
+      cleanDepartment(appraisal?.cluster) ??
+      "-"
+    );
+  }
 
   return (
     <>
@@ -168,13 +269,13 @@ export default async function DashboardPage() {
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>By cluster</CardTitle>
+            <CardTitle>By department</CardTitle>
           </CardHeader>
           <CardContent>
             <table className="w-full text-sm">
               <thead className="text-left text-muted-foreground">
                 <tr>
-                  <th className="pb-2">Cluster</th>
+                  <th className="pb-2">Department</th>
                   <th className="pb-2">Emp.</th>
                   <th className="pb-2">Avg score</th>
                   <th className="pb-2">Avg gap</th>
@@ -259,4 +360,9 @@ function StatCard({
       </CardContent>
     </Card>
   );
+}
+
+function cleanDepartment(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
 }

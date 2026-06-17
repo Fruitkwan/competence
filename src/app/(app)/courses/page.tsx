@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/table";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
+import { formatCourseDevelops } from "@/lib/course-format";
 
 export default async function CoursesPage() {
   const supabase = await createClient();
@@ -62,7 +63,7 @@ export default async function CoursesPage() {
               {courses?.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.title}</TableCell>
-                  <TableCell className="text-muted-foreground">{c.develops}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatCourseDevelops(c.develops) || "—"}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       {c.cluster_fit.map((cf) => (

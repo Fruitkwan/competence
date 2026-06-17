@@ -1,20 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
-import { Plus, Trash2, CheckCircle2, Clock, PlayCircle, Loader2 } from "lucide-react";
+import { Check, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
+import { formatCourseDevelops } from "@/lib/course-format";
+import { assignCourseToEmployee, updateEmployeeCourseStatus } from "@/lib/actions/training";
 import { toast } from "sonner";
 
 type Employee = { employee_id: string; full_name: string; job_title: string };
 type Course = { id: string; title: string; develops: string | null };
+type PickerOption = { value: string; label: string; meta?: string };
 type Assignment = {
   id: string;
   employee_id: string;
@@ -50,6 +52,24 @@ export function AssignCourseForm({
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const employeeOptions = useMemo<PickerOption[]>(
+    () =>
+      employees.map((employee) => ({
+        value: employee.employee_id,
+        label: `${employee.employee_id} - ${employee.full_name}`,
+        meta: employee.job_title,
+      })),
+    [employees]
+  );
+  const courseOptions = useMemo<PickerOption[]>(
+    () =>
+      courses.map((course) => ({
+        value: course.id,
+        label: course.title,
+        meta: formatCourseDevelops(course.develops) || undefined,
+      })),
+    [courses]
+  );
 
   async function handleAssign() {
     if (!selectedEmployee || !selectedCourse) {
@@ -57,21 +77,16 @@ export function AssignCourseForm({
       return;
     }
     setSaving(true);
-    const supabase = createClient();
-    const { data, error } = await supabase
-      .from("employee_courses")
-      .insert({ employee_id: selectedEmployee, course_id: selectedCourse, status: "Enrolled" })
-      .select("id, employee_id, course_id, status, enrolled_at, started_at, completed_at, score")
-      .single();
+    const result = await assignCourseToEmployee(selectedEmployee, selectedCourse);
 
-    if (error) {
-      toast.error(error.code === "23505" ? "This employee is already enrolled in this course." : error.message);
-    } else if (data) {
+    if (result.error) {
+      toast.error(result.error);
+    } else if (result.data) {
       const emp = employees.find((e) => e.employee_id === selectedEmployee);
       const crs = courses.find((c) => c.id === selectedCourse);
       setAssignments((prev) => [
         {
-          ...data,
+          ...result.data,
           employee_name: emp?.full_name ?? selectedEmployee,
           course_title: crs?.title ?? "",
         },
@@ -85,22 +100,21 @@ export function AssignCourseForm({
   }
 
   async function handleUpdateStatus(id: string, newStatus: string) {
-    const supabase = createClient();
-    const updates: {
-      status: string;
-      started_at?: string;
-      completed_at?: string;
-    } = { status: newStatus };
-    if (newStatus === "In Progress") updates.started_at = new Date().toISOString();
-    if (newStatus === "Completed") updates.completed_at = new Date().toISOString();
-
-    const { error } = await supabase.from("employee_courses").update(updates as never).eq("id", id);
-    if (error) {
-      toast.error(error.message);
+    const result = await updateEmployeeCourseStatus(id, newStatus);
+    if (result.error) {
+      toast.error(result.error);
     } else {
+      const now = new Date().toISOString();
       setAssignments((prev) =>
         prev.map((a) =>
-          a.id === id ? { ...a, status: newStatus, ...(newStatus === "Completed" ? { completed_at: new Date().toISOString() } : {}) } : a
+          a.id === id
+            ? {
+                ...a,
+                status: newStatus,
+                ...(newStatus === "In Progress" ? { started_at: now } : {}),
+                ...(newStatus === "Completed" ? { completed_at: now } : {}),
+              }
+            : a
         )
       );
       toast.success("Status updated.");
@@ -131,42 +145,32 @@ export function AssignCourseForm({
   return (
     <div className="space-y-6">
       {/* Assign form */}
-      <Card>
+      <Card className="overflow-visible">
         <CardHeader>
           <CardTitle>Assign Course to Employee</CardTitle>
           <CardDescription>Select an employee and a course, then click Assign.</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-visible transition-[padding] has-[.training-picker-open]:pb-72">
           <div className="flex flex-wrap items-end gap-3">
             <div className="min-w-[200px] flex-1">
               <label className="mb-1 block text-xs font-medium text-muted-foreground">Employee</label>
-              <select
+              <SearchablePicker
+                options={employeeOptions}
                 value={selectedEmployee}
-                onChange={(e) => setSelectedEmployee(e.target.value)}
-                className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                <option value="">Select employee...</option>
-                {employees.map((e) => (
-                  <option key={e.employee_id} value={e.employee_id}>
-                    {e.employee_id} — {e.full_name} ({e.job_title})
-                  </option>
-                ))}
-              </select>
+                onChange={setSelectedEmployee}
+                placeholder="Type employee ID or name..."
+                emptyText="No employees match."
+              />
             </div>
             <div className="min-w-[200px] flex-1">
               <label className="mb-1 block text-xs font-medium text-muted-foreground">Course</label>
-              <select
+              <SearchablePicker
+                options={courseOptions}
                 value={selectedCourse}
-                onChange={(e) => setSelectedCourse(e.target.value)}
-                className="h-9 w-full rounded-lg border border-input bg-transparent px-3 text-sm outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                <option value="">Select course...</option>
-                {courses.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.title}{c.develops ? ` (${c.develops})` : ""}
-                  </option>
-                ))}
-              </select>
+                onChange={setSelectedCourse}
+                placeholder="Type course title or focus..."
+                emptyText="No courses match."
+              />
             </div>
             <Button onClick={handleAssign} disabled={saving} className="gap-1.5">
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
@@ -253,6 +257,97 @@ export function AssignCourseForm({
           </Table>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+function SearchablePicker({
+  options,
+  value,
+  onChange,
+  placeholder,
+  emptyText,
+}: {
+  options: PickerOption[];
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  emptyText: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const selected = options.find((option) => option.value === value) ?? null;
+  const visibleText = open ? query : selected ? selected.label : "";
+  const filtered = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const matches = needle
+      ? options.filter((option) =>
+          [option.label, option.meta].filter(Boolean).join(" ").toLowerCase().includes(needle)
+        )
+      : options;
+    return matches.slice(0, 40);
+  }, [options, query]);
+
+  function choose(option: PickerOption) {
+    onChange(option.value);
+    setQuery("");
+    setOpen(false);
+  }
+
+  return (
+    <div className={cn("relative", open && "training-picker-open")}>
+      <div className="flex h-9 items-center gap-2 rounded-lg border border-input bg-transparent px-3 text-sm outline-none transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
+        <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <input
+          value={visibleText}
+          onFocus={() => {
+            setOpen(true);
+            setQuery("");
+          }}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setOpen(true);
+            if (value) onChange("");
+          }}
+          onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+          placeholder={placeholder}
+          className="h-full min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
+        />
+      </div>
+
+      {open && (
+        <div className="absolute z-50 mt-1 max-h-72 w-full overflow-y-auto rounded-lg border border-input bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10">
+          {filtered.length === 0 ? (
+            <div className="px-3 py-4 text-center text-sm text-muted-foreground">{emptyText}</div>
+          ) : (
+            filtered.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => choose(option)}
+                className={cn(
+                  "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm hover:bg-accent hover:text-accent-foreground",
+                  option.value === value && "bg-accent text-accent-foreground"
+                )}
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate font-medium">{option.label}</span>
+                  {option.meta ? (
+                    <span className="block truncate text-xs text-muted-foreground">{option.meta}</span>
+                  ) : null}
+                </span>
+                {option.value === value ? <Check className="h-4 w-4 shrink-0 text-primary" /> : null}
+              </button>
+            ))
+          )}
+          {options.length > filtered.length ? (
+            <div className="px-3 py-2 text-center text-xs text-muted-foreground">
+              Showing {filtered.length} of {options.length}. Keep typing to narrow.
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

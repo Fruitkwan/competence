@@ -215,7 +215,7 @@ export function EmployeeImportForm() {
               id: employee.employee_id,
               name: employee.full_name,
               job: employee.job_title,
-              detail: employee.manager_name ?? "No manager",
+              detail: employee.department ?? employee.manager_name ?? "No manager",
             }))}
             empty="No new employees."
           />
@@ -282,7 +282,7 @@ function PreviewTable({
               <TableHead>Employee ID</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Designation</TableHead>
-              <TableHead>Details</TableHead>
+              <TableHead>Manager</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
