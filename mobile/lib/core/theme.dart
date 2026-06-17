@@ -16,7 +16,7 @@ ThemeData buildAppTheme(Brightness brightness) {
       elevation: 0,
       centerTitle: false,
     ),
-    cardTheme: CardTheme(
+    cardTheme: CardThemeData(
       elevation: 0,
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(

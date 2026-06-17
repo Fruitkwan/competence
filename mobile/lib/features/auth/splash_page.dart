@@ -1,7 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../core/auth_controller.dart';
+import '../../core/env.dart';
 import '../../core/supabase_client.dart';
 
 class SplashPage extends ConsumerStatefulWidget {
@@ -18,9 +21,19 @@ class _SplashPageState extends ConsumerState<SplashPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _decide());
   }
 
-  void _decide() {
-    final user = ref.read(supabaseProvider).auth.currentUser;
+  Future<void> _decide() async {
+    final supabase = ref.read(supabaseProvider);
+
+    if (Env.devAutoLoginEnabled && supabase.auth.currentUser == null) {
+      try {
+        await ref.read(authControllerProvider).devAutoSignIn();
+      } catch (e, st) {
+        debugPrint('Dev auto-login failed: $e\n$st');
+      }
+    }
+
     if (!mounted) return;
+    final user = ref.read(supabaseProvider).auth.currentUser;
     if (user == null) {
       context.go('/login');
     } else {

@@ -44,7 +44,13 @@ export async function GET(request: NextRequest) {
   const search = request.nextUrl.searchParams;
   const query = (search.get("q") ?? "").toLowerCase().trim();
   const status = search.get("status") ?? "";
-  const priority = search.get("priority") ?? "";
+  const priorityParam = search.get("priority") ?? "";
+  const priority =
+    priorityParam === "HIGH" ||
+    priorityParam === "MEDIUM" ||
+    priorityParam === "LOW"
+      ? priorityParam
+      : null;
   const cluster = search.get("cluster") ?? "";
   const country = search.get("country") ?? "";
   const overdueOnly = search.get("overdue") === "1";
@@ -93,7 +99,7 @@ export async function GET(request: NextRequest) {
     q = q.eq("manager_name", myDisplayName);
   }
   if (status) q = q.eq("status", status);
-  if (priority) q = q.eq("priority", priority);
+  if (priority !== null) q = q.eq("priority", priority);
   if (cluster) q = q.eq("cluster", cluster);
   if (country) q = q.eq("country_code", country);
   if (overdueOnly) q = q.eq("overdue", true);

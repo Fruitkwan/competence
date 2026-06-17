@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class Env {
@@ -21,4 +22,16 @@ class Env {
     final value = dotenv.maybeGet('ENABLE_PUSH')?.toLowerCase();
     return value == 'true' || value == '1' || value == 'yes';
   }
+
+  /// Debug-only: auto sign-in on launch (see splash_page.dart).
+  static bool get devAutoLoginEnabled {
+    if (!kDebugMode) return false;
+    return devAutoLoginEmail.isNotEmpty && devAutoLoginPassword.isNotEmpty;
+  }
+
+  static String get devAutoLoginEmail =>
+      dotenv.maybeGet('DEV_AUTO_LOGIN_EMAIL')?.trim() ?? '';
+
+  static String get devAutoLoginPassword =>
+      dotenv.maybeGet('DEV_AUTO_LOGIN_PASSWORD') ?? '';
 }

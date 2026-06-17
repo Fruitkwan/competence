@@ -1,8 +1,10 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../data/models/profile.dart';
 import '../data/repositories/profile_repository.dart';
+import 'env.dart';
 import 'role.dart';
 import 'supabase_client.dart';
 
@@ -43,6 +45,16 @@ class AuthController {
   }
 
   Future<void> signOut() => _supabase.auth.signOut();
+
+  /// Debug-only password sign-in to skip the OTP flow during local development.
+  Future<void> devAutoSignIn() async {
+    assert(kDebugMode);
+    if (!Env.devAutoLoginEnabled) return;
+    await _supabase.auth.signInWithPassword(
+      email: Env.devAutoLoginEmail,
+      password: Env.devAutoLoginPassword,
+    );
+  }
 }
 
 final authControllerProvider = Provider<AuthController>((ref) {
