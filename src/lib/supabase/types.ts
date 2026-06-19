@@ -439,6 +439,58 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["employee_courses"]["Insert"]>;
         Relationships: [];
       };
+      training_survey_responses: {
+        Row: {
+          id: string;
+          user_id: string;
+          employee_id: string | null;
+          full_name: string;
+          job_title: string;
+          department: string;
+          role_level: string;
+          email: string;
+          manager_name: string | null;
+          learn_departments: string[];
+          learn_topics: string | null;
+          urgency: string | null;
+          preferred_format: string | null;
+          learning_hours: string | null;
+          teach_departments: string[];
+          teach_topics: string | null;
+          confidence: string | null;
+          teaching_hours: string | null;
+          recommended_trainers: string | null;
+          comments: string | null;
+          status: "submitted" | "reviewed" | "actioned" | "archived";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          employee_id?: string | null;
+          full_name: string;
+          job_title: string;
+          department: string;
+          role_level: string;
+          email: string;
+          manager_name?: string | null;
+          learn_departments?: string[];
+          learn_topics?: string | null;
+          urgency?: string | null;
+          preferred_format?: string | null;
+          learning_hours?: string | null;
+          teach_departments?: string[];
+          teach_topics?: string | null;
+          confidence?: string | null;
+          teaching_hours?: string | null;
+          recommended_trainers?: string | null;
+          comments?: string | null;
+          status?: "submitted" | "reviewed" | "actioned" | "archived";
+        };
+        Update: Partial<Database["public"]["Tables"]["training_survey_responses"]["Insert"]>;
+        Relationships: [];
+      };
       departments: {
         Row: {
           id: string;

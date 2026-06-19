@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { NOTIFICATION_TYPES } from "@/lib/constants/notification-types";
+import { createNotification } from "@/lib/notifications/create-notification";
 
 type CourseStatus = "Enrolled" | "In Progress" | "Completed" | "Dropped";
 
@@ -72,6 +73,67 @@ export async function updateEmployeeCourseStatus(assignmentId: string, status: s
   return { success: true };
 }
 
+export async function updateOwnEmployeeCourseStatus(assignmentId: string, status: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  if (status !== "In Progress" && status !== "Completed") {
+    return { error: "Employees can only start or complete assigned courses." };
+  }
+
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("employee_id")
+    .eq("id", user.id)
+    .single();
+
+  if (profileError) return { error: profileError.message };
+  if (!profile?.employee_id) return { error: "Your user profile is not linked to an employee record." };
+
+  const { data: existing, error: existingError } = await supabase
+    .from("employee_courses")
+    .select("id, employee_id, course_id, status, started_at")
+    .eq("id", assignmentId)
+    .eq("employee_id", profile.employee_id)
+    .single();
+
+  if (existingError || !existing) return { error: existingError?.message ?? "Assignment not found." };
+  if (existing.status === "Dropped") return { error: "Dropped courses cannot be updated by employees." };
+  if (existing.status === "Completed") return { success: true };
+
+  const nextStatus = status as Extract<CourseStatus, "In Progress" | "Completed">;
+  const now = new Date().toISOString();
+  const updates: {
+    status: CourseStatus;
+    started_at?: string;
+    completed_at?: string;
+  } = { status: nextStatus };
+
+  if (nextStatus === "In Progress" && !existing.started_at) updates.started_at = now;
+  if (nextStatus === "Completed") {
+    if (!existing.started_at) updates.started_at = now;
+    updates.completed_at = now;
+  }
+
+  const { error } = await supabase
+    .from("employee_courses")
+    .update(updates)
+    .eq("id", existing.id)
+    .eq("employee_id", profile.employee_id);
+
+  if (error) return { error: error.message };
+
+  if (nextStatus === "Completed") {
+    await notifyCourseCompleted(existing.employee_id, existing.course_id);
+  }
+
+  revalidateTrainingPaths();
+  return { success: true };
+}
+
 async function requireTrainingManager() {
   const supabase = await createClient();
   const {
@@ -90,7 +152,6 @@ async function requireTrainingManager() {
 }
 
 async function notifyCourseAssigned(employeeId: string, courseId: string) {
-  const supabase = await createClient();
   const [employee, course] = await Promise.all([
     getEmployeeNotificationContext(employeeId),
     getCourseTitle(courseId),
@@ -98,7 +159,7 @@ async function notifyCourseAssigned(employeeId: string, courseId: string) {
 
   if (!employee.employeeUserId) return;
 
-  await supabase.from("notifications").insert({
+  await createNotification({
     user_id: employee.employeeUserId,
     type: NOTIFICATION_TYPES.COURSE_ASSIGNED,
     title: `New course assigned: ${course}`,
@@ -109,7 +170,6 @@ async function notifyCourseAssigned(employeeId: string, courseId: string) {
 }
 
 async function notifyCourseCompleted(employeeId: string, courseId: string) {
-  const supabase = await createClient();
   const [employee, course] = await Promise.all([
     getEmployeeNotificationContext(employeeId),
     getCourseTitle(courseId),
@@ -117,7 +177,7 @@ async function notifyCourseCompleted(employeeId: string, courseId: string) {
 
   if (!employee.managerUserId) return;
 
-  await supabase.from("notifications").insert({
+  await createNotification({
     user_id: employee.managerUserId,
     type: NOTIFICATION_TYPES.COURSE_COMPLETED,
     title: `${employee.fullName} completed ${course}`,
@@ -172,6 +232,7 @@ async function getCourseTitle(courseId: string) {
 
 function revalidateTrainingPaths() {
   revalidatePath("/");
+  revalidatePath("/dashboard");
   revalidatePath("/notifications");
   revalidatePath("/training/assign");
   revalidatePath("/training/my-courses");

@@ -1,10 +1,11 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { Download } from "lucide-react";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { PageHeader } from "@/components/page-header";
 import { HeatmapTable } from "@/components/training/heatmap-table";
@@ -23,6 +24,8 @@ export type TrainingDashboardData = {
   heatmapRows: (number | null)[][];
   recentAssignments: AssignmentRow[];
   assignments: AssignmentRow[];
+  recentSurveyResponses: SurveyResponseRow[];
+  surveyResponses: SurveyResponseRow[];
 };
 
 type AssignmentRow = {
@@ -41,6 +44,22 @@ type AssignmentRow = {
   avatarBg: string;
 };
 
+type SurveyResponseRow = {
+  id: string;
+  initials: string;
+  name: string;
+  employeeId: string | null;
+  role: string;
+  dept: string;
+  wantsToLearnFrom: string[];
+  topics: string | null;
+  urgency: UrgencyLevel;
+  preferredFormat: string | null;
+  status: "submitted" | "reviewed" | "actioned" | "archived";
+  createdAt: string;
+  avatarBg: string;
+};
+
 const URGENCY_DOT: Record<UrgencyLevel, string> = {
   Critical: "bg-red-500",
   High: "bg-orange-500",
@@ -52,6 +71,20 @@ const STATUS_STYLE: Record<RequestStatus, string> = {
   Matched: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400",
   Pending: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400",
   Unmatched: "bg-muted text-muted-foreground",
+};
+
+const SURVEY_STATUS_STYLE: Record<SurveyResponseRow["status"], string> = {
+  submitted: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400",
+  reviewed: "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400",
+  actioned: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400",
+  archived: "bg-muted text-muted-foreground",
+};
+
+const SURVEY_STATUS_LABEL: Record<SurveyResponseRow["status"], string> = {
+  submitted: "Submitted",
+  reviewed: "Reviewed",
+  actioned: "Actioned",
+  archived: "Archived",
 };
 
 const DEPT_TAG: Record<string, string> = {
@@ -78,12 +111,15 @@ export function TrainingDashboardClient({ data }: { data: TrainingDashboardData 
     return matchesDept && matchesType && (!search || haystack.includes(search.toLowerCase()));
   });
   const recentAssignments = data.assignments.filter((row) => row.trainingType === activeType).slice(0, 6);
+  const filteredSurveyResponses = data.surveyResponses.filter((response) => matchesSurveyDept(response, activeDept));
+  const recentSurveyResponses =
+    activeType === "cross_functional" ? data.recentSurveyResponses.filter((response) => matchesSurveyDept(response, activeDept)) : [];
 
   return (
     <>
       <PageHeader
         title="Training Dashboard"
-        description="Manager dashboard — training demand, assignments, and employee course progress."
+        description="Manager dashboard - training demand, assignments, and employee course progress."
         actions={
           <>
             {data.cycles.length > 0 && <NativeSelect options={data.cycles} />}
@@ -146,7 +182,7 @@ export function TrainingDashboardClient({ data }: { data: TrainingDashboardData 
         <Card>
           <CardHeader>
             <CardTitle>Training demand heatmap</CardTitle>
-            <CardDescription>Rows = employee department · Columns = course fit</CardDescription>
+            <CardDescription>Rows = employee department · Columns = requested learning department</CardDescription>
           </CardHeader>
           <CardContent>
             {data.heatmapDepartments.length > 0 ? (
@@ -159,8 +195,101 @@ export function TrainingDashboardClient({ data }: { data: TrainingDashboardData 
 
         <Card>
           <CardHeader>
-            <CardTitle>Recent training assignments</CardTitle>
-            <CardDescription>Latest employee course records</CardDescription>
+            <CardTitle>Recent survey demand</CardTitle>
+            <CardDescription>Latest employee training feedback</CardDescription>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                  <th className="pb-2">Employee</th>
+                  <th className="pb-2">Wants to learn from</th>
+                  <th className="pb-2">Urgency</th>
+                  <th className="pb-2">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentSurveyResponses.map((response) => (
+                  <tr key={response.id} className="border-t border-border">
+                    <td className="py-2.5">
+                      <SurveyEmployeeCell response={response} />
+                    </td>
+                    <td className="max-w-[240px] text-muted-foreground">
+                      {response.wantsToLearnFrom.length ? response.wantsToLearnFrom.join(", ") : "-"}
+                    </td>
+                    <td>
+                      <UrgencyLabel urgency={response.urgency} />
+                    </td>
+                    <td>
+                      <SurveyStatusBadge status={response.status} />
+                    </td>
+                  </tr>
+                ))}
+                {recentSurveyResponses.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="py-8 text-center text-sm text-muted-foreground">
+                      No survey demand for this view.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            <div className="mt-3 text-right">
+              <Link href="/training/survey/results" className="text-xs font-medium text-primary hover:underline">
+                View all survey results
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="mt-5">
+        <CardHeader>
+          <CardTitle>Recent training assignments</CardTitle>
+          <CardDescription>Latest employee course records</CardDescription>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                <th className="pb-2">Employee</th>
+                <th className="pb-2">Department</th>
+                <th className="pb-2">Course</th>
+                <th className="pb-2">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {recentAssignments.map((assignment) => (
+                <tr key={assignment.id} className="border-t border-border">
+                  <td className="py-2.5">
+                    <EmployeeCell assignment={assignment} />
+                  </td>
+                  <td>
+                    <DepartmentBadge department={assignment.dept} />
+                  </td>
+                  <td className="text-muted-foreground">{assignment.course}</td>
+                  <td>
+                    <StatusBadge status={assignment.status} />
+                  </td>
+                </tr>
+              ))}
+              {recentAssignments.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="py-8 text-center text-sm text-muted-foreground">
+                    No training assignments yet.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+
+      {activeType === "cross_functional" && (
+        <Card className="mt-5">
+          <CardHeader>
+            <CardTitle>Survey demand details</CardTitle>
+            <CardDescription>Employee requests from the live training survey</CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -168,35 +297,41 @@ export function TrainingDashboardClient({ data }: { data: TrainingDashboardData 
                 <tr className="text-left text-[11px] uppercase tracking-wide text-muted-foreground">
                   <th className="pb-2">Employee</th>
                   <th className="pb-2">Department</th>
-                  <th className="pb-2">Course</th>
+                  <th className="pb-2">Wants to learn from</th>
+                  <th className="pb-2">Topics</th>
+                  <th className="pb-2">Format</th>
+                  <th className="pb-2">Urgency</th>
+                  <th className="pb-2">Submitted</th>
                   <th className="pb-2">Status</th>
-                  <th className="pb-2"></th>
                 </tr>
               </thead>
               <tbody>
-                {recentAssignments.map((assignment) => (
-                  <tr key={assignment.id} className="border-t border-border">
+                {filteredSurveyResponses.map((response) => (
+                  <tr key={response.id} className="border-t border-border">
                     <td className="py-2.5">
-                      <EmployeeCell assignment={assignment} />
+                      <SurveyEmployeeCell response={response} />
                     </td>
                     <td>
-                      <DepartmentBadge department={assignment.dept} />
+                      <DepartmentBadge department={response.dept} />
                     </td>
-                    <td className="text-muted-foreground">{assignment.course}</td>
-                    <td>
-                      <StatusBadge status={assignment.status} />
+                    <td className="max-w-[220px] text-muted-foreground">
+                      {response.wantsToLearnFrom.length ? response.wantsToLearnFrom.join(", ") : "-"}
                     </td>
+                    <td className="max-w-[260px] text-muted-foreground">{response.topics ?? "-"}</td>
+                    <td className="text-muted-foreground">{response.preferredFormat ?? "-"}</td>
                     <td>
-                      <Button variant="outline" size="xs">
-                        View
-                      </Button>
+                      <UrgencyLabel urgency={response.urgency} />
+                    </td>
+                    <td className="text-muted-foreground">{formatDate(response.createdAt)}</td>
+                    <td>
+                      <SurveyStatusBadge status={response.status} />
                     </td>
                   </tr>
                 ))}
-                {recentAssignments.length === 0 && (
+                {filteredSurveyResponses.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-sm text-muted-foreground">
-                      No training assignments yet.
+                    <td colSpan={8} className="py-8 text-center text-sm text-muted-foreground">
+                      No survey demand matches your filters.
                     </td>
                   </tr>
                 )}
@@ -204,7 +339,7 @@ export function TrainingDashboardClient({ data }: { data: TrainingDashboardData 
             </table>
           </CardContent>
         </Card>
-      </div>
+      )}
 
       <Card className="mt-5">
         <CardHeader className="flex-row items-center justify-between gap-4">
@@ -248,10 +383,7 @@ export function TrainingDashboardClient({ data }: { data: TrainingDashboardData 
                   <td className="text-muted-foreground">{assignment.course}</td>
                   <td className="text-muted-foreground">{assignment.focus}</td>
                   <td>
-                    <span className="flex items-center gap-1.5">
-                      <span className={cn("inline-block h-2 w-2 rounded-full", URGENCY_DOT[assignment.urgency])} />
-                      {assignment.urgency}
-                    </span>
+                    <UrgencyLabel urgency={assignment.urgency} />
                   </td>
                   <td className="text-muted-foreground">{formatDate(assignment.enrolledAt)}</td>
                   <td className="text-muted-foreground">{formatDate(assignment.completedAt)}</td>
@@ -272,6 +404,25 @@ export function TrainingDashboardClient({ data }: { data: TrainingDashboardData 
         </CardContent>
       </Card>
     </>
+  );
+}
+
+function SurveyEmployeeCell({ response }: { response: SurveyResponseRow }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div
+        className={cn(
+          "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[11px] font-bold",
+          response.avatarBg
+        )}
+      >
+        {response.initials}
+      </div>
+      <div>
+        <div className="font-medium">{response.name}</div>
+        <div className="text-[11px] text-muted-foreground">{response.role}</div>
+      </div>
+    </div>
   );
 }
 
@@ -302,10 +453,27 @@ function DepartmentBadge({ department }: { department: string }) {
   );
 }
 
+function UrgencyLabel({ urgency }: { urgency: UrgencyLevel }) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className={cn("inline-block h-2 w-2 rounded-full", URGENCY_DOT[urgency])} />
+      {urgency}
+    </span>
+  );
+}
+
 function StatusBadge({ status }: { status: RequestStatus }) {
   return (
     <span className={cn("inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold", STATUS_STYLE[status])}>
       {status}
+    </span>
+  );
+}
+
+function SurveyStatusBadge({ status }: { status: SurveyResponseRow["status"] }) {
+  return (
+    <span className={cn("inline-block rounded-full px-2.5 py-0.5 text-[11px] font-semibold", SURVEY_STATUS_STYLE[status])}>
+      {SURVEY_STATUS_LABEL[status]}
     </span>
   );
 }
@@ -325,6 +493,14 @@ function NativeSelect({ options }: { options: string[] }) {
         <option key={option}>{option}</option>
       ))}
     </select>
+  );
+}
+
+function matchesSurveyDept(response: SurveyResponseRow, activeDept: string) {
+  return (
+    activeDept === "All departments" ||
+    response.dept === activeDept ||
+    response.wantsToLearnFrom.includes(activeDept)
   );
 }
 

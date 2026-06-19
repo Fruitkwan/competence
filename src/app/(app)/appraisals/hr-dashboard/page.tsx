@@ -17,6 +17,9 @@ type DashboardAppraisal = {
   calibrated_rating: number | null;
   final_rating: number | null;
   total_weighted_score: number | null;
+  employee_signed_at: string | null;
+  manager_signed_at: string | null;
+  hr_signed_at: string | null;
   created_at: string;
   employees?: {
     full_name?: string | null;
@@ -51,6 +54,9 @@ export default async function HRDashboardPage() {
       calibrated_rating,
       final_rating,
       total_weighted_score,
+      employee_signed_at,
+      manager_signed_at,
+      hr_signed_at,
       created_at,
       employees!performance_appraisals_employee_id_fkey (full_name, department)
     `)
@@ -58,7 +64,7 @@ export default async function HRDashboardPage() {
   const appraisals = (appraisalsRaw ?? []) as unknown as DashboardAppraisal[];
 
   const totalAppraisals = appraisals.length;
-  const pendingCalibration = appraisals.filter((a) => a.status === "N2 Complete");
+  const pendingCalibration = appraisals.filter((a) => a.employee_signed_at && a.manager_signed_at && !a.hr_signed_at);
   const finalAppraisals = appraisals.filter((a) => a.status === "Final");
   const inProgress = appraisals.filter((a) => a.status === "Draft" || a.status === "N1 Complete");
 

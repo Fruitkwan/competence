@@ -46,7 +46,22 @@ type AssignmentRow = {
   completed_at: string | null;
 };
 
+type SurveyResponseRow = {
+  id: string;
+  full_name: string;
+  employee_id: string | null;
+  job_title: string;
+  department: string;
+  learn_departments: string[];
+  learn_topics: string | null;
+  urgency: string | null;
+  preferred_format: string | null;
+  status: "submitted" | "reviewed" | "actioned" | "archived";
+  created_at: string;
+};
+
 type DashboardAssignment = TrainingDashboardData["assignments"][number];
+type DashboardSurveyResponse = TrainingDashboardData["surveyResponses"][number];
 
 export default async function TrainingDashboardPage() {
   const supabase = await createClient();
@@ -58,7 +73,7 @@ export default async function TrainingDashboardPage() {
 
   const { data: currentProfile } = await supabase
     .from("profiles")
-    .select("role, employee_id")
+    .select("role, employee_id, cluster")
     .eq("id", user.id)
     .single();
 
@@ -73,12 +88,17 @@ export default async function TrainingDashboardPage() {
     .select("id, employee_id, course_id, status, enrolled_at, completed_at")
     .order("enrolled_at", { ascending: false });
 
+  const surveyResponsesQuery = supabase
+    .from("training_survey_responses")
+    .select("id, full_name, employee_id, job_title, department, learn_departments, learn_topics, urgency, preferred_format, status, created_at")
+    .order("created_at", { ascending: false });
+
   if (currentProfile?.role === "employee" && currentProfile.employee_id) {
     employeesQuery = employeesQuery.eq("employee_id", currentProfile.employee_id);
     assignmentsQuery = assignmentsQuery.eq("employee_id", currentProfile.employee_id);
   }
 
-  const [employeesRes, profilesRes, departmentsRes, coursesRes, assignmentsRes, cyclesRes, courseRulesRes, jobProfilesRes] = await Promise.all([
+  const [employeesRes, profilesRes, departmentsRes, coursesRes, assignmentsRes, cyclesRes, courseRulesRes, jobProfilesRes, surveyResponsesRes] = await Promise.all([
     employeesQuery,
     supabase.from("profiles").select("employee_id, department_id, cluster"),
     supabase.from("departments").select("id, name").order("name"),
@@ -87,16 +107,32 @@ export default async function TrainingDashboardPage() {
     supabase.from("appraisal_cycles").select("name, status, start_date").order("start_date", { ascending: false }),
     supabase.from("course_rules").select("course_id"),
     supabase.from("job_profiles").select("title, department"),
+    surveyResponsesQuery,
   ]);
 
-  const employees = (employeesRes.data ?? []) as EmployeeRow[];
+  const rawEmployees = (employeesRes.data ?? []) as EmployeeRow[];
   const profiles = (profilesRes.data ?? []) as ProfileRow[];
   const departments = (departmentsRes.data ?? []) as DepartmentRow[];
   const courses = (coursesRes.data ?? []) as CourseRow[];
-  const assignments = (assignmentsRes.data ?? []) as AssignmentRow[];
+  const rawAssignments = (assignmentsRes.data ?? []) as AssignmentRow[];
   const courseRules = (courseRulesRes.data ?? []) as CourseRuleRow[];
   const jobProfiles = (jobProfilesRes.data ?? []) as JobProfileRow[];
+  const rawSurveyResponses = (surveyResponsesRes.data ?? []) as SurveyResponseRow[];
   const cycles = (cyclesRes.data ?? []).map((cycle) => `${cycle.name} (${cycle.status})`);
+
+  const managerDepartment = currentProfile?.role === "manager"
+    ? rawEmployees.find((employee) => employee.employee_id === currentProfile.employee_id)?.department ?? currentProfile.cluster
+    : null;
+  const employees = managerDepartment
+    ? rawEmployees.filter((employee) => employee.department === managerDepartment)
+    : rawEmployees;
+  const employeeIds = new Set(employees.map((employee) => employee.employee_id));
+  const assignments = managerDepartment
+    ? rawAssignments.filter((assignment) => employeeIds.has(assignment.employee_id))
+    : rawAssignments;
+  const surveyResponses = managerDepartment
+    ? rawSurveyResponses.filter((response) => cleanDepartment(response.department) === managerDepartment)
+    : rawSurveyResponses;
 
   const employeeById = new Map(employees.map((employee) => [employee.employee_id, employee]));
   const profileByEmployeeId = new Map(
@@ -148,13 +184,31 @@ export default async function TrainingDashboardPage() {
     };
   });
 
+  const surveyRows: DashboardSurveyResponse[] = surveyResponses.map((response, index) => ({
+    id: response.id,
+    initials: initials(response.full_name),
+    name: response.full_name,
+    employeeId: response.employee_id,
+    role: response.job_title,
+    dept: cleanDepartment(response.department) ?? "Unassigned",
+    wantsToLearnFrom: normalizeDepartments(response.learn_departments),
+    topics: response.learn_topics,
+    urgency: surveyUrgency(response.urgency),
+    preferredFormat: response.preferred_format,
+    status: response.status,
+    createdAt: response.created_at,
+    avatarBg: avatarClass(index + assignmentRows.length),
+  }));
+
   const departmentsInUse = uniqueSorted([
     ...employees.map((employee) => departmentForEmployee(employee.employee_id)),
     ...departments.map((department) => department.name),
+    ...surveyRows.map((response) => response.dept),
   ]);
   const heatmapDepartments = uniqueSorted([
     ...departmentsInUse,
     ...assignments.flatMap((assignment) => courseById.get(assignment.course_id)?.cluster_fit ?? []),
+    ...surveyRows.flatMap((response) => response.wantsToLearnFrom),
   ]).slice(0, 8);
   const heatmapIndex = new Map(heatmapDepartments.map((department, index) => [department, index]));
   const heatmapRows: (number | null)[][] = heatmapDepartments.map((rowDept) =>
@@ -177,8 +231,19 @@ export default async function TrainingDashboardPage() {
     }
   }
 
+  for (const response of surveyRows) {
+    const rowIndex = heatmapIndex.get(response.dept);
+    if (rowIndex == null) continue;
+
+    for (const targetDepartment of response.wantsToLearnFrom) {
+      const colIndex = heatmapIndex.get(targetDepartment);
+      if (colIndex == null || rowIndex === colIndex) continue;
+      heatmapRows[rowIndex][colIndex] = (heatmapRows[rowIndex][colIndex] ?? 0) + 1;
+    }
+  }
+
   const assignedDepartments = new Set(assignmentRows.map((row) => row.dept));
-  const criticalCount = assignmentRows.filter((row) => row.urgency === "Critical").length;
+  const openSurveyDemand = surveyRows.filter((row) => row.status === "submitted" || row.status === "reviewed").length;
   const activeDepartmentCount = departmentsInUse.filter((department) => department !== "Unassigned").length;
 
   const data: TrainingDashboardData = {
@@ -191,25 +256,27 @@ export default async function TrainingDashboardPage() {
     filters: ["All departments", ...departmentsInUse],
     metrics: [
       { label: "Active employees", value: String(employees.length), sub: "from employee directory" },
+      { label: "Survey responses", value: String(surveyRows.length), sub: "training feedback records" },
       { label: "Training assignments", value: String(assignments.length), sub: "employee course records" },
-      { label: "Critical urgency", value: String(criticalCount), sub: "enrolled over 30 days" },
       {
-        label: "Depts with training",
-        value: String(assignedDepartments.size),
-        sub: `out of ${activeDepartmentCount} departments`,
+        label: "Open demand",
+        value: String(openSurveyDemand),
+        sub: `across ${Math.max(assignedDepartments.size, activeDepartmentCount)} departments`,
       },
     ],
     heatmapDepartments,
     heatmapRows,
     assignments: assignmentRows,
     recentAssignments: assignmentRows.slice(0, 6),
+    surveyResponses: surveyRows,
+    recentSurveyResponses: surveyRows.slice(0, 6),
   };
 
   return <TrainingDashboardClient data={data} />;
 }
 
 function uniqueSorted(values: (string | null | undefined)[]) {
-  return [...new Set(values.filter((value): value is string => Boolean(value)))].sort((a, b) =>
+  return [...new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)))].sort((a, b) =>
     a.localeCompare(b)
   );
 }
@@ -256,6 +323,18 @@ function statusForAssignment(status: AssignmentRow["status"]): DashboardAssignme
   if (status === "Completed" || status === "In Progress") return "Matched";
   if (status === "Dropped") return "Unmatched";
   return "Pending";
+}
+
+function normalizeDepartments(values: string[] | null | undefined) {
+  return uniqueSorted(values ?? []);
+}
+
+function surveyUrgency(value: string | null): DashboardSurveyResponse["urgency"] {
+  const normalized = value?.toLowerCase() ?? "";
+  if (normalized.includes("critical")) return "Critical";
+  if (normalized.includes("high")) return "High";
+  if (normalized.includes("medium")) return "Medium";
+  return "Low";
 }
 
 function avatarClass(index: number) {

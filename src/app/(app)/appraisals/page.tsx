@@ -90,8 +90,8 @@ export default async function AppraisalsPage({
   const allowedScopes = new Set(
     role === "employee"
       ? ["own"]
-      : role === "manager"
-      ? ["own", "team", "all"]
+    : role === "manager"
+      ? ["own", "team"]
       : ["own", "team", "all"],
   );
   const requestedScope = getParam(params.scope);

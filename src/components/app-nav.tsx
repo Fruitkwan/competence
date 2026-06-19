@@ -184,8 +184,8 @@ const NAV: NavItem[] = [
     roles: ["admin", "manager"],
   },
   {
-    href: "/training/survey",
-    label: "Training Survey",
+    href: "/training/survey/results",
+    label: "Survey Results",
     icon: ClipboardList,
     iconColor: "#d946ef",
     roles: ["admin", "manager"],

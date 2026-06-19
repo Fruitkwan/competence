@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { NOTIFICATION_TYPES } from "@/lib/constants/notification-types";
+import { createNotification } from "@/lib/notifications/create-notification";
 
 export async function createObjective(formData: FormData) {
   const supabase = await createClient();
@@ -107,16 +109,18 @@ export async function submitObjectives(cycleId: string) {
     .single();
 
   if (profile?.manager_id) {
-    await supabase.from("notifications").insert({
+    await createNotification({
       user_id: profile.manager_id,
-      type: "objective_submitted",
+      type: NOTIFICATION_TYPES.OBJECTIVE_SUBMITTED,
       title: `${profile.full_name || "An employee"} submitted objectives for review`,
       body: `${objectives.length} objectives are waiting for your approval.`,
       link: "/objectives/review",
+      metadata: { cycle_id: cycleId, employee_user_id: user.id },
     });
   }
 
   revalidatePath("/objectives");
+  revalidatePath("/notifications");
   return { success: true };
 }
 
@@ -148,14 +152,18 @@ export async function approveObjective(objectiveId: string) {
   if (error) return { error: error.message };
 
   // Notify employee
-  await supabase.from("notifications").insert({
+  await createNotification({
     user_id: objective.employee_id,
-    type: "objective_approved",
+    type: NOTIFICATION_TYPES.OBJECTIVE_APPROVED,
     title: `Objective approved: "${objective.title}"`,
     link: "/objectives",
+    metadata: { objective_id: objectiveId },
   });
 
   revalidatePath("/objectives/review");
+  revalidatePath("/objectives");
+  revalidatePath("/dashboard");
+  revalidatePath("/notifications");
   return { success: true };
 }
 
@@ -195,15 +203,19 @@ export async function requestRevision(objectiveId: string, comment: string) {
   });
 
   // Notify employee
-  await supabase.from("notifications").insert({
+  await createNotification({
     user_id: objective.employee_id,
-    type: "objective_revision_requested",
+    type: NOTIFICATION_TYPES.OBJECTIVE_REVISION_REQUESTED,
     title: `Revision requested for: "${objective.title}"`,
     body: comment,
     link: "/objectives",
+    metadata: { objective_id: objectiveId },
   });
 
   revalidatePath("/objectives/review");
+  revalidatePath("/objectives");
+  revalidatePath("/dashboard");
+  revalidatePath("/notifications");
   return { success: true };
 }
 
@@ -240,15 +252,19 @@ export async function rejectObjective(objectiveId: string, comment: string) {
     });
   }
 
-  await supabase.from("notifications").insert({
+  await createNotification({
     user_id: objective.employee_id,
-    type: "objective_rejected",
+    type: NOTIFICATION_TYPES.OBJECTIVE_REJECTED,
     title: `Objective rejected: "${objective.title}"`,
     body: comment || undefined,
     link: "/objectives",
+    metadata: { objective_id: objectiveId },
   });
 
   revalidatePath("/objectives/review");
+  revalidatePath("/objectives");
+  revalidatePath("/dashboard");
+  revalidatePath("/notifications");
   return { success: true };
 }
 

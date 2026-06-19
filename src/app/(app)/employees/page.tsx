@@ -19,6 +19,7 @@ import {
 type SearchParams = {
   q?: string | string[];
   country?: string | string[];
+  department?: string | string[];
   job?: string | string[];
   status?: string | string[];
   priority?: string | string[];
@@ -34,6 +35,7 @@ export default async function EmployeesPage({
   const params = await searchParams;
   const query = getParam(params.q).toLowerCase();
   const country = getParam(params.country);
+  const department = getParam(params.department);
   const job = getParam(params.job);
   const status = getParam(params.status);
   const priority = getParam(params.priority);
@@ -41,14 +43,19 @@ export default async function EmployeesPage({
   const requestedPage = Math.max(1, Number(getParam(params.page)) || 1);
   const supabase = await createClient();
 
-  const { data: employees } = await supabase
-    .from("employees")
-    .select("employee_id, full_name, job_title, country_code, manager_name, active")
-    .order("employee_id");
-
-  const { data: latest } = await supabase
-    .from("appraisal_full")
-    .select("employee_id, priority, current_avg, gap, status, appraisal_date");
+  const { data: { user } } = await supabase.auth.getUser();
+  const [{ data: profile }, { data: employees }, { data: latest }] = await Promise.all([
+    user
+      ? supabase.from("profiles").select("role, employee_id, cluster").eq("id", user.id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("employees")
+      .select("employee_id, full_name, job_title, department, country_code, manager_name, active")
+      .order("employee_id"),
+    supabase
+      .from("appraisal_full")
+      .select("employee_id, priority, current_avg, gap, status, appraisal_date"),
+  ]);
 
   const latestByEmp = new Map<string, { priority: string; avg: number; gap: number; status: string; date: string }>();
   (latest ?? []).forEach((r) => {
@@ -64,8 +71,15 @@ export default async function EmployeesPage({
     }
   });
 
-  const allEmployees = employees ?? [];
+  const rawEmployees = employees ?? [];
+  const managerDepartment = profile?.role === "manager"
+    ? rawEmployees.find((e) => e.employee_id === profile.employee_id)?.department ?? profile.cluster
+    : null;
+  const allEmployees = managerDepartment
+    ? rawEmployees.filter((e) => e.department === managerDepartment)
+    : rawEmployees;
   const countries = uniqueSorted(allEmployees.map((e) => e.country_code).filter(Boolean));
+  const departments = uniqueSorted(allEmployees.map((e) => e.department).filter(Boolean));
   const jobs = uniqueSorted(allEmployees.map((e) => e.job_title).filter(Boolean));
   const priorities = uniqueSorted(
     allEmployees
@@ -79,6 +93,7 @@ export default async function EmployeesPage({
       employee.employee_id,
       employee.full_name,
       employee.job_title,
+      employee.department,
       employee.country_code,
       employee.manager_name,
     ]
@@ -88,6 +103,7 @@ export default async function EmployeesPage({
 
     if (query && !haystack.includes(query)) return false;
     if (country && employee.country_code !== country) return false;
+    if (department && employee.department !== department) return false;
     if (job && employee.job_title !== job) return false;
     if (status === "active" && !employee.active) return false;
     if (status === "inactive" && employee.active) return false;
@@ -107,7 +123,7 @@ export default async function EmployeesPage({
       />
       <Card className="mb-4">
         <CardContent className="p-4">
-          <form className="grid gap-3 md:grid-cols-6">
+          <form className="grid gap-3 md:grid-cols-7">
             <div className="md:col-span-2">
               <Input
                 name="q"
@@ -116,6 +132,7 @@ export default async function EmployeesPage({
               />
             </div>
             <FilterSelect name="country" label="All countries" value={country} options={countries} />
+            <FilterSelect name="department" label="All departments" value={department} options={departments} />
             <FilterSelect name="job" label="All job titles" value={job} options={jobs} />
             <FilterSelect
               name="status"
@@ -139,7 +156,7 @@ export default async function EmployeesPage({
               ]}
             />
             <input type="hidden" name="page" value="1" />
-            <div className="flex gap-2 md:col-span-6">
+            <div className="flex gap-2 md:col-span-7">
               <Button type="submit">Apply filters</Button>
               <Link href="/employees" className={cn(buttonVariants({ variant: "outline" }))}>
                 Clear
@@ -155,6 +172,7 @@ export default async function EmployeesPage({
               <TableHead>ID</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Job Title</TableHead>
+              <TableHead>Department</TableHead>
               <TableHead>Country</TableHead>
               <TableHead>Manager</TableHead>
               <TableHead>Latest priority</TableHead>
@@ -178,6 +196,7 @@ export default async function EmployeesPage({
                     </Link>
                   </TableCell>
                   <TableCell>{e.job_title}</TableCell>
+                  <TableCell>{e.department ?? "—"}</TableCell>
                   <TableCell>{e.country_code ?? "—"}</TableCell>
                   <TableCell>{e.manager_name ?? "—"}</TableCell>
                   <TableCell>
@@ -197,7 +216,7 @@ export default async function EmployeesPage({
               );
             }) : (
               <TableRow>
-                <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
                   No employees match the current filters.
                 </TableCell>
               </TableRow>
@@ -256,7 +275,7 @@ function clampNumber(value: number, min: number, max: number) {
 
 function pageHref(params: SearchParams, page: number, pageSize: number) {
   const next = new URLSearchParams();
-  for (const key of ["q", "country", "job", "status", "priority"] as const) {
+  for (const key of ["q", "country", "department", "job", "status", "priority"] as const) {
     const value = getParam(params[key]);
     if (value) next.set(key, value);
   }

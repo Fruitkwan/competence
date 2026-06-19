@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/table";
 import { BookOpen, CheckCircle2, Clock, PlayCircle, XCircle } from "lucide-react";
 import { CertificateUpload } from "@/components/training/certificate-upload";
+import { EmployeeCourseActions } from "@/components/training/employee-course-actions";
 import { formatCourseDevelops } from "@/lib/course-format";
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ComponentType<{ className?: string }> }> = {
@@ -115,6 +116,7 @@ export default async function MyCoursesPage() {
                   <TableHead>Completed</TableHead>
                   <TableHead className="text-right">Score</TableHead>
                   <TableHead>Certificate</TableHead>
+                  {isEmployee && <TableHead>Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -170,6 +172,11 @@ export default async function MyCoursesPage() {
                           ) : "—"
                         )}
                       </TableCell>
+                      {isEmployee && (
+                        <TableCell>
+                          <EmployeeCourseActions assignmentId={c.id} status={c.status} />
+                        </TableCell>
+                      )}
                     </TableRow>
                   );
                 })}

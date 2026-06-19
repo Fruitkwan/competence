@@ -17,7 +17,7 @@ export default async function EditPerformanceAppraisalPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("role")
+    .select("role, employee_id, full_name")
     .eq("id", user.id)
     .single();
 
@@ -28,6 +28,22 @@ export default async function EditPerformanceAppraisalPage({
     .single();
 
   if (!appraisal) return notFound();
+
+  if (profile?.role === "employee" && appraisal.employee_id !== profile.employee_id) {
+    return notFound();
+  }
+
+  if (profile?.role === "manager" || profile?.role === "executive") {
+    const { data: employee } = await supabase
+      .from("employees")
+      .select("manager_name")
+      .eq("employee_id", appraisal.employee_id)
+      .maybeSingle();
+    const isAssignedManager =
+      appraisal.manager_id === profile.employee_id ||
+      Boolean(employee?.manager_name && employee.manager_name === profile.full_name);
+    if (!isAssignedManager) return notFound();
+  }
 
   const { data: employees } = await supabase
     .from("employees")

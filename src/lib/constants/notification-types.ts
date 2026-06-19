@@ -26,6 +26,7 @@ export const NOTIFICATION_TYPES = {
   // Training
   COURSE_ASSIGNED: "course_assigned",
   COURSE_COMPLETED: "course_completed",
+  TRAINING_SURVEY_SUBMITTED: "training_survey_submitted",
 
   // Skill gaps
   SKILL_GAPS_DETECTED: "skill_gaps_detected",
@@ -60,6 +61,7 @@ export const NOTIFICATION_ICONS: Record<string, string> = {
   appraisal_completed: "🏆",
   course_assigned: "📚",
   course_completed: "🎓",
+  training_survey_submitted: "📋",
   skill_gaps_detected: "🔍",
   pip_created: "⚠️",
   pip_milestone_due: "📌",
