@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -11,16 +13,13 @@ import '../../data/models/course.dart';
 import '../../data/repositories/course_repository.dart';
 import '../../data/repositories/employee_repository.dart';
 import '../../data/repositories/skill_gap_repository.dart';
-import '../../shared/widgets/async_value_view.dart';
+import '../../shared/widgets/soft_ui.dart';
 import '../../shared/widgets/status_chip.dart';
 
-final _myCoursesProvider =
-    FutureProvider<List<EmployeeCourse>>((ref) async {
+final _myCoursesProvider = FutureProvider<List<EmployeeCourse>>((ref) async {
   final emp = await ref.watch(myEmployeeRecordProvider.future);
   if (emp == null) return const [];
-  return ref
-      .watch(courseRepositoryProvider)
-      .listMyCourses(emp.employeeId);
+  return ref.watch(courseRepositoryProvider).listMyCourses(emp.employeeId);
 });
 
 final _mySkillGapsProvider = FutureProvider((ref) async {
@@ -29,13 +28,97 @@ final _mySkillGapsProvider = FutureProvider((ref) async {
   return ref.watch(skillGapRepositoryProvider).listForEmployee(emp.employeeId);
 });
 
-class IdpPage extends ConsumerWidget {
+class IdpPage extends ConsumerStatefulWidget {
   const IdpPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<IdpPage> createState() => _IdpPageState();
+}
+
+class _IdpPageState extends ConsumerState<IdpPage>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _entrance;
+
+  @override
+  void initState() {
+    super.initState();
+    _entrance = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..forward();
+  }
+
+  @override
+  void dispose() {
+    _entrance.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final courses = ref.watch(_myCoursesProvider);
     final gaps = ref.watch(_mySkillGapsProvider);
+
+    final sections = <Widget>[
+      const SectionHeader(title: 'Assigned courses'),
+      const SizedBox(height: 10),
+      courses.when(
+        loading: () => const SkeletonBlock(height: 120),
+        error: (e, _) =>
+            ErrorCard(title: 'Could not load courses', detail: '$e'),
+        data: (rows) {
+          if (rows.isEmpty) {
+            return const EmptyCard(
+              icon: Icons.school_outlined,
+              title: 'No courses assigned yet',
+              body:
+                  'Once your manager or HR assigns development activities, they will show up here.',
+            );
+          }
+          return Column(
+            children: [
+              for (final c in rows)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _CourseTile(course: c),
+                ),
+            ],
+          );
+        },
+      ),
+      const SizedBox(height: 24),
+      const SectionHeader(title: 'My skill gaps'),
+      const SizedBox(height: 10),
+      gaps.when(
+        loading: () => const SkeletonBlock(height: 88),
+        error: (e, _) =>
+            ErrorCard(title: 'Could not load skill gaps', detail: '$e'),
+        data: (rows) {
+          if (rows.isEmpty) {
+            return const EmptyCard(
+              icon: Icons.celebration_outlined,
+              title: 'No open skill gaps',
+              body:
+                  'Great work! All assessed competencies meet the required level.',
+            );
+          }
+          return Column(
+            children: [
+              for (final g in rows.take(5))
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _GapTile(
+                    name: g.competencyName,
+                    section: g.section,
+                    gap: g.gap?.toString() ?? '-',
+                    severity: g.severity ?? 'low',
+                  ),
+                ),
+            ],
+          );
+        },
+      ),
+    ];
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -43,79 +126,72 @@ class IdpPage extends ConsumerWidget {
           ..invalidate(_myCoursesProvider)
           ..invalidate(_mySkillGapsProvider);
       },
-      child: ListView(
-        padding: const EdgeInsets.all(16),
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        itemCount: sections.length,
+        itemBuilder: (context, index) {
+          return StaggeredEntrance(
+            controller: _entrance,
+            interval: entranceInterval(index),
+            child: sections[index],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _GapTile extends StatelessWidget {
+  const _GapTile({
+    required this.name,
+    required this.section,
+    required this.gap,
+    required this.severity,
+  });
+
+  final String name;
+  final String section;
+  final String gap;
+  final String severity;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final tone = severity == 'high'
+        ? StatusTone.danger
+        : (severity == 'medium' ? StatusTone.warning : StatusTone.info);
+    final accent = tone == StatusTone.danger
+        ? scheme.error
+        : (tone == StatusTone.warning ? scheme.secondary : scheme.primary);
+    return SoftCard(
+      leadingAccent: accent,
+      padding: const EdgeInsets.fromLTRB(20, 14, 14, 14),
+      child: Row(
         children: [
-          Text('Assigned courses',
-              style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          courses.when(
-            loading: () => const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(child: CircularProgressIndicator()),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  name,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  '$section · gap $gap',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
-            error: (e, _) => Card(child: ListTile(title: Text('$e'))),
-            data: (rows) {
-              if (rows.isEmpty) {
-                return Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.school_outlined),
-                    title: const Text('No courses assigned yet'),
-                    subtitle: const Text(
-                      'Once your manager or HR assigns development activities, they will show up here.',
-                    ),
-                  ),
-                );
-              }
-              return Column(
-                children: [
-                  for (final c in rows) _CourseTile(course: c),
-                ],
-              );
-            },
           ),
-          const SizedBox(height: 24),
-          Text('My skill gaps',
-              style: Theme.of(context).textTheme.titleMedium),
-          const SizedBox(height: 8),
-          gaps.when(
-            loading: () => const SizedBox.shrink(),
-            error: (e, _) => Text('$e'),
-            data: (rows) {
-              if (rows.isEmpty) {
-                return Card(
-                  child: ListTile(
-                    leading: const Icon(Icons.celebration_outlined),
-                    title: const Text('No open skill gaps'),
-                    subtitle: const Text(
-                      'Great work! All assessed competencies meet the required level.',
-                    ),
-                  ),
-                );
-              }
-              return Column(
-                children: [
-                  for (final g in rows.take(5))
-                    Card(
-                      child: ListTile(
-                        title: Text(g.competencyName),
-                        subtitle: Text(
-                          '${g.section} · gap ${g.gap ?? '-'}',
-                        ),
-                        trailing: StatusChip(
-                          g.severity ?? 'low',
-                          tone: g.severity == 'high'
-                              ? StatusTone.danger
-                              : (g.severity == 'medium'
-                                  ? StatusTone.warning
-                                  : StatusTone.info),
-                        ),
-                      ),
-                    ),
-                ],
-              );
-            },
-          ),
+          const SizedBox(width: 8),
+          StatusChip(severity, tone: tone),
         ],
       ),
     );
@@ -205,73 +281,119 @@ class _CourseTileState extends ConsumerState<_CourseTile> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final c = widget.course;
-    final t = c.course?.title ?? c.courseId;
+    final title = c.course?.title ?? c.courseId;
     final status = c.status;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(t,
-                      style: Theme.of(context).textTheme.titleMedium),
+    final tone = status == 'Completed'
+        ? StatusTone.success
+        : (status == 'In Progress'
+            ? StatusTone.info
+            : StatusTone.warning);
+    final accent = tone == StatusTone.success
+        ? scheme.tertiary
+        : (tone == StatusTone.info ? scheme.primary : scheme.secondary);
+
+    return SoftCard(
+      leadingAccent: accent,
+      padding: const EdgeInsets.fromLTRB(20, 14, 14, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: accent.withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                StatusChip(
-                  status,
-                  tone: status == 'Completed'
-                      ? StatusTone.success
-                      : (status == 'In Progress'
-                          ? StatusTone.info
-                          : StatusTone.warning),
+                child: Icon(
+                  Icons.school_rounded,
+                  size: 20,
+                  color: accent,
                 ),
-              ],
-            ),
-            if (c.course?.develops != null) ...[
-              const SizedBox(height: 4),
-              Text(c.course!.develops!,
-                  style: Theme.of(context).textTheme.bodySmall),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              StatusChip(status, tone: tone),
             ],
-            const SizedBox(height: 4),
+          ),
+          if (c.course?.develops != null) ...[
+            const SizedBox(height: 10),
             Text(
-              'Enrolled ${DateFormat.yMMMd().format(c.enrolledAt)}',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                if (c.course?.link != null)
-                  TextButton.icon(
-                    onPressed: () =>
-                        launchUrl(Uri.parse(c.course!.link!)),
-                    icon: const Icon(Icons.open_in_new),
-                    label: const Text('Open course'),
-                  ),
-                const Spacer(),
-                if (status == 'Enrolled')
-                  FilledButton(
-                    onPressed: _busy ? null : _markStarted,
-                    child: const Text('Start'),
-                  )
-                else if (status == 'In Progress')
-                  FilledButton(
-                    onPressed: _busy ? null : _markComplete,
-                    child: const Text('Mark complete'),
-                  )
-                else if (c.certificateUrl != null)
-                  TextButton.icon(
-                    onPressed: () =>
-                        launchUrl(Uri.parse(c.certificateUrl!)),
-                    icon: const Icon(Icons.description_outlined),
-                    label: const Text('Certificate'),
-                  ),
-              ],
+              c.course!.develops!,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
             ),
           ],
-        ),
+          const SizedBox(height: 6),
+          Text(
+            'Enrolled ${DateFormat.yMMMd().format(c.enrolledAt)}',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant.withOpacity(0.8),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              if (c.course?.link != null)
+                TextButton.icon(
+                  onPressed: () => launchUrl(Uri.parse(c.course!.link!)),
+                  icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                  label: const Text('Open course'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+              const Spacer(),
+              if (status == 'Enrolled')
+                FilledButton(
+                  onPressed: _busy ? null : _markStarted,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 36),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  child: const Text('Start'),
+                )
+              else if (status == 'In Progress')
+                FilledButton(
+                  onPressed: _busy ? null : _markComplete,
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 36),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  child: const Text('Mark complete'),
+                )
+              else if (c.certificateUrl != null)
+                TextButton.icon(
+                  onPressed: () => launchUrl(Uri.parse(c.certificateUrl!)),
+                  icon: const Icon(Icons.description_outlined, size: 16),
+                  label: const Text('Certificate'),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 6),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+            ],
+          ),
+        ],
       ),
     );
   }

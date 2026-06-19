@@ -1,24 +1,27 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth_controller.dart';
-import '../../core/role.dart';
 import '../../data/repositories/notification_repository.dart';
+import '../profile/profile_page.dart';
 
 class _NavTab {
-  const _NavTab(this.path, this.icon, this.label);
+  const _NavTab(this.path, this.icon, this.activeIcon, this.label);
   final String path;
   final IconData icon;
+  final IconData activeIcon;
   final String label;
 }
 
 const _tabs = <_NavTab>[
-  _NavTab('/dashboard', Icons.home_outlined, 'Home'),
-  _NavTab('/objectives', Icons.flag_outlined, 'Objectives'),
-  _NavTab('/appraisals', Icons.assessment_outlined, 'Appraisals'),
-  _NavTab('/idp', Icons.school_outlined, 'IDP'),
-  _NavTab('/notifications', Icons.notifications_outlined, 'Inbox'),
+  _NavTab('/dashboard', Icons.home_outlined, Icons.home_rounded, 'Home'),
+  _NavTab('/objectives', Icons.flag_outlined, Icons.flag_rounded, 'Objectives'),
+  _NavTab('/appraisals', Icons.assessment_outlined, Icons.assessment_rounded,
+      'Appraisals'),
+  _NavTab('/idp', Icons.school_outlined, Icons.school_rounded, 'IDP'),
 ];
 
 class AppShell extends ConsumerWidget {
@@ -36,94 +39,31 @@ class AppShell extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final location = GoRouterState.of(context).matchedLocation;
     final selected = _indexFor(location);
-    final role = ref.watch(currentRoleProvider);
     final profile = ref.watch(currentProfileProvider).valueOrNull;
     final unread = ref.watch(unreadNotificationsCountProvider).valueOrNull ?? 0;
+    final scheme = Theme.of(context).colorScheme;
+
+    final avatarName = profile?.fullName ?? profile?.email;
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_tabs[selected].label),
-        actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.account_circle_outlined),
-            onSelected: (value) async {
-              if (value == 'logout') {
-                await ref.read(authControllerProvider).signOut();
-                if (context.mounted) context.go('/login');
-              } else if (value == 'employees') {
-                context.go('/employees');
-              } else if (value == 'calibration') {
-                context.go('/calibration');
-              } else if (value == 'hr_dashboard') {
-                context.go('/hr-dashboard');
-              } else if (value == 'review') {
-                context.go('/objectives/review');
-              }
-            },
-            itemBuilder: (context) {
-              return [
-                PopupMenuItem<String>(
-                  enabled: false,
-                  child: Text(
-                    profile?.fullName ?? profile?.email ?? 'Signed in',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ),
-                PopupMenuItem<String>(
-                  enabled: false,
-                  child: Text(
-                    role.label,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ),
-                const PopupMenuDivider(),
-                if (role.canManage)
-                  const PopupMenuItem(
-                    value: 'review',
-                    child: ListTile(
-                      leading: Icon(Icons.rule_outlined),
-                      title: Text('Review objectives'),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                if (role.isHr) ...[
-                  const PopupMenuItem(
-                    value: 'employees',
-                    child: ListTile(
-                      leading: Icon(Icons.people_outline),
-                      title: Text('Employee directory'),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'calibration',
-                    child: ListTile(
-                      leading: Icon(Icons.tune),
-                      title: Text('Calibration'),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'hr_dashboard',
-                    child: ListTile(
-                      leading: Icon(Icons.bar_chart_outlined),
-                      title: Text('HR dashboard'),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                ],
-                const PopupMenuDivider(),
-                const PopupMenuItem(
-                  value: 'logout',
-                  child: ListTile(
-                    leading: Icon(Icons.logout),
-                    title: Text('Sign out'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-              ];
-            },
+        titleSpacing: 12,
+        leadingWidth: 64,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 12),
+          child: _AvatarButton(
+            initials: initialsFor(avatarName),
+            onTap: () => context.push('/profile'),
           ),
+        ),
+        title: const SizedBox.shrink(),
+        actions: [
+          _BellButton(
+            unread: unread,
+            color: scheme.onSurface,
+            onTap: () => context.push('/notifications'),
+          ),
+          const SizedBox(width: 8),
         ],
       ),
       body: child,
@@ -133,13 +73,85 @@ class AppShell extends ConsumerWidget {
         destinations: [
           for (var i = 0; i < _tabs.length; i++)
             NavigationDestination(
-              icon: _tabs[i].path == '/notifications' && unread > 0
-                  ? Badge.count(count: unread, child: Icon(_tabs[i].icon))
-                  : Icon(_tabs[i].icon),
+              icon: Icon(_tabs[i].icon),
+              selectedIcon: Icon(_tabs[i].activeIcon),
               label: _tabs[i].label,
             ),
         ],
       ),
+    );
+  }
+}
+
+class _AvatarButton extends StatelessWidget {
+  const _AvatarButton({required this.initials, required this.onTap});
+
+  final String initials;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final accent =
+        Color.lerp(scheme.primary, scheme.tertiary, 0.55) ?? scheme.primary;
+    return InkResponse(
+      onTap: onTap,
+      radius: 26,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [scheme.primary, accent],
+          ),
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: scheme.primary.withOpacity(0.25),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          initials,
+          style: TextStyle(
+            color: scheme.onPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+            letterSpacing: 0.3,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _BellButton extends StatelessWidget {
+  const _BellButton({
+    required this.unread,
+    required this.color,
+    required this.onTap,
+  });
+
+  final int unread;
+  final Color color;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onTap,
+      tooltip: 'Notifications',
+      icon: unread > 0
+          ? Badge.count(
+              count: unread,
+              child: Icon(Icons.notifications_rounded, color: color),
+            )
+          : Icon(Icons.notifications_none_rounded, color: color),
     );
   }
 }

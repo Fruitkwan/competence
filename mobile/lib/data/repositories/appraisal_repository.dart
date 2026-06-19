@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -5,72 +6,106 @@ import '../../core/supabase_client.dart';
 import '../models/appraisal_form.dart';
 import '../models/performance_appraisal.dart';
 
+const _employeeFk = 'employees!performance_appraisals_employee_id_fkey';
+
+void _logRepoError(String where, Object error, StackTrace stack) {
+  if (error is PostgrestException) {
+    debugPrint(
+      '[AppraisalRepository.$where] Postgrest ${error.code}: ${error.message}'
+      '${error.hint != null ? ' | hint: ${error.hint}' : ''}'
+      '${error.details != null ? ' | details: ${error.details}' : ''}',
+    );
+  } else {
+    debugPrint('[AppraisalRepository.$where] $error');
+  }
+  debugPrintStack(stackTrace: stack);
+}
+
 class AppraisalRepository {
   AppraisalRepository(this._supabase);
   final SupabaseClient _supabase;
 
   /// All appraisals visible to the current user (RLS handles filtering).
   Future<List<PerformanceAppraisal>> listAll({String? cycleId}) async {
-    var q = _supabase
-        .from('performance_appraisals')
-        .select('*, employees(full_name)');
-    if (cycleId != null) q = q.eq('cycle_id', cycleId);
-    final rows = await q.order('updated_at', ascending: false);
-    return rows.map<PerformanceAppraisal>((r) {
-      final map = Map<String, dynamic>.from(r as Map);
-      final emp = map['employees'];
-      if (emp is Map) map['employee_name'] = emp['full_name'];
-      return PerformanceAppraisal.fromJson(map);
-    }).toList();
+    try {
+      var q = _supabase
+          .from('performance_appraisals')
+          .select('*, $_employeeFk(full_name)');
+      if (cycleId != null) q = q.eq('cycle_id', cycleId);
+      final rows = await q.order('updated_at', ascending: false);
+      return rows.map<PerformanceAppraisal>((r) {
+        final map = Map<String, dynamic>.from(r as Map);
+        final emp = map['employees'];
+        if (emp is Map) map['employee_name'] = emp['full_name'];
+        return PerformanceAppraisal.fromJson(map);
+      }).toList();
+    } catch (e, s) {
+      _logRepoError('listAll', e, s);
+      rethrow;
+    }
   }
 
   Future<List<PerformanceAppraisal>> listForMe() async {
-    final user = _supabase.auth.currentUser;
-    if (user == null) return const [];
-    // We need to find the employee_id for this user via the employees table.
-    final emp = await _supabase
-        .from('employees')
-        .select('employee_id')
-        .eq('user_id', user.id)
-        .maybeSingle();
-    if (emp == null) return const [];
-    final rows = await _supabase
-        .from('performance_appraisals')
-        .select()
-        .eq('employee_id', emp['employee_id'])
-        .order('updated_at', ascending: false);
-    return rows
-        .map<PerformanceAppraisal>(
-            (r) => PerformanceAppraisal.fromJson(Map<String, dynamic>.from(r)))
-        .toList();
+    try {
+      final user = _supabase.auth.currentUser;
+      if (user == null) return const [];
+      final emp = await _supabase
+          .from('employees')
+          .select('employee_id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+      if (emp == null) return const [];
+      final rows = await _supabase
+          .from('performance_appraisals')
+          .select()
+          .eq('employee_id', emp['employee_id'])
+          .order('updated_at', ascending: false);
+      return rows
+          .map<PerformanceAppraisal>((r) =>
+              PerformanceAppraisal.fromJson(Map<String, dynamic>.from(r)))
+          .toList();
+    } catch (e, s) {
+      _logRepoError('listForMe', e, s);
+      rethrow;
+    }
   }
 
   Future<List<PerformanceAppraisal>> awaitingCalibration() async {
-    final rows = await _supabase
-        .from('performance_appraisals')
-        .select('*, employees(full_name)')
-        .eq('status', 'N2 Complete')
-        .filter('calibrated_rating', 'is', null)
-        .order('updated_at', ascending: false);
-    return rows.map<PerformanceAppraisal>((r) {
-      final map = Map<String, dynamic>.from(r as Map);
-      final emp = map['employees'];
-      if (emp is Map) map['employee_name'] = emp['full_name'];
-      return PerformanceAppraisal.fromJson(map);
-    }).toList();
+    try {
+      final rows = await _supabase
+          .from('performance_appraisals')
+          .select('*, $_employeeFk(full_name)')
+          .eq('status', 'N2 Complete')
+          .filter('calibrated_rating', 'is', null)
+          .order('updated_at', ascending: false);
+      return rows.map<PerformanceAppraisal>((r) {
+        final map = Map<String, dynamic>.from(r as Map);
+        final emp = map['employees'];
+        if (emp is Map) map['employee_name'] = emp['full_name'];
+        return PerformanceAppraisal.fromJson(map);
+      }).toList();
+    } catch (e, s) {
+      _logRepoError('awaitingCalibration', e, s);
+      rethrow;
+    }
   }
 
   Future<PerformanceAppraisal?> getById(String id) async {
-    final row = await _supabase
-        .from('performance_appraisals')
-        .select('*, employees(full_name)')
-        .eq('id', id)
-        .maybeSingle();
-    if (row == null) return null;
-    final map = Map<String, dynamic>.from(row);
-    final emp = map['employees'];
-    if (emp is Map) map['employee_name'] = emp['full_name'];
-    return PerformanceAppraisal.fromJson(map);
+    try {
+      final row = await _supabase
+          .from('performance_appraisals')
+          .select('*, $_employeeFk(full_name)')
+          .eq('id', id)
+          .maybeSingle();
+      if (row == null) return null;
+      final map = Map<String, dynamic>.from(row);
+      final emp = map['employees'];
+      if (emp is Map) map['employee_name'] = emp['full_name'];
+      return PerformanceAppraisal.fromJson(map);
+    } catch (e, s) {
+      _logRepoError('getById', e, s);
+      rethrow;
+    }
   }
 
   /// Save self-assessment (N1) fields and flip status to N1 Complete if requested.

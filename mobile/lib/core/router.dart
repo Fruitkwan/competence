@@ -19,6 +19,7 @@ import '../features/notifications/notifications_page.dart';
 import '../features/objectives/manager_objectives_page.dart';
 import '../features/objectives/objective_edit_page.dart';
 import '../features/objectives/objectives_page.dart';
+import '../features/profile/profile_page.dart';
 import '../features/shell/app_shell.dart';
 import 'supabase_client.dart';
 
@@ -104,14 +105,18 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, __) => const IdpPage(),
           ),
           GoRoute(
-            path: '/notifications',
-            builder: (_, __) => const NotificationsPage(),
-          ),
-          GoRoute(
             path: '/hr-dashboard',
             builder: (_, __) => const HrDashboardPage(),
           ),
         ],
+      ),
+      GoRoute(
+        path: '/profile',
+        builder: (_, __) => const ProfilePage(),
+      ),
+      GoRoute(
+        path: '/notifications',
+        builder: (_, __) => const NotificationsPage(),
       ),
     ],
   );
