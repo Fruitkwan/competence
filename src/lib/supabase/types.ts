@@ -715,6 +715,27 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["notifications"]["Insert"]>;
         Relationships: [];
       };
+      firebase_messaging_tokens: {
+        Row: {
+          id: string;
+          user_id: string;
+          token: string;
+          user_agent: string | null;
+          active: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          token: string;
+          user_agent?: string | null;
+          active?: boolean;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["firebase_messaging_tokens"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: {
       appraisal_full: {

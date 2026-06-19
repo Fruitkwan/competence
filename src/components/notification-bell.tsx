@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useTransition } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
@@ -30,28 +30,33 @@ type Notification = {
 
 export function NotificationBell({
   notifications,
-  unreadCount,
 }: {
   notifications: Notification[];
   unreadCount: number;
 }) {
   const router = useRouter();
-  const [count, setCount] = useState(unreadCount);
-  const [items, setItems] = useState(notifications);
+  const [now] = useState(() => Date.now());
+  const [optimisticReadIds, setOptimisticReadIds] = useState<Set<string>>(() => new Set());
   const [isPending, startTransition] = useTransition();
-
-  useEffect(() => {
-    setCount(unreadCount);
-    setItems(notifications);
-  }, [unreadCount, notifications]);
+  const items = useMemo(
+    () =>
+      notifications.map((notification) =>
+        optimisticReadIds.has(notification.id) ? { ...notification, read: true } : notification
+      ),
+    [notifications, optimisticReadIds]
+  );
+  const count = items.filter((notification) => !notification.read).length;
 
   function handleClick(n: Notification) {
     if (!n.read) {
       startTransition(async () => {
         await markAsRead(n.id);
       });
-      setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
-      setCount((c) => Math.max(0, c - 1));
+      setOptimisticReadIds((prev) => {
+        const next = new Set(prev);
+        next.add(n.id);
+        return next;
+      });
     }
     if (n.link) {
       router.push(n.link);
@@ -62,12 +67,15 @@ export function NotificationBell({
     startTransition(async () => {
       await markAllAsRead();
     });
-    setItems((prev) => prev.map((n) => ({ ...n, read: true })));
-    setCount(0);
+    setOptimisticReadIds((prev) => {
+      const next = new Set(prev);
+      for (const notification of notifications) next.add(notification.id);
+      return next;
+    });
   }
 
   function timeAgo(dateStr: string) {
-    const diff = Date.now() - new Date(dateStr).getTime();
+    const diff = now - new Date(dateStr).getTime();
     const mins = Math.floor(diff / 60000);
     if (mins < 1) return "just now";
     if (mins < 60) return `${mins}m ago`;

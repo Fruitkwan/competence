@@ -282,7 +282,7 @@ function PreviewTable({
               <TableHead>Employee ID</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Designation</TableHead>
-              <TableHead>Manager</TableHead>
+              <TableHead>Department</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>

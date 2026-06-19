@@ -56,11 +56,6 @@ export function EmployeePicker({
       .slice(0, maxItems);
   }, [options, query, maxItems]);
 
-  // Reset highlight when filtered list changes.
-  React.useEffect(() => {
-    setActiveIndex(0);
-  }, [query, open]);
-
   // Close on outside click.
   React.useEffect(() => {
     if (!open) return;
@@ -114,7 +109,8 @@ export function EmployeePicker({
         type="button"
         disabled={disabled}
         onClick={() => {
-          setOpen((o) => !o);
+          setOpen((isOpen) => !isOpen);
+          setActiveIndex(0);
           // Focus the search input next tick.
           setTimeout(() => inputRef.current?.focus(), 0);
         }}
@@ -174,7 +170,10 @@ export function EmployeePicker({
               type="text"
               autoFocus
               value={query}
-              onChange={(e) => setQuery(e.target.value)}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setActiveIndex(0);
+              }}
               onKeyDown={handleKey}
               placeholder={placeholder}
               className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
@@ -182,7 +181,10 @@ export function EmployeePicker({
             {query && (
               <button
                 type="button"
-                onClick={() => setQuery("")}
+                onClick={() => {
+                  setQuery("");
+                  setActiveIndex(0);
+                }}
                 className="rounded p-0.5 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 aria-label="Clear search"
               >

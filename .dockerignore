@@ -10,3 +10,10 @@ Dockerfile
 README.md
 coverage
 .vscode
+docs
+mobile
+scratch
+/supabase
+*.html
+*.md
+tsconfig.tsbuildinfo

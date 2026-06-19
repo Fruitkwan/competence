@@ -327,15 +327,14 @@ async function upsertEmployeesWithDepartmentFallback(
   if (!result.error || result.error.code !== "PGRST204") return result;
   if (!employees.some((employee) => employee.department)) return result;
 
-  return supabase
-    .from("employees")
-    .upsert(employees.map(stripEmployeeDepartment), { onConflict: "employee_id" });
-}
-
-function stripEmployeeDepartment(employee: ParsedEmployee) {
-  const employeeWithoutDepartment = { ...employee };
-  delete employeeWithoutDepartment.department;
-  return employeeWithoutDepartment;
+  return {
+    data: null,
+    error: {
+      ...result.error,
+      message:
+        "The uploaded file has department data, but the employees.department database column is missing. Run scripts/migration-employee-import.sql in Supabase, then import the Excel file again.",
+    },
+  };
 }
 
 async function syncImportedDepartments(supabase: SupabaseClient, employees: ParsedEmployee[]) {
