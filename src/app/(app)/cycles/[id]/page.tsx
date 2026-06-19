@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,6 +25,7 @@ export default async function CycleDetailPage({
     .single();
 
   const role = profile?.role ?? "employee";
+  if (!["admin", "manager", "executive"].includes(role)) redirect("/dashboard");
 
   const { data: cycle } = await supabase
     .from("appraisal_cycles")

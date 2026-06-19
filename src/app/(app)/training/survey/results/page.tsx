@@ -27,9 +27,7 @@ export default async function TrainingSurveyResultsPage() {
     .single<ProfileRow>();
 
   if (profile?.role === "employee") redirect("/training/survey");
-  if (profile?.role !== "admin" && profile?.role !== "manager" && profile?.role !== "executive") {
-    redirect("/dashboard");
-  }
+  if (profile?.role !== "admin" && profile?.role !== "manager") redirect("/dashboard");
 
   const canUpdateStatus = profile?.role === "admin" || profile?.role === "manager";
 

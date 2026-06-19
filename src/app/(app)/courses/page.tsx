@@ -11,11 +11,22 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ExternalLink } from "lucide-react";
 import { formatCourseDevelops } from "@/lib/course-format";
 
 export default async function CoursesPage() {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (!profile || !["admin", "manager", "executive"].includes(profile.role)) redirect("/dashboard");
+
   const [{ data: courses }, { data: rules }, { data: skillGaps }] = await Promise.all([
     supabase
       .from("courses")

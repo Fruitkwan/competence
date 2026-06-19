@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/table";
 import { RoleTableRow } from "@/components/roles/role-table-row";
 import { CreateRoleDialog } from "@/components/roles/role-edit-dialogs";
+import { redirect } from "next/navigation";
 
 export default async function RolesPage() {
   const supabase = await createClient();
@@ -25,6 +26,7 @@ export default async function RolesPage() {
   const { data: userProfile } = user
     ? await supabase.from("profiles").select("role").eq("id", user.id).single()
     : { data: null };
+  if (!userProfile || !["admin", "manager", "executive"].includes(userProfile.role)) redirect("/dashboard");
 
   const canEdit = userProfile?.role === "admin";
 

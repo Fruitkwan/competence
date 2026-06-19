@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -72,6 +73,8 @@ export default async function EmployeesPage({
   });
 
   const rawEmployees = employees ?? [];
+  if (profile?.role === "employee") redirect("/dashboard");
+
   const managerDepartment = profile?.role === "manager"
     ? rawEmployees.find((e) => e.employee_id === profile.employee_id)?.department ?? profile.cluster
     : null;

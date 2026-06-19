@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Card, CardContent } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
@@ -18,6 +19,7 @@ export default async function CyclesPage() {
     .single();
 
   const role = profile?.role ?? "employee";
+  if (!["admin", "manager", "executive"].includes(role)) redirect("/dashboard");
 
   const { data: cycles } = await supabase
     .from("appraisal_cycles")

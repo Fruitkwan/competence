@@ -76,6 +76,7 @@ export default async function TrainingDashboardPage() {
     .select("role, employee_id, cluster")
     .eq("id", user.id)
     .single();
+  if (!currentProfile || !["admin", "manager"].includes(currentProfile.role)) redirect("/dashboard");
 
   let employeesQuery = supabase
     .from("employees")

@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import {
   RoleDetailView,
@@ -26,6 +26,7 @@ export default async function RoleDetailPage({
   const { data: userProfile } = user
     ? await supabase.from("profiles").select("role").eq("id", user.id).single()
     : { data: null };
+  if (!userProfile || !["admin", "manager", "executive"].includes(userProfile.role)) redirect("/dashboard");
 
   const canEdit = userProfile?.role === "admin";
 
