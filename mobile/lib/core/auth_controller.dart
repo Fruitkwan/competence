@@ -27,6 +27,7 @@ class AuthController {
   final SupabaseClient _supabase;
 
   Future<void> sendOtp(String email) async {
+    // Supabase sends OTP when the email template uses {{ .Token }}.
     await _supabase.auth.signInWithOtp(
       email: email,
       shouldCreateUser: false,

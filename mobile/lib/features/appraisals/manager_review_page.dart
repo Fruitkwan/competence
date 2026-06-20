@@ -137,7 +137,8 @@ class _ManagerReviewPageState extends ConsumerState<ManagerReviewPage> {
             );
           }
           _hydrate(a);
-          final readOnly = a.status == 'Final' || a.status == 'Archived';
+          final canReview = a.status == 'N1 Complete';
+          final readOnly = !canReview;
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -149,6 +150,42 @@ class _ManagerReviewPageState extends ConsumerState<ManagerReviewPage> {
                   trailing: Text(a.status),
                 ),
               ),
+              if (!canReview) ...[
+                const SizedBox(height: 12),
+                Card(
+                  child: ListTile(
+                    leading: const Icon(Icons.lock_outline),
+                    title: Text(
+                      a.status == 'Draft'
+                          ? 'Waiting for employee sign-off'
+                          : 'Manager review is locked',
+                    ),
+                    subtitle: const Text(
+                      'N2 ratings are available only after the employee completes and signs the self-assessment.',
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 16),
+              Text('Goals & objectives',
+                  style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 8),
+              if (_goals.where(_hasGoalDetails).isEmpty)
+                const Card(
+                  child: ListTile(
+                    leading: Icon(Icons.flag_outlined),
+                    title: Text('No goals available'),
+                  ),
+                )
+              else
+                for (var i = 0; i < _goals.length; i++)
+                  if (_hasGoalDetails(_goals[i]))
+                    _GoalReviewCard(
+                      goal: _goals[i],
+                      index: i,
+                      readOnly: readOnly,
+                      onChanged: () => setState(() {}),
+                    ),
               const SizedBox(height: 16),
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
@@ -232,7 +269,7 @@ class _ManagerReviewPageState extends ConsumerState<ManagerReviewPage> {
                     : (v) => setState(() => _recommendedAction = v),
               ),
               const SizedBox(height: 24),
-              if (!readOnly) ...[
+              if (canReview) ...[
                 FilledButton(
                   onPressed: _saving ? null : () => _save(markComplete: false),
                   child: const Text('Save draft'),
@@ -246,6 +283,81 @@ class _ManagerReviewPageState extends ConsumerState<ManagerReviewPage> {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+bool _hasGoalDetails(GoalRow goal) {
+  return goal.objective.trim().isNotEmpty ||
+      goal.kpi.trim().isNotEmpty ||
+      goal.target.trim().isNotEmpty;
+}
+
+class _GoalReviewCard extends StatelessWidget {
+  const _GoalReviewCard({
+    required this.goal,
+    required this.index,
+    required this.readOnly,
+    required this.onChanged,
+  });
+
+  final GoalRow goal;
+  final int index;
+  final bool readOnly;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Goal ${index + 1}',
+                style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            _kv('Objective', goal.objective),
+            _kv('KPI', goal.kpi),
+            _kv('Target', goal.target),
+            _kv('Actual', goal.actual),
+            _kv('Achievement', goal.achievementPct),
+            _kv('Employee rating', goal.ratingN1?.toString() ?? '-'),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 4,
+              children: [
+                for (var i = 1; i <= 5; i++)
+                  ChoiceChip(
+                    label: Text('$i'),
+                    selected: goal.ratingN2 == i,
+                    onSelected: readOnly
+                        ? null
+                        : (selected) {
+                            goal.ratingN2 = selected ? i : null;
+                            onChanged();
+                          },
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _kv(String label, String value) {
+    final display = value.trim().isEmpty ? '-' : value;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(width: 116, child: Text(label)),
+          Expanded(child: Text(display)),
+        ],
       ),
     );
   }

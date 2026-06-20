@@ -3,6 +3,7 @@ class Employee {
     required this.employeeId,
     required this.fullName,
     required this.jobTitle,
+    this.department,
     this.countryCode,
     this.managerName,
     this.email,
@@ -16,6 +17,7 @@ class Employee {
   final String employeeId;
   final String fullName;
   final String jobTitle;
+  final String? department;
   final String? countryCode;
   final String? managerName;
   final String? email;
@@ -30,6 +32,7 @@ class Employee {
       employeeId: json['employee_id'] as String,
       fullName: json['full_name'] as String,
       jobTitle: json['job_title'] as String,
+      department: json['department'] as String?,
       countryCode: json['country_code'] as String?,
       managerName: json['manager_name'] as String?,
       email: json['email'] as String?,

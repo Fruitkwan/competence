@@ -57,6 +57,8 @@ class EmployeesDirectoryPage extends ConsumerWidget {
     final state = ref.watch(_dirStateProvider);
     final result = ref.watch(_dirResultProvider);
     final countries = ref.watch(countriesProvider).valueOrNull ?? const [];
+    final departments =
+        ref.watch(departmentsProvider).valueOrNull ?? const [];
     final jobs = ref.watch(jobsProvider).valueOrNull ?? const [];
 
     return Scaffold(
@@ -66,6 +68,7 @@ class EmployeesDirectoryPage extends ConsumerWidget {
           _FilterBar(
             state: state,
             countries: countries,
+            departments: departments,
             jobs: jobs,
             onChanged: (next) =>
                 ref.read(_dirStateProvider.notifier).state = next,
@@ -109,11 +112,13 @@ class _FilterBar extends StatefulWidget {
   const _FilterBar({
     required this.state,
     required this.countries,
+    required this.departments,
     required this.jobs,
     required this.onChanged,
   });
   final _DirState state;
   final List<String> countries;
+  final List<String> departments;
   final List<String> jobs;
   final ValueChanged<_DirState> onChanged;
 
@@ -163,6 +168,24 @@ class _FilterBarState extends State<_FilterBar> {
             ),
             onSubmitted: (v) => widget.onChanged(widget.state.copyWith(
               filter: filter.copyWith(query: v.trim()),
+              page: 1,
+            )),
+          ),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String?>(
+            value: filter.department,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Department'),
+            items: [
+              const DropdownMenuItem(value: null, child: Text('All')),
+              for (final d in widget.departments)
+                DropdownMenuItem(value: d, child: Text(d)),
+            ],
+            onChanged: (v) => widget.onChanged(widget.state.copyWith(
+              filter: filter.copyWith(
+                department: v,
+                clearDepartment: v == null,
+              ),
               page: 1,
             )),
           ),
@@ -245,6 +268,9 @@ class _EmployeeTile extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(employee.jobTitle),
+            if (employee.department != null)
+              Text(employee.department!,
+                  style: Theme.of(context).textTheme.bodySmall),
             if (employee.email != null)
               Text(employee.email!,
                   style: Theme.of(context).textTheme.bodySmall),

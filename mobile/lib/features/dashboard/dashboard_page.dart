@@ -11,43 +11,26 @@ import '../../core/role.dart';
 import '../../data/models/cycle_objective.dart';
 import '../../data/repositories/appraisal_repository.dart';
 import '../../data/repositories/cycle_repository.dart';
+import '../../data/repositories/notification_repository.dart';
 import '../../data/repositories/objective_repository.dart';
 import '../../shared/widgets/soft_ui.dart';
 import '../../shared/widgets/status_chip.dart';
 
-class DashboardPage extends ConsumerStatefulWidget {
+const _teal = Color(0xFF10B7B5);
+const _blue = Color(0xFF0070B8);
+const _orange = Color(0xFFF59E0B);
+
+class DashboardPage extends ConsumerWidget {
   const DashboardPage({super.key});
 
   @override
-  ConsumerState<DashboardPage> createState() => _DashboardPageState();
-}
-
-class _DashboardPageState extends ConsumerState<DashboardPage>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _entrance;
-
-  @override
-  void initState() {
-    super.initState();
-    _entrance = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..forward();
-  }
-
-  @override
-  void dispose() {
-    _entrance.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final profile = ref.watch(currentProfileProvider).valueOrNull;
     final role = ref.watch(currentRoleProvider);
     final cycle = ref.watch(currentObjectiveCycleProvider);
     final myObjectives = ref.watch(myObjectivesProvider(null));
     final myAppraisals = ref.watch(myAppraisalsProvider);
+    final unread = ref.watch(unreadNotificationsCountProvider).valueOrNull;
     final pendingApprovals = role.canManage
         ? ref.watch(pendingObjectivesForApprovalProvider)
         : const AsyncValue<List<CycleObjective>>.data([]);
@@ -55,173 +38,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
     final openObjectives = myObjectives.valueOrNull
         ?.where((o) => o.status != ObjectiveStatus.approved)
         .length;
-
-    final secondaryMetric = role.canManage
+    final appraisalCount = role.canManage
         ? pendingApprovals.valueOrNull?.length
         : myAppraisals.valueOrNull?.length;
-
-    final theme = Theme.of(context);
-
-    final sections = <Widget>[
-      _GradientHero(name: profile?.fullName ?? 'there', role: role),
-      const SizedBox(height: 20),
-      cycle.when(
-        data: (c) => c == null
-            ? const EmptyCard(
-                icon: Icons.event_busy_outlined,
-                title: 'No active cycle',
-                body:
-                    'HR has not opened a cycle yet. You will see goals and appraisals here when one starts.',
-              )
-            : _CycleCard(
-                cycleName: c.name,
-                status: c.status,
-                endDate: c.endDate,
-              ),
-        loading: () => const SkeletonBlock(),
-        error: (e, _) =>
-            ErrorCard(title: 'Could not load cycle', detail: '$e'),
-      ),
-      const SizedBox(height: 16),
-      Row(
-        children: [
-          Expanded(
-            child: _MetricCard(
-              label: 'My open objectives',
-              value: openObjectives,
-              icon: Icons.flag_rounded,
-              accent: theme.colorScheme.primary,
-              onTap: () => context.go('/objectives'),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _MetricCard(
-              label: role.canManage ? 'Awaiting my approval' : 'My appraisals',
-              value: secondaryMetric,
-              icon: role.canManage
-                  ? Icons.rule_rounded
-                  : Icons.assessment_rounded,
-              accent: theme.colorScheme.tertiary,
-              onTap: () => context.go(
-                role.canManage ? '/objectives/review' : '/appraisals',
-              ),
-            ),
-          ),
-        ],
-      ),
-      const SizedBox(height: 28),
-      const SectionHeader(title: 'Recent appraisals'),
-      const SizedBox(height: 10),
-      myAppraisals.when(
-        loading: () => const SkeletonBlock(height: 72),
-        error: (e, _) =>
-            ErrorCard(title: 'Could not load appraisals', detail: '$e'),
-        data: (rows) {
-          if (rows.isEmpty) {
-            return const EmptyCard(
-              icon: Icons.inbox_outlined,
-              title: 'No appraisals yet',
-              body:
-                  'You will see your appraisals here once HR opens a cycle.',
-            );
-          }
-          return Column(
-            children: [
-              for (final a in rows.take(3))
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: SoftCard(
-                    onTap: () => context.go(routeForAppraisal(a, role)),
-                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                a.appraisalPeriod ?? 'Appraisal',
-                                style: theme.textTheme.titleSmall?.copyWith(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Updated ${DateFormat.yMMMd().format(a.updatedAt)}',
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: theme.colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        StatusChip(a.status, tone: _toneForStatus(a.status)),
-                      ],
-                    ),
-                  ),
-                ),
-            ],
-          );
-        },
-      ),
-      if (role.canManage && (pendingApprovals.valueOrNull?.isNotEmpty ?? false)) ...[
-        const SizedBox(height: 24),
-        const SectionHeader(title: 'Awaiting your approval'),
-        const SizedBox(height: 10),
-        for (final o in pendingApprovals.value!.take(3))
-          Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: SoftCard(
-              onTap: () => context.go('/objectives/review'),
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-              child: Row(
-                children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.secondaryContainer,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      Icons.pending_actions_rounded,
-                      size: 18,
-                      color: theme.colorScheme.onSecondaryContainer,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          o.title,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          o.employeeName ?? o.employeeId,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ],
-              ),
-            ),
-          ),
-      ],
-    ];
+    final daysLeft = cycle.valueOrNull?.endDate.difference(DateTime.now()).inDays;
 
     return RefreshIndicator(
       onRefresh: () async {
@@ -229,22 +49,138 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
         ref.invalidate(myObjectivesProvider(null));
         ref.invalidate(myAppraisalsProvider);
         ref.invalidate(pendingObjectivesForApprovalProvider);
+        ref.invalidate(unreadNotificationsCountProvider);
       },
-      child: ListView.builder(
+      child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-        itemCount: sections.length,
-        itemBuilder: (context, index) {
-          return StaggeredEntrance(
-            controller: _entrance,
-            interval: entranceInterval(index),
-            child: sections[index],
-          );
-        },
+        children: [
+          _Header(name: profile?.fullName ?? 'there', role: role),
+          const SizedBox(height: 18),
+          GridView.count(
+            crossAxisCount: 2,
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1.55,
+            physics: const NeverScrollableScrollPhysics(),
+            shrinkWrap: true,
+            children: [
+              _StatTile(
+                icon: Icons.flag_outlined,
+                label: 'Open objectives',
+                value: _num(openObjectives),
+                color: _blue,
+                onTap: () => context.go('/objectives'),
+              ),
+              _StatTile(
+                icon: role.canManage
+                    ? Icons.fact_check_outlined
+                    : Icons.assessment_outlined,
+                label: role.canManage ? 'For approval' : 'Appraisals',
+                value: _num(appraisalCount),
+                color: _teal,
+                onTap: () => context.go(
+                  role.canManage ? '/objectives/review' : '/appraisals',
+                ),
+              ),
+              _StatTile(
+                icon: Icons.calendar_month_outlined,
+                label: 'Cycle days left',
+                value: daysLeft == null ? '-' : daysLeft.clamp(0, 999).toString(),
+                color: _orange,
+              ),
+              _StatTile(
+                icon: Icons.notifications_none_outlined,
+                label: 'Unread',
+                value: _num(unread),
+                color: _teal,
+                onTap: () => context.go('/notifications'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          SectionHeader(
+            title: "Today's focus",
+            trailing: TextButton(
+              onPressed: () => context.go('/objectives'),
+              child: const Text('See more'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          cycle.when(
+            data: (c) => c == null
+                ? const EmptyCard(
+                    icon: Icons.event_busy_outlined,
+                    title: 'No active cycle',
+                    body: 'HR has not opened a cycle yet.',
+                  )
+                : _FocusCard(
+                    title: c.name,
+                    subtitle: 'Ends ${DateFormat.yMMMd().format(c.endDate)}',
+                    status: c.status,
+                    color: _blue,
+                  ),
+            loading: () => const SkeletonBlock(height: 86),
+            error: (e, _) =>
+                ErrorCard(title: 'Could not load cycle', detail: '$e'),
+          ),
+          if (role.canManage && (pendingApprovals.valueOrNull?.isNotEmpty ?? false)) ...[
+            const SizedBox(height: 10),
+            _FocusCard(
+              title: '${pendingApprovals.value!.length} objectives need review',
+              subtitle: 'Approve or request revisions',
+              status: 'Pending',
+              color: _orange,
+              onTap: () => context.go('/objectives/review'),
+            ),
+          ],
+          const SizedBox(height: 24),
+          SectionHeader(
+            title: 'Recent activity',
+            trailing: TextButton(
+              onPressed: () => context.go('/appraisals'),
+              child: const Text('View all'),
+            ),
+          ),
+          const SizedBox(height: 10),
+          myAppraisals.when(
+            loading: () => const SkeletonBlock(height: 92),
+            error: (e, _) =>
+                ErrorCard(title: 'Could not load appraisals', detail: '$e'),
+            data: (rows) {
+              if (rows.isEmpty) {
+                return const EmptyCard(
+                  icon: Icons.inbox_outlined,
+                  title: 'No appraisals yet',
+                  body: 'You will see appraisal activity here.',
+                );
+              }
+              return Column(
+                children: [
+                  for (final a in rows.take(4))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: _ActivityRow(
+                        icon: Icons.assignment_turned_in_outlined,
+                        title: a.appraisalPeriod ?? 'Appraisal',
+                        subtitle:
+                            'Updated ${DateFormat.yMMMd().format(a.updatedAt)}',
+                        status: a.status,
+                        color: _teal,
+                        onTap: () => context.go(routeForAppraisal(a, role)),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+        ],
       ),
     );
   }
 }
+
+String _num(int? value) => value?.toString() ?? '-';
 
 StatusTone _toneForStatus(String status) {
   switch (status) {
@@ -261,254 +197,239 @@ StatusTone _toneForStatus(String status) {
   }
 }
 
-class _GradientHero extends StatelessWidget {
-  const _GradientHero({required this.name, required this.role});
+class _Header extends StatelessWidget {
+  const _Header({required this.name, required this.role});
   final String name;
   final AppRole role;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
-    final hour = DateTime.now().hour;
-    final greeting = hour < 12
-        ? 'Good morning'
-        : hour < 18
-            ? 'Good afternoon'
-            : 'Good evening';
-
-    final accent =
-        Color.lerp(scheme.primary, scheme.tertiary, 0.55) ?? scheme.primary;
-
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [scheme.primary, accent],
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: scheme.primary.withOpacity(0.28),
-            blurRadius: 22,
-            offset: const Offset(0, 12),
+    final initials = name
+        .split(RegExp(r'\s+'))
+        .where((p) => p.isNotEmpty)
+        .take(2)
+        .map((p) => p[0].toUpperCase())
+        .join();
+    return Row(
+      children: [
+        InkResponse(
+          onTap: () => context.push('/profile'),
+          radius: 28,
+          child: CircleAvatar(
+            radius: 24,
+            backgroundColor: _blue.withOpacity(0.12),
+            foregroundColor: _blue,
+            child: Text(initials.isEmpty ? 'DG' : initials),
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(24),
-        child: Stack(
-          children: [
-            Positioned(
-              right: -36,
-              top: -36,
-              child: _decorativeCircle(scheme.onPrimary.withOpacity(0.10), 160),
-            ),
-            Positioned(
-              right: 60,
-              bottom: -52,
-              child: _decorativeCircle(scheme.onPrimary.withOpacity(0.06), 110),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '$greeting,',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: scheme.onPrimary.withOpacity(0.85),
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    name,
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      color: scheme.onPrimary,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.5,
-                      height: 1.1,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  _HeroRoleChip(label: role.label),
-                ],
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Welcome back!',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _decorativeCircle(Color color, double size) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(shape: BoxShape.circle, color: color),
-    );
-  }
-}
-
-class _HeroRoleChip extends StatelessWidget {
-  const _HeroRoleChip({required this.label});
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: scheme.onPrimary.withOpacity(0.18),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: scheme.onPrimary.withOpacity(0.25)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          PulsingDot(color: scheme.onPrimary),
-          const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              color: scheme.onPrimary,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-              letterSpacing: 0.2,
-            ),
+              Text(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                role.label,
+                style: theme.textTheme.bodySmall?.copyWith(color: _teal),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
-class _CycleCard extends StatelessWidget {
-  const _CycleCard({
-    required this.cycleName,
-    required this.status,
-    required this.endDate,
+class _StatTile extends StatelessWidget {
+  const _StatTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+    this.onTap,
   });
 
-  final String cycleName;
-  final String status;
-  final DateTime endDate;
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final daysLeft = endDate.difference(DateTime.now()).inDays;
     return SoftCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(14),
+      borderRadius: 18,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: scheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(
-                  Icons.calendar_today_rounded,
-                  size: 16,
-                  color: scheme.onPrimaryContainer,
+              Text(
+                value,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  cycleName,
-                  style: theme.textTheme.titleMedium?.copyWith(
+              const Spacer(),
+              _IconBubble(icon: icon, color: color),
+            ],
+          ),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FocusCard extends StatelessWidget {
+  const _FocusCard({
+    required this.title,
+    required this.subtitle,
+    required this.status,
+    required this.color,
+    this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final String status;
+  final Color color;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SoftCard(
+      onTap: onTap,
+      leadingAccent: color,
+      padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          StatusChip(status, tone: _toneForStatus(status)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActivityRow extends StatelessWidget {
+  const _ActivityRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.status,
+    required this.color,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final String status;
+  final Color color;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SoftCard(
+      onTap: onTap,
+      padding: const EdgeInsets.all(12),
+      borderRadius: 18,
+      child: Row(
+        children: [
+          _IconBubble(icon: icon, color: color),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-              ),
-              StatusChip(status, tone: StatusTone.info),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            daysLeft > 0
-                ? 'Ends ${DateFormat.yMMMd().format(endDate)} · $daysLeft days left'
-                : 'Ended ${DateFormat.yMMMd().format(endDate)}',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: scheme.onSurfaceVariant,
+                const SizedBox(height: 3),
+                Text(
+                  subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
           ),
+          const SizedBox(width: 8),
+          StatusChip(status, tone: _toneForStatus(status)),
         ],
       ),
     );
   }
 }
 
-class _MetricCard extends StatelessWidget {
-  const _MetricCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-    required this.accent,
-    required this.onTap,
-  });
-
-  final String label;
-  final int? value;
+class _IconBubble extends StatelessWidget {
+  const _IconBubble({required this.icon, required this.color});
   final IconData icon;
-  final Color accent;
-  final VoidCallback onTap;
+  final Color color;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return SoftCard(
-      onTap: onTap,
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: accent.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Icon(icon, size: 18, color: accent),
-              ),
-              const Spacer(),
-              Icon(
-                Icons.arrow_outward_rounded,
-                size: 16,
-                color: scheme.onSurfaceVariant.withOpacity(0.5),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          AnimatedCount(
-            value: value,
-            style: theme.textTheme.headlineMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: accent,
-              letterSpacing: -1,
-              height: 1,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: scheme.onSurfaceVariant,
-            ),
-          ),
-        ],
+    return Container(
+      width: 34,
+      height: 34,
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(10),
       ),
+      child: Icon(icon, size: 18, color: color),
     );
   }
 }

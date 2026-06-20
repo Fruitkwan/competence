@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth_controller.dart';
+import '../../core/biometric_auth.dart';
 import '../../core/env.dart';
 import '../../core/supabase_client.dart';
 
@@ -37,6 +38,15 @@ class _SplashPageState extends ConsumerState<SplashPage> {
     if (user == null) {
       context.go('/login');
     } else {
+      final biometrics = ref.read(biometricAuthProvider);
+      if (await biometrics.isEnabled()) {
+        final ok = await biometrics.authenticate();
+        if (!ok) {
+          await supabase.auth.signOut();
+          if (mounted) context.go('/login');
+          return;
+        }
+      }
       context.go('/dashboard');
     }
   }

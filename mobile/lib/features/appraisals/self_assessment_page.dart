@@ -124,19 +124,37 @@ class _SelfAssessmentPageState extends ConsumerState<SelfAssessmentPage> {
             children: [
               _SectionHeader(
                 title: 'Section A · Goals & objectives',
-                subtitle: 'Rate your achievement on each.',
+                subtitle: 'Review assigned goals and add your N1 rating.',
               ),
-              for (var i = 0; i < _goals.length; i++)
-                _GoalCard(
-                  goal: _goals[i],
-                  index: i,
-                  readOnly: readOnly,
-                  onChanged: () => setState(() {}),
+              if (_goals.where(_hasGoalDetails).isEmpty)
+                const Card(
+                  child: ListTile(
+                    leading: Icon(Icons.flag_outlined),
+                    title: Text('No goals assigned yet'),
+                    subtitle: Text(
+                      'Your goals will appear here once they are added to the appraisal.',
+                    ),
+                  ),
+                )
+              else
+                for (var i = 0; i < _goals.length; i++)
+                  if (_hasGoalDetails(_goals[i]))
+                    _GoalCard(
+                      goal: _goals[i],
+                      index: i,
+                      readOnlyDetails: true,
+                      readOnlyRating: readOnly,
+                      onChanged: () => setState(() {}),
+                    ),
+              const SizedBox(height: 12),
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.lock_outline),
+                  title: const Text('Goal details are locked'),
+                  subtitle: const Text(
+                    'Employees can rate their achievement, but cannot add, delete, or change appraisal goals.',
+                  ),
                 ),
-              TextButton.icon(
-                onPressed: readOnly ? null : () => setState(() => _goals.add(GoalRow())),
-                icon: const Icon(Icons.add),
-                label: const Text('Add goal'),
               ),
               const SizedBox(height: 12),
               _SectionHeader(title: 'Section B · Core competencies'),
@@ -226,6 +244,12 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
+bool _hasGoalDetails(GoalRow goal) {
+  return goal.objective.trim().isNotEmpty ||
+      goal.kpi.trim().isNotEmpty ||
+      goal.target.trim().isNotEmpty;
+}
+
 class _MultilineField extends StatelessWidget {
   const _MultilineField({
     required this.label,
@@ -255,12 +279,14 @@ class _GoalCard extends StatefulWidget {
   const _GoalCard({
     required this.goal,
     required this.index,
-    required this.readOnly,
+    required this.readOnlyDetails,
+    required this.readOnlyRating,
     required this.onChanged,
   });
   final GoalRow goal;
   final int index;
-  final bool readOnly;
+  final bool readOnlyDetails;
+  final bool readOnlyRating;
   final VoidCallback onChanged;
 
   @override
@@ -308,7 +334,7 @@ class _GoalCardState extends State<_GoalCard> {
             const SizedBox(height: 8),
             TextField(
               controller: _objective,
-              readOnly: widget.readOnly,
+              readOnly: widget.readOnlyDetails,
               decoration: const InputDecoration(labelText: 'Objective'),
               onChanged: (v) {
                 widget.goal.objective = v;
@@ -318,7 +344,7 @@ class _GoalCardState extends State<_GoalCard> {
             const SizedBox(height: 8),
             TextField(
               controller: _kpi,
-              readOnly: widget.readOnly,
+              readOnly: widget.readOnlyDetails,
               decoration: const InputDecoration(labelText: 'KPI'),
               onChanged: (v) {
                 widget.goal.kpi = v;
@@ -331,7 +357,7 @@ class _GoalCardState extends State<_GoalCard> {
                 Expanded(
                   child: TextField(
                     controller: _target,
-                    readOnly: widget.readOnly,
+                    readOnly: widget.readOnlyDetails,
                     decoration: const InputDecoration(labelText: 'Target'),
                     onChanged: (v) {
                       widget.goal.target = v;
@@ -343,7 +369,7 @@ class _GoalCardState extends State<_GoalCard> {
                 Expanded(
                   child: TextField(
                     controller: _actual,
-                    readOnly: widget.readOnly,
+                    readOnly: widget.readOnlyDetails,
                     decoration: const InputDecoration(labelText: 'Actual'),
                     onChanged: (v) {
                       widget.goal.actual = v;
@@ -356,7 +382,7 @@ class _GoalCardState extends State<_GoalCard> {
             const SizedBox(height: 8),
             TextField(
               controller: _achievement,
-              readOnly: widget.readOnly,
+              readOnly: widget.readOnlyDetails,
               keyboardType: TextInputType.number,
               decoration: const InputDecoration(labelText: 'Achievement %'),
               onChanged: (v) {
@@ -365,7 +391,11 @@ class _GoalCardState extends State<_GoalCard> {
               },
             ),
             const SizedBox(height: 8),
-            _SelfRating(goal: widget.goal, readOnly: widget.readOnly, onChanged: widget.onChanged),
+            _SelfRating(
+              goal: widget.goal,
+              readOnly: widget.readOnlyRating,
+              onChanged: widget.onChanged,
+            ),
           ],
         ),
       ),

@@ -143,16 +143,21 @@ class _ProfilePageState extends ConsumerState<ProfilePage>
   Future<void> _signOut(BuildContext context) async {
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Sign out?'),
+      builder: (dialogContext) => AlertDialog(
+        title: Row(
+          children: [
+            const Expanded(child: Text('Sign out?')),
+            IconButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              icon: const Icon(Icons.close),
+              tooltip: 'Close',
+            ),
+          ],
+        ),
         content: const Text('You will need to sign back in to continue.'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, true),
+            onPressed: () => Navigator.pop(dialogContext, true),
             child: const Text('Sign out'),
           ),
         ],
@@ -198,95 +203,74 @@ class _ProfileHero extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
-        child: Stack(
-          children: [
-            Positioned(
-              right: -36,
-              top: -36,
-              child: _decorativeCircle(scheme.onPrimary.withOpacity(0.10), 160),
-            ),
-            Positioned(
-              right: 60,
-              bottom: -52,
-              child: _decorativeCircle(scheme.onPrimary.withOpacity(0.06), 110),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      _Avatar(
-                        initials: initialsFor(name),
-                        size: 64,
-                        bg: scheme.onPrimary.withOpacity(0.18),
-                        fg: scheme.onPrimary,
-                        border: scheme.onPrimary.withOpacity(0.32),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+        child: SizedBox(
+          height: 144,
+          child: Stack(
+            children: [
+              Positioned(
+                right: -36,
+                top: -36,
+                child:
+                    _decorativeCircle(scheme.onPrimary.withOpacity(0.10), 160),
+              ),
+              Positioned(
+                right: 60,
+                bottom: -52,
+                child:
+                    _decorativeCircle(scheme.onPrimary.withOpacity(0.06), 110),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _Avatar(
+                      initials: initialsFor(name),
+                      size: 64,
+                      bg: scheme.onPrimary.withOpacity(0.18),
+                      fg: scheme.onPrimary,
+                      border: scheme.onPrimary.withOpacity(0.32),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            name,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              color: scheme.onPrimary,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: -0.3,
+                              height: 1.15,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (email.isNotEmpty) ...[
+                            const SizedBox(height: 2),
                             Text(
-                              name,
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                color: scheme.onPrimary,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: -0.3,
-                                height: 1.15,
+                              email,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: scheme.onPrimary.withOpacity(0.85),
                               ),
-                              maxLines: 2,
+                              maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            if (email.isNotEmpty) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                email,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: scheme.onPrimary.withOpacity(0.85),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ],
                           ],
-                        ),
+                        ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 14),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: scheme.onPrimary.withOpacity(0.18),
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(
-                          color: scheme.onPrimary.withOpacity(0.25)),
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        PulsingDot(color: scheme.onPrimary, size: 10),
-                        const SizedBox(width: 8),
-                        Text(
-                          role.label,
-                          style: TextStyle(
-                            color: scheme.onPrimary,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+              Positioned(
+                right: 18,
+                bottom: 18,
+                child: _RolePill(label: role.label),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -297,6 +281,40 @@ class _ProfileHero extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(shape: BoxShape.circle, color: color),
+    );
+  }
+}
+
+class _RolePill extends StatelessWidget {
+  const _RolePill({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: scheme.onPrimary.withOpacity(0.18),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: scheme.onPrimary.withOpacity(0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const PulsingDot(color: Color(0xFF22C55E), size: 10),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              color: scheme.onPrimary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

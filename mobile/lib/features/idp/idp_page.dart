@@ -16,6 +16,9 @@ import '../../data/repositories/skill_gap_repository.dart';
 import '../../shared/widgets/soft_ui.dart';
 import '../../shared/widgets/status_chip.dart';
 
+const _blue = Color(0xFF0070B8);
+const _orange = Color(0xFFF59E0B);
+
 final _myCoursesProvider = FutureProvider<List<EmployeeCourse>>((ref) async {
   final emp = await ref.watch(myEmployeeRecordProvider.future);
   if (emp == null) return const [];
@@ -60,6 +63,28 @@ class _IdpPageState extends ConsumerState<IdpPage>
     final gaps = ref.watch(_mySkillGapsProvider);
 
     final sections = <Widget>[
+      Row(
+        children: [
+          Expanded(
+            child: _MiniStat(
+              icon: Icons.school_outlined,
+              label: 'Courses',
+              value: '${courses.valueOrNull?.length ?? 0}',
+              color: _blue,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _MiniStat(
+              icon: Icons.auto_graph_outlined,
+              label: 'Open gaps',
+              value: '${gaps.valueOrNull?.length ?? 0}',
+              color: _orange,
+            ),
+          ),
+        ],
+      ),
+      const SizedBox(height: 24),
       const SectionHeader(title: 'Assigned courses'),
       const SizedBox(height: 10),
       courses.when(
@@ -137,6 +162,64 @@ class _IdpPageState extends ConsumerState<IdpPage>
             child: sections[index],
           );
         },
+      ),
+    );
+  }
+}
+
+class _MiniStat extends StatelessWidget {
+  const _MiniStat({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SoftCard(
+      padding: const EdgeInsets.all(14),
+      borderRadius: 18,
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: color),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

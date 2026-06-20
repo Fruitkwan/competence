@@ -42,29 +42,35 @@ class AppShell extends ConsumerWidget {
     final profile = ref.watch(currentProfileProvider).valueOrNull;
     final unread = ref.watch(unreadNotificationsCountProvider).valueOrNull ?? 0;
     final scheme = Theme.of(context).colorScheme;
+    final showShellAvatar = !location.startsWith('/dashboard');
 
     final avatarName = profile?.fullName ?? profile?.email;
 
     return Scaffold(
       appBar: AppBar(
+        toolbarHeight: showShellAvatar ? kToolbarHeight : 0,
         titleSpacing: 12,
-        leadingWidth: 64,
-        leading: Padding(
-          padding: const EdgeInsets.only(left: 12),
-          child: _AvatarButton(
-            initials: initialsFor(avatarName),
-            onTap: () => context.push('/profile'),
-          ),
-        ),
+        leadingWidth: showShellAvatar ? 64 : 0,
+        leading: showShellAvatar
+            ? Padding(
+                padding: const EdgeInsets.only(left: 12),
+                child: _AvatarButton(
+                  initials: initialsFor(avatarName),
+                  onTap: () => context.push('/profile'),
+                ),
+              )
+            : null,
         title: const SizedBox.shrink(),
-        actions: [
-          _BellButton(
-            unread: unread,
-            color: scheme.onSurface,
-            onTap: () => context.push('/notifications'),
-          ),
-          const SizedBox(width: 8),
-        ],
+        actions: showShellAvatar
+            ? [
+                _BellButton(
+                  unread: unread,
+                  color: scheme.onSurface,
+                  onTap: () => context.push('/notifications'),
+                ),
+                const SizedBox(width: 8),
+              ]
+            : null,
       ),
       body: child,
       bottomNavigationBar: NavigationBar(
@@ -92,8 +98,6 @@ class _AvatarButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final accent =
-        Color.lerp(scheme.primary, scheme.tertiary, 0.55) ?? scheme.primary;
     return InkResponse(
       onTap: onTap,
       radius: 26,
@@ -101,25 +105,14 @@ class _AvatarButton extends StatelessWidget {
         width: 40,
         height: 40,
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [scheme.primary, accent],
-          ),
+          color: const Color(0xFF0070B8).withOpacity(0.12),
           shape: BoxShape.circle,
-          boxShadow: [
-            BoxShadow(
-              color: scheme.primary.withOpacity(0.25),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
         ),
         alignment: Alignment.center,
         child: Text(
           initials,
-          style: TextStyle(
-            color: scheme.onPrimary,
+          style: const TextStyle(
+            color: Color(0xFF0070B8),
             fontWeight: FontWeight.w700,
             fontSize: 14,
             letterSpacing: 0.3,

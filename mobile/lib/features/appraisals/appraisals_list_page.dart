@@ -14,6 +14,9 @@ import '../../data/repositories/appraisal_repository.dart';
 import '../../shared/widgets/soft_ui.dart';
 import '../../shared/widgets/status_chip.dart';
 
+const _teal = Color(0xFF10B7B5);
+const _orange = Color(0xFFF59E0B);
+
 class AppraisalsListPage extends ConsumerStatefulWidget {
   const AppraisalsListPage({super.key});
 
@@ -70,6 +73,10 @@ class _AppraisalsListPageState extends ConsumerState<AppraisalsListPage>
           ),
         ),
         data: (rows) {
+          final pending = rows
+              .where((a) => a.status != 'Final' && a.status != 'Archived')
+              .length;
+          final done = rows.length - pending;
           return RefreshIndicator(
             onRefresh: () async {
               ref
@@ -92,15 +99,42 @@ class _AppraisalsListPageState extends ConsumerState<AppraisalsListPage>
                 : ListView.builder(
                     physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                    itemCount: rows.length,
+                    itemCount: rows.length + 1,
                     itemBuilder: (context, i) {
+                      if (i == 0) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 16),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: _SummaryTile(
+                                  icon: Icons.pending_actions_outlined,
+                                  label: 'In progress',
+                                  value: '$pending',
+                                  color: _orange,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: _SummaryTile(
+                                  icon: Icons.check_circle_outline,
+                                  label: 'Completed',
+                                  value: '$done',
+                                  color: _teal,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      final appraisal = rows[i - 1];
                       return StaggeredEntrance(
                         controller: _entrance,
                         interval: entranceInterval(i, step: 0.04, span: 0.4),
                         child: Padding(
                           padding: const EdgeInsets.only(bottom: 10),
                           child: _AppraisalTile(
-                            appraisal: rows[i],
+                            appraisal: appraisal,
                             role: role,
                           ),
                         ),
@@ -109,6 +143,64 @@ class _AppraisalsListPageState extends ConsumerState<AppraisalsListPage>
                   ),
           );
         },
+      ),
+    );
+  }
+}
+
+class _SummaryTile extends StatelessWidget {
+  const _SummaryTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  final IconData icon;
+  final String label;
+  final String value;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SoftCard(
+      padding: const EdgeInsets.all(14),
+      borderRadius: 18,
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, size: 18, color: color),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

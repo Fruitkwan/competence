@@ -47,7 +47,8 @@ class _HrFinalizePageState extends ConsumerState<HrFinalizePage> {
             calibrationRationale: _rationale.text.trim().isEmpty
                 ? null
                 : _rationale.text.trim(),
-            hrRepresentative: _hrRep.text.trim().isEmpty ? null : _hrRep.text.trim(),
+            hrRepresentative:
+                _hrRep.text.trim().isEmpty ? null : _hrRep.text.trim(),
           );
       if (!mounted) return;
       ref.invalidate(appraisalByIdProvider(widget.appraisalId));
@@ -78,6 +79,7 @@ class _HrFinalizePageState extends ConsumerState<HrFinalizePage> {
           }
           _hydrate(a);
           final isFinal = a.status == 'Final' || a.status == 'Archived';
+          final canFinalize = a.status == 'N2 Complete' && !isFinal;
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -91,6 +93,18 @@ class _HrFinalizePageState extends ConsumerState<HrFinalizePage> {
                 ),
               ),
               const SizedBox(height: 16),
+              if (!canFinalize && !isFinal) ...[
+                const Card(
+                  child: ListTile(
+                    leading: Icon(Icons.lock_outline),
+                    title: Text('Waiting for manager sign-off'),
+                    subtitle: Text(
+                      'HR can finalize after both employee and manager have signed the appraisal.',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
               Card(
                 child: Padding(
                   padding: const EdgeInsets.all(12),
@@ -118,15 +132,17 @@ class _HrFinalizePageState extends ConsumerState<HrFinalizePage> {
                     ChoiceChip(
                       label: Text('$i'),
                       selected: _calibrated == i,
-                      onSelected:
-                          isFinal ? null : (s) => setState(() => _calibrated = s ? i : null),
+                      onSelected: canFinalize
+                          ? (s) =>
+                              setState(() => _calibrated = s ? i : null)
+                          : null,
                     ),
                 ],
               ),
               const SizedBox(height: 8),
               TextField(
                 controller: _rationale,
-                readOnly: isFinal,
+                readOnly: !canFinalize,
                 minLines: 2,
                 maxLines: 4,
                 decoration: const InputDecoration(
@@ -135,11 +151,11 @@ class _HrFinalizePageState extends ConsumerState<HrFinalizePage> {
               const SizedBox(height: 8),
               TextField(
                 controller: _hrRep,
-                readOnly: isFinal,
+                readOnly: !canFinalize,
                 decoration: const InputDecoration(labelText: 'HR representative'),
               ),
               const SizedBox(height: 24),
-              if (!isFinal)
+              if (canFinalize)
                 FilledButton(
                   onPressed: _saving ? null : _finalize,
                   child: _saving

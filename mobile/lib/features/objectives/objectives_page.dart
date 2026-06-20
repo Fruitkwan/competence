@@ -11,6 +11,10 @@ import '../../data/repositories/objective_repository.dart';
 import '../../shared/widgets/soft_ui.dart';
 import '../../shared/widgets/status_chip.dart';
 
+const _teal = Color(0xFF10B7B5);
+const _blue = Color(0xFF0070B8);
+const _orange = Color(0xFFF59E0B);
+
 class ObjectivesPage extends ConsumerStatefulWidget {
   const ObjectivesPage({super.key});
 
@@ -78,11 +82,7 @@ class _ObjectivesPageState extends ConsumerState<ObjectivesPage>
             ),
             const SizedBox(height: 16),
             if (rows.isEmpty)
-              const EmptyCard(
-                icon: Icons.flag_outlined,
-                title: 'No objectives yet',
-                body: 'Tap + below to draft your first objective.',
-              )
+              const _ObjectiveEmptyCard()
             else
               for (final o in rows)
                 Padding(
@@ -154,11 +154,10 @@ class _WeightProgressBanner extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    final start = canSubmit ? scheme.primary : scheme.surfaceContainerHighest;
-    final end = canSubmit
-        ? (Color.lerp(scheme.primary, scheme.tertiary, 0.55) ?? scheme.primary)
-        : scheme.surfaceContainerHighest;
-    final fg = canSubmit ? scheme.onPrimary : scheme.onSurface;
+    final start = canSubmit ? _blue : theme.colorScheme.surface;
+    final end = canSubmit ? _teal : _blue.withOpacity(0.06);
+    final fg = canSubmit ? Colors.white : scheme.onSurface;
+    final accent = canSubmit ? Colors.white : _blue;
 
     return Container(
       width: double.infinity,
@@ -169,18 +168,16 @@ class _WeightProgressBanner extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [start, end],
         ),
-        border: canSubmit
-            ? null
-            : Border.all(color: scheme.outlineVariant.withOpacity(0.45)),
-        boxShadow: canSubmit
-            ? [
-                BoxShadow(
-                  color: scheme.primary.withOpacity(0.28),
-                  blurRadius: 22,
-                  offset: const Offset(0, 12),
-                ),
-              ]
-            : null,
+        border: Border.all(
+          color: canSubmit ? Colors.transparent : _blue.withOpacity(0.14),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: (canSubmit ? _blue : scheme.shadow).withOpacity(0.08),
+            blurRadius: 14,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
@@ -217,8 +214,8 @@ class _WeightProgressBanner extends StatelessWidget {
             const SizedBox(height: 12),
             _AnimatedProgressBar(
               progress: (totalWeight / 100).clamp(0.0, 1.0),
-              track: fg.withOpacity(canSubmit ? 0.22 : 0.18),
-              fill: canSubmit ? fg : scheme.primary,
+              track: canSubmit ? fg.withOpacity(0.22) : _blue.withOpacity(0.12),
+              fill: accent,
             ),
             const SizedBox(height: 12),
             Row(
@@ -240,15 +237,13 @@ class _WeightProgressBanner extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 9),
                     decoration: BoxDecoration(
-                      color: canSubmit
-                          ? fg
-                          : scheme.surfaceContainerHigh.withOpacity(0.6),
+                      color: canSubmit ? fg : _orange.withOpacity(0.10),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       'Submit',
                       style: TextStyle(
-                        color: canSubmit ? scheme.primary : scheme.onSurfaceVariant,
+                        color: canSubmit ? _blue : _orange,
                         fontWeight: FontWeight.w700,
                         fontSize: 13,
                       ),
@@ -301,6 +296,53 @@ class _AnimatedProgressBar extends StatelessWidget {
   }
 }
 
+class _ObjectiveEmptyCard extends StatelessWidget {
+  const _ObjectiveEmptyCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SoftCard(
+      leadingAccent: _orange,
+      padding: const EdgeInsets.fromLTRB(20, 16, 16, 16),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: _orange.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.flag_outlined, color: _orange),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'No objectives yet',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  'Tap + below to draft your first objective.',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ObjectiveTile extends ConsumerWidget {
   const _ObjectiveTile({required this.objective});
   final CycleObjective objective;
@@ -312,16 +354,27 @@ class _ObjectiveTile extends ConsumerWidget {
     final canEdit = objective.status == ObjectiveStatus.draft ||
         objective.status == ObjectiveStatus.revisionRequested;
     final tone = _tone(objective.status);
+    final accent = _accentFor(scheme, tone);
 
     return SoftCard(
       onTap: canEdit
           ? () => context.go('/objectives/${objective.id}/edit')
           : null,
-      leadingAccent: _accentFor(scheme, tone),
+      leadingAccent: accent,
       padding: const EdgeInsets.fromLTRB(20, 14, 12, 14),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: accent.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(_iconFor(objective.status), color: accent, size: 20),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -428,15 +481,29 @@ class _ObjectiveTile extends ConsumerWidget {
   Color _accentFor(ColorScheme scheme, StatusTone tone) {
     switch (tone) {
       case StatusTone.success:
-        return scheme.tertiary;
+        return _teal;
       case StatusTone.warning:
-        return scheme.secondary;
+        return _orange;
       case StatusTone.danger:
         return scheme.error;
       case StatusTone.info:
-        return scheme.primary;
+        return _blue;
       case StatusTone.neutral:
         return scheme.outline;
+    }
+  }
+
+  IconData _iconFor(ObjectiveStatus status) {
+    switch (status) {
+      case ObjectiveStatus.approved:
+        return Icons.check_circle_outline;
+      case ObjectiveStatus.submitted:
+        return Icons.upload_file_outlined;
+      case ObjectiveStatus.rejected:
+        return Icons.error_outline;
+      case ObjectiveStatus.draft:
+      case ObjectiveStatus.revisionRequested:
+        return Icons.edit_note_outlined;
     }
   }
 }

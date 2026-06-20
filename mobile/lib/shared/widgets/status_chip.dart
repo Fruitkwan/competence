@@ -13,6 +13,7 @@ class StatusChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: colors.bg,
         borderRadius: BorderRadius.circular(999),
+        border: colors.border == null ? null : Border.all(color: colors.border!),
       ),
       child: Text(
         label,
@@ -29,9 +30,10 @@ class StatusChip extends StatelessWidget {
 enum StatusTone { neutral, success, warning, danger, info }
 
 class _ChipColors {
-  const _ChipColors(this.bg, this.fg);
+  const _ChipColors(this.bg, this.fg, [this.border]);
   final Color bg;
   final Color fg;
+  final Color? border;
 }
 
 _ChipColors _toneColors(BuildContext context, StatusTone tone) {
@@ -39,7 +41,10 @@ _ChipColors _toneColors(BuildContext context, StatusTone tone) {
   switch (tone) {
     case StatusTone.success:
       return _ChipColors(
-          scheme.tertiaryContainer, scheme.onTertiaryContainer);
+        const Color(0xFFEFFDF5),
+        const Color(0xFF15803D),
+        const Color(0xFF22C55E),
+      );
     case StatusTone.warning:
       return _ChipColors(scheme.secondaryContainer, scheme.onSecondaryContainer);
     case StatusTone.danger:
