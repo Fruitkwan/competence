@@ -25,8 +25,16 @@ export default async function AdminUsersPage() {
   const { data: departments } = await supabase
     .from("departments")
     .select("id, name");
+  const employeeIds = users?.map((u) => u.employee_id).filter((id): id is string => Boolean(id)) ?? [];
+  const { data: employees } = employeeIds.length
+    ? await supabase
+        .from("employees")
+        .select("employee_id, department, manager_name")
+        .in("employee_id", employeeIds)
+    : { data: [] };
   const deptMap = new Map(departments?.map((d) => [d.id, d.name]) ?? []);
   const nameMap = new Map(users?.map((u) => [u.id, u.full_name]) ?? []);
+  const employeeMap = new Map(employees?.map((e) => [e.employee_id, e]) ?? []);
 
   const roleBadgeColor: Record<string, string> = {
     admin: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
@@ -57,7 +65,9 @@ export default async function AdminUsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {users?.map((u) => (
+                {users?.map((u) => {
+                  const employee = u.employee_id ? employeeMap.get(u.employee_id) : null;
+                  return (
                   <tr key={u.id} className="border-b transition-colors hover:bg-muted/30">
                     <td className="px-4 py-3 font-medium">
                       {u.full_name ?? "â€”"}
@@ -77,10 +87,10 @@ export default async function AdminUsersPage() {
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {u.department_id ? deptMap.get(u.department_id) ?? "â€”" : "â€”"}
+                      {u.department_id ? deptMap.get(u.department_id) ?? "—" : employee?.department ?? "—"}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {u.manager_id ? nameMap.get(u.manager_id) ?? "â€”" : "â€”"}
+                      {u.manager_id ? nameMap.get(u.manager_id) ?? "—" : employee?.manager_name ?? "—"}
                     </td>
                     <td className="px-4 py-3">
                       {u.is_active !== false ? (
@@ -90,7 +100,8 @@ export default async function AdminUsersPage() {
                       )}
                     </td>
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

@@ -7,6 +7,7 @@ export type EmployeeInput = {
   employee_id: string;
   full_name: string;
   job_title: string;
+  department?: string;
   country_code?: string;
   manager_name?: string;
   email?: string;

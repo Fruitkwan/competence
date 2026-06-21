@@ -33,6 +33,7 @@ export function EmployeeDialog({
       employee_id: "",
       full_name: "",
       job_title: "",
+      department: "",
       email: "",
       country_code: "",
       manager_name: "",
@@ -60,6 +61,7 @@ export function EmployeeDialog({
             employee_id: "",
             full_name: "",
             job_title: "",
+            department: "",
             email: "",
             country_code: "",
             manager_name: "",
@@ -131,6 +133,16 @@ export function EmployeeDialog({
                 value={formData.job_title}
                 onChange={(e) =>
                   setFormData({ ...formData, job_title: e.target.value })
+                }
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="department">Department</Label>
+              <Input
+                id="department"
+                value={formData.department || ""}
+                onChange={(e) =>
+                  setFormData({ ...formData, department: e.target.value })
                 }
               />
             </div>

@@ -26,6 +26,7 @@ export const metadata = {
 type SearchParams = {
   q?: string | string[];
   country?: string | string[];
+  department?: string | string[];
   job?: string | string[];
   status?: string | string[];
   page?: string | string[];
@@ -40,6 +41,7 @@ export default async function EmployeesPage({
   const params = await searchParams;
   const query = getParam(params.q).toLowerCase();
   const country = getParam(params.country);
+  const department = getParam(params.department);
   const job = getParam(params.job);
   const status = getParam(params.status);
   const pageSize = clampNumber(Number(getParam(params.pageSize)) || 25, 10, 100);
@@ -69,6 +71,7 @@ export default async function EmployeesPage({
 
   const allEmployees = employees ?? [];
   const countries = uniqueSorted(allEmployees.map((employee) => employee.country_code).filter(Boolean));
+  const departments = uniqueSorted(allEmployees.map((employee) => employee.department).filter(Boolean));
   const jobs = uniqueSorted(allEmployees.map((employee) => employee.job_title).filter(Boolean));
   const filteredEmployees = allEmployees.filter((employee) => {
     const haystack = [
@@ -76,6 +79,7 @@ export default async function EmployeesPage({
       employee.full_name,
       employee.email,
       employee.job_title,
+      employee.department,
       employee.country_code,
       employee.manager_name,
     ]
@@ -85,6 +89,7 @@ export default async function EmployeesPage({
 
     if (query && !haystack.includes(query)) return false;
     if (country && employee.country_code !== country) return false;
+    if (department && employee.department !== department) return false;
     if (job && employee.job_title !== job) return false;
     if (status === "active" && !employee.active) return false;
     if (status === "inactive" && employee.active) return false;
@@ -122,15 +127,16 @@ export default async function EmployeesPage({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <form className="mb-4 grid gap-3 md:grid-cols-6">
+          <form className="mb-4 grid gap-3 md:grid-cols-7">
             <div className="md:col-span-2">
               <Input
                 name="q"
                 defaultValue={getParam(params.q)}
-                placeholder="Search ID, name, email, title, manager..."
+                placeholder="Search ID, name, email, title, department, manager..."
               />
             </div>
             <FilterSelect name="country" label="All countries" value={country} options={countries} />
+            <FilterSelect name="department" label="All departments" value={department} options={departments} />
             <FilterSelect name="job" label="All job titles" value={job} options={jobs} />
             <FilterSelect
               name="status"
@@ -153,7 +159,7 @@ export default async function EmployeesPage({
               ]}
             />
             <input type="hidden" name="page" value="1" />
-            <div className="flex gap-2 md:col-span-6">
+            <div className="flex gap-2 md:col-span-7">
               <Button type="submit">Apply filters</Button>
               <Link href="/admin/employees" className={cn(buttonVariants({ variant: "outline" }))}>
                 Clear
@@ -166,7 +172,9 @@ export default async function EmployeesPage({
                 <TableHead>Employee ID</TableHead>
                 <TableHead>Name</TableHead>
                 <TableHead>Job Title</TableHead>
+                <TableHead>Department</TableHead>
                 <TableHead>Country</TableHead>
+                <TableHead>Manager</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -181,7 +189,9 @@ export default async function EmployeesPage({
                       <div className="text-xs text-muted-foreground">{emp.email}</div>
                     </TableCell>
                     <TableCell>{emp.job_title}</TableCell>
+                    <TableCell>{emp.department || "-"}</TableCell>
                     <TableCell>{emp.country_code || "-"}</TableCell>
+                    <TableCell>{emp.manager_name || "-"}</TableCell>
                     <TableCell>
                       <Badge variant={emp.active ? "default" : "secondary"}>
                         {emp.active ? "Active" : "Inactive"}
@@ -194,6 +204,7 @@ export default async function EmployeesPage({
                             employee_id: emp.employee_id,
                             full_name: emp.full_name,
                             job_title: emp.job_title,
+                            department: emp.department ?? "",
                             email: emp.email ?? "",
                             country_code: emp.country_code ?? "",
                             manager_name: emp.manager_name ?? "",
@@ -213,7 +224,7 @@ export default async function EmployeesPage({
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                     No employees match the current filters.
                   </TableCell>
                 </TableRow>
@@ -273,7 +284,7 @@ function clampNumber(value: number, min: number, max: number) {
 
 function pageHref(params: SearchParams, page: number, pageSize: number) {
   const next = new URLSearchParams();
-  for (const key of ["q", "country", "job", "status"] as const) {
+  for (const key of ["q", "country", "department", "job", "status"] as const) {
     const value = getParam(params[key]);
     if (value) next.set(key, value);
   }

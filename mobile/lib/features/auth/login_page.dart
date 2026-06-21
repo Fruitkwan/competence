@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -48,7 +47,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       await ref.read(authControllerProvider).sendOtp(email);
       if (!mounted) return;
       setState(() => _otpSent = true);
-      showSuccessSnack(context, 'Check your email for the 6-digit OTP.');
+      showSuccessSnack(context, 'Check your email for the 8-digit OTP.');
     } catch (e) {
       if (mounted) showErrorSnack(context, e);
     } finally {
@@ -58,8 +57,8 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   Future<void> _verifyOtp() async {
     final code = _token.text.trim();
-    if (code.length < 6) {
-      showErrorSnack(context, 'Enter the 6-digit code.');
+    if (code.length < 8) {
+      showErrorSnack(context, 'Enter the 8-digit OTP.');
       return;
     }
     setState(() => _verifying = true);
@@ -187,7 +186,17 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     ),
                     if (_otpSent) ...[
                       const SizedBox(height: 16),
-                      _OtpBoxes(controller: _token),
+                      TextFormField(
+                        controller: _token,
+                        keyboardType: TextInputType.number,
+                        autofocus: true,
+                        maxLength: 8,
+                        decoration: const InputDecoration(
+                          counterText: '',
+                          labelText: '8-digit OTP',
+                          prefixIcon: Icon(Icons.lock_outline),
+                        ),
+                      ),
                     ],
                     const SizedBox(height: 24),
                     if (!_otpSent)
@@ -229,104 +238,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _OtpBoxes extends StatelessWidget {
-  const _OtpBoxes({required this.controller});
-
-  final TextEditingController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('6-digit OTP', style: TextStyle(color: scheme.onSurfaceVariant)),
-        const SizedBox(height: 8),
-        SizedBox(
-          height: 54,
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: TextField(
-                  controller: controller,
-                  autofocus: true,
-                  keyboardType: TextInputType.number,
-                  maxLength: 6,
-                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                  style: const TextStyle(color: Colors.transparent),
-                  cursorColor: Colors.transparent,
-                  decoration: const InputDecoration(
-                    counterText: '',
-                    border: InputBorder.none,
-                    enabledBorder: InputBorder.none,
-                    focusedBorder: InputBorder.none,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-              ),
-              IgnorePointer(
-                child: AnimatedBuilder(
-                  animation: controller,
-                  builder: (context, _) {
-                    final code = controller.text;
-                    return Row(
-                      children: List.generate(6, (i) {
-                        final filled = i < code.length;
-                        final active = i == code.length.clamp(0, 5);
-                        return Expanded(
-                          child: Padding(
-                            padding: EdgeInsets.only(right: i == 5 ? 0 : 8),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 160),
-                              height: 50,
-                              alignment: Alignment.center,
-                              decoration: BoxDecoration(
-                                color: filled
-                                    ? const Color(0xFFEAF6FC)
-                                    : scheme.surfaceContainerHighest
-                                        .withOpacity(0.38),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: filled
-                                      ? const Color(0xFFD3EAF6)
-                                      : Colors.transparent,
-                                ),
-                                boxShadow: active
-                                    ? [
-                                        BoxShadow(
-                                          color: scheme.shadow.withOpacity(0.08),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ]
-                                    : null,
-                              ),
-                              child: Text(
-                                filled ? code[i] : '',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleLarge
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.w800,
-                                      color: scheme.onSurface,
-                                    ),
-                              ),
-                            ),
-                          ),
-                        );
-                      }),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }
