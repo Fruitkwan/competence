@@ -15,14 +15,31 @@ CREATE TABLE IF NOT EXISTS public.training_requests (
   employee_id TEXT REFERENCES public.employees(employee_id) ON DELETE SET NULL,
   employee_name TEXT NOT NULL,
   manager_user_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  course_id UUID NOT NULL REFERENCES public.courses(id) ON DELETE CASCADE,
+  course_id UUID REFERENCES public.courses(id) ON DELETE SET NULL,
   course_title TEXT NOT NULL,
+  location TEXT,
+  budget_amount NUMERIC(12,2),
+  budget_currency TEXT DEFAULT 'AED',
+  start_date DATE,
+  end_date DATE,
+  duration_days INTEGER,
+  certification_required BOOLEAN DEFAULT false,
   reason TEXT,
   status TEXT NOT NULL DEFAULT 'pending'
     CHECK (status IN ('pending','approved','rejected','assigned')),
   created_at TIMESTAMPTZ DEFAULT now(),
   updated_at TIMESTAMPTZ DEFAULT now()
 );
+
+ALTER TABLE public.training_requests
+  ALTER COLUMN course_id DROP NOT NULL,
+  ADD COLUMN IF NOT EXISTS location TEXT,
+  ADD COLUMN IF NOT EXISTS budget_amount NUMERIC(12,2),
+  ADD COLUMN IF NOT EXISTS budget_currency TEXT DEFAULT 'AED',
+  ADD COLUMN IF NOT EXISTS start_date DATE,
+  ADD COLUMN IF NOT EXISTS end_date DATE,
+  ADD COLUMN IF NOT EXISTS duration_days INTEGER,
+  ADD COLUMN IF NOT EXISTS certification_required BOOLEAN DEFAULT false;
 
 ALTER TABLE public.training_requests ENABLE ROW LEVEL SECURITY;
 GRANT SELECT, INSERT, UPDATE ON TABLE public.training_requests TO authenticated;
