@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth_controller.dart';
-import '../../data/repositories/notification_repository.dart';
 import '../profile/profile_page.dart';
 
 class _NavTab {
@@ -40,8 +39,6 @@ class AppShell extends ConsumerWidget {
     final location = GoRouterState.of(context).matchedLocation;
     final selected = _indexFor(location);
     final profile = ref.watch(currentProfileProvider).valueOrNull;
-    final unread = ref.watch(unreadNotificationsCountProvider).valueOrNull ?? 0;
-    final scheme = Theme.of(context).colorScheme;
     final showShellAvatar = !location.startsWith('/dashboard');
 
     final avatarName = profile?.fullName ?? profile?.email;
@@ -61,16 +58,6 @@ class AppShell extends ConsumerWidget {
               )
             : null,
         title: const SizedBox.shrink(),
-        actions: showShellAvatar
-            ? [
-                _BellButton(
-                  unread: unread,
-                  color: scheme.onSurface,
-                  onTap: () => context.push('/notifications'),
-                ),
-                const SizedBox(width: 8),
-              ]
-            : null,
       ),
       body: child,
       bottomNavigationBar: NavigationBar(
@@ -119,32 +106,6 @@ class _AvatarButton extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _BellButton extends StatelessWidget {
-  const _BellButton({
-    required this.unread,
-    required this.color,
-    required this.onTap,
-  });
-
-  final int unread;
-  final Color color;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: onTap,
-      tooltip: 'Notifications',
-      icon: unread > 0
-          ? Badge.count(
-              count: unread,
-              child: Icon(Icons.notifications_rounded, color: color),
-            )
-          : Icon(Icons.notifications_none_rounded, color: color),
     );
   }
 }

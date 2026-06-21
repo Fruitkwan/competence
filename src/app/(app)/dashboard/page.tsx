@@ -367,7 +367,7 @@ export default async function DashboardPage() {
         description={
           isEmployee
             ? `Personal competency overview for ${userName || "you"}.`
-            : "Live view of gaps, priorities, and training progress."
+            : "Live view of gaps and priorities."
         }
       />
 
