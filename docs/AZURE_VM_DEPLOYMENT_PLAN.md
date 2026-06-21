@@ -65,6 +65,9 @@ Also collect:
   - `SUPABASE_PUBLISHABLE_KEY`
   - `SUPABASE_SECRET_KEY`
 - Firebase VAPID key if Firebase push notifications should be enabled in production.
+- Firebase Admin service account credentials for server-side push delivery:
+  - Preferred `.env` format: `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` with newlines escaped as `\n`.
+  - Alternative GitHub secret format: `FIREBASE_SERVICE_ACCOUNT_JSON`.
 
 ## Phase 0 - Prepare Local Repo
 
@@ -377,6 +380,9 @@ NEXT_PUBLIC_SUPABASE_URL=http://<supabase-domain-or-ip>:8000
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=<self-hosted-supabase-publishable-key>
 SUPABASE_SERVICE_ROLE_KEY=<self-hosted-supabase-secret-key>
 NEXT_PUBLIC_FIREBASE_VAPID_KEY=<firebase-vapid-key-if-used>
+FIREBASE_PROJECT_ID=<firebase-project-id>
+FIREBASE_CLIENT_EMAIL=<firebase-service-account-email>
+FIREBASE_PRIVATE_KEY=<firebase-private-key-with-escaped-newlines>
 EOF
 ```
 
@@ -460,6 +466,10 @@ NEXT_PUBLIC_SUPABASE_URL
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 SUPABASE_SERVICE_ROLE_KEY
 NEXT_PUBLIC_FIREBASE_VAPID_KEY
+FIREBASE_SERVICE_ACCOUNT_JSON
+FIREBASE_PROJECT_ID
+FIREBASE_CLIENT_EMAIL
+FIREBASE_PRIVATE_KEY
 ```
 
 Later improvement:

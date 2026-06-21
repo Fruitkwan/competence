@@ -260,6 +260,13 @@ begin
     raise exception 'Not authenticated' using errcode = '42501';
   end if;
 
+  if not exists (
+    select 1 from public.performance_appraisals
+    where id = p_id and status = 'Draft'
+  ) then
+    raise exception 'Only draft appraisals can be edited by the employee';
+  end if;
+
   update public.performance_appraisals
      set goals = p_goals,
          core_competencies = p_core,
@@ -319,6 +326,13 @@ begin
     raise exception 'Not authenticated' using errcode = '42501';
   end if;
 
+  if not exists (
+    select 1 from public.performance_appraisals
+    where id = p_id and status = 'N1 Complete'
+  ) then
+    raise exception 'Manager review is available only after employee sign-off';
+  end if;
+
   update public.performance_appraisals
      set goals = p_goals,
          core_competencies = p_core,
@@ -344,6 +358,18 @@ begin
     raise exception 'Appraisal not found or not accessible';
   end if;
 
+  if p_mark_complete then
+    insert into public.notifications (user_id, type, title, body, link)
+    select p.id,
+           'appraisal_manager_complete',
+           'Performance appraisal ready for HR sign-off',
+           coalesce(e.full_name, v_row.employee_id) || ' and their manager signed the appraisal.',
+           '/appraisals/performance/' || v_row.id
+      from public.profiles p
+      left join public.employees e on e.employee_id = v_row.employee_id
+     where p.role in ('admin', 'executive');
+  end if;
+
   return v_row;
 end;
 $$;
@@ -363,6 +389,13 @@ declare
 begin
   if auth.uid() is null then
     raise exception 'Not authenticated' using errcode = '42501';
+  end if;
+
+  if not exists (
+    select 1 from public.performance_appraisals
+    where id = p_id and status = 'N2 Complete'
+  ) then
+    raise exception 'HR can finalize only after manager sign-off';
   end if;
 
   update public.performance_appraisals
