@@ -6,6 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { ROLE_LABELS } from "@/lib/constants/roles";
 import type { AppRole } from "@/lib/constants/roles";
 
+const EM_DASH = "\u2014";
+
 export default async function AdminUsersPage() {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -70,7 +72,7 @@ export default async function AdminUsersPage() {
                   return (
                   <tr key={u.id} className="border-b transition-colors hover:bg-muted/30">
                     <td className="px-4 py-3 font-medium">
-                      {u.full_name ?? "â€”"}
+                      {u.full_name ?? EM_DASH}
                       {u.employee_id && (
                         <span className="ml-1.5 text-xs text-muted-foreground">
                           #{u.employee_id}
@@ -87,10 +89,10 @@ export default async function AdminUsersPage() {
                       </Badge>
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {u.department_id ? deptMap.get(u.department_id) ?? "—" : employee?.department ?? "—"}
+                      {u.department_id ? deptMap.get(u.department_id) ?? EM_DASH : employee?.department ?? EM_DASH}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {u.manager_id ? nameMap.get(u.manager_id) ?? "—" : employee?.manager_name ?? "—"}
+                      {u.manager_id ? nameMap.get(u.manager_id) ?? EM_DASH : employee?.manager_name ?? EM_DASH}
                     </td>
                     <td className="px-4 py-3">
                       {u.is_active !== false ? (
