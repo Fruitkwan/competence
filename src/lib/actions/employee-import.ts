@@ -243,6 +243,7 @@ function mapBasisRow(row: Record<string, unknown>): ParsedEmployee {
     full_name: text(row["Employee Name as in Passport"]),
     job_title: text(row["Designation"]),
     department: departmentFromRow(row),
+    email: nullableText(row["Company Email"] ?? row["Email"] ?? row["Work Email"] ?? row["Business Email"]),
     country_code: mapCountry(text(row["Country"])),
     manager_name: nullableText(row["Reporting Manager"]),
     grade: nullableText(row["Grade"]),
@@ -303,6 +304,9 @@ function changedFields(current: EmployeeRow, next: ParsedEmployee) {
   const fields: (keyof ParsedEmployee)[] = [
     "full_name",
     "job_title",
+    "department",
+    "country_code",
+    "email",
     "manager_name",
     "grade",
     "grade_band",
@@ -310,8 +314,6 @@ function changedFields(current: EmployeeRow, next: ParsedEmployee) {
     "joining_date",
     "manager_position",
   ];
-  if (Object.prototype.hasOwnProperty.call(current, "department")) fields.splice(2, 0, "department");
-  fields.splice(3, 0, "country_code");
 
   return fields.filter((field) => (current[field] ?? null) !== (next[field] ?? null));
 }

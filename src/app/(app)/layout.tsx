@@ -2,7 +2,6 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppNav } from "@/components/app-nav";
 import { UserMenu } from "@/components/user-menu";
-import { FirebaseNotifications } from "@/components/firebase-notifications";
 import { NotificationBell } from "@/components/notification-bell";
 
 export default async function AppLayout({
@@ -42,7 +41,6 @@ export default async function AppLayout({
       </aside>
       <div className="flex min-h-screen flex-1 flex-col">
         <header className="sticky top-0 z-10 flex h-14 items-center justify-end gap-3 border-b bg-background/95 px-4 backdrop-blur">
-          <FirebaseNotifications />
           <NotificationBell
             notifications={notifications ?? []}
             unreadCount={unreadCount}
