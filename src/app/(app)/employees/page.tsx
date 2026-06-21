@@ -47,7 +47,7 @@ export default async function EmployeesPage({
   const { data: { user } } = await supabase.auth.getUser();
   const [{ data: profile }, { data: employees }, { data: latest }] = await Promise.all([
     user
-      ? supabase.from("profiles").select("role, employee_id, cluster").eq("id", user.id).maybeSingle()
+      ? supabase.from("profiles").select("role, employee_id, full_name, country_code").eq("id", user.id).maybeSingle()
       : Promise.resolve({ data: null }),
     supabase
       .from("employees")
@@ -75,11 +75,16 @@ export default async function EmployeesPage({
   const rawEmployees = employees ?? [];
   if (profile?.role === "employee") redirect("/dashboard");
 
-  const managerDepartment = profile?.role === "manager"
-    ? rawEmployees.find((e) => e.employee_id === profile.employee_id)?.department ?? profile.cluster
+  const managerEmployee = profile?.role === "manager"
+    ? rawEmployees.find((e) => e.employee_id === profile.employee_id)
     : null;
-  const allEmployees = managerDepartment
-    ? rawEmployees.filter((e) => e.department === managerDepartment)
+  const managerName = managerEmployee?.full_name ?? profile?.full_name;
+  const managerCountry = canonicalCountry(profile?.country_code ?? managerEmployee?.country_code);
+  const allEmployees = profile?.role === "manager"
+    ? rawEmployees.filter((e) =>
+        sameText(e.manager_name, managerName) &&
+        (!managerCountry || canonicalCountry(e.country_code) === managerCountry)
+      )
     : rawEmployees;
   const countries = uniqueSorted(allEmployees.map((e) => e.country_code).filter(Boolean));
   const departments = uniqueSorted(allEmployees.map((e) => e.department).filter(Boolean));
@@ -274,6 +279,15 @@ function uniqueSorted(values: (string | null | undefined)[]) {
 
 function clampNumber(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
+}
+
+function sameText(a: string | null | undefined, b: string | null | undefined) {
+  return Boolean(a && b && a.trim().toLowerCase() === b.trim().toLowerCase());
+}
+
+function canonicalCountry(value: string | null | undefined) {
+  const country = value?.trim().toUpperCase();
+  return country === "KSA" ? "SA" : country;
 }
 
 function pageHref(params: SearchParams, page: number, pageSize: number) {
