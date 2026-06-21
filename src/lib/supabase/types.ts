@@ -767,6 +767,34 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["notifications"]["Insert"]>;
         Relationships: [];
       };
+      training_requests: {
+        Row: {
+          id: string;
+          user_id: string;
+          employee_id: string | null;
+          employee_name: string;
+          manager_user_id: string;
+          course_id: string;
+          course_title: string;
+          reason: string | null;
+          status: "pending" | "approved" | "rejected" | "assigned";
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          employee_id?: string | null;
+          employee_name: string;
+          manager_user_id: string;
+          course_id: string;
+          course_title: string;
+          reason?: string | null;
+          status?: "pending" | "approved" | "rejected" | "assigned";
+        };
+        Update: Partial<Database["public"]["Tables"]["training_requests"]["Insert"]>;
+        Relationships: [];
+      };
       firebase_messaging_tokens: {
         Row: {
           id: string;

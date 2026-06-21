@@ -36,10 +36,12 @@ export default async function EmployeePage(props: PageProps<"/employees/[id]">) 
 
   if (profile?.role === "employee" && profile.employee_id !== employee.employee_id) notFound();
   if (profile?.role === "manager") {
+    const managerEmployeeId = profile.employee_id;
+    if (!managerEmployeeId) notFound();
     const { data: managerEmployee } = await supabase
       .from("employees")
       .select("full_name, country_code")
-      .eq("employee_id", profile.employee_id)
+      .eq("employee_id", managerEmployeeId)
       .maybeSingle();
     const managerName = managerEmployee?.full_name ?? profile.full_name;
     const managerCountry = canonicalCountry(profile.country_code ?? managerEmployee?.country_code);

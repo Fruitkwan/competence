@@ -26,6 +26,7 @@ export const NOTIFICATION_TYPES = {
   // Training
   COURSE_ASSIGNED: "course_assigned",
   COURSE_COMPLETED: "course_completed",
+  TRAINING_REQUEST_SUBMITTED: "training_request_submitted",
   TRAINING_SURVEY_SUBMITTED: "training_survey_submitted",
 
   // Skill gaps

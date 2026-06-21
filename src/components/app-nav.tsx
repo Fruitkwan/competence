@@ -70,8 +70,8 @@ const NAV: NavItem[] = [
     roles: ["employee"],
   },
   {
-    href: "/training/survey",
-    label: "Training Feedback",
+    href: "/training/request",
+    label: "Training Request",
     icon: ClipboardList,
     iconColor: "#8b5cf6",
     roles: ["employee"],
