@@ -440,29 +440,28 @@ Acceptance:
 
 Goal: deploy automatically from GitHub after the manual VM deployment is proven.
 
-Recommended first pipeline:
+Status on 2026-06-26:
 
-1. On pull request:
-   - `npm ci`
-   - `npm run lint`
-   - `npx tsc --noEmit`
-   - `docker build`
-
-2. On push to `main`:
-   - SSH to Azure VM.
-   - `git pull --ff-only`
-   - write/update `.env.production` from GitHub secrets.
-   - `docker compose up -d --build`
-   - run smoke checks.
+- Added workflow: `.github/workflows/ci-cd-azure-vm.yml`.
+- Added setup guide: `docs/GITHUB_CICD_AZURE_VM.md`.
+- Added web health endpoint: `src/app/api/health/route.ts`.
+- Workflow behavior:
+  - Pull requests to `main`: `npm ci`, `npm run lint`, `npx tsc --noEmit`, and Docker build smoke test.
+  - Pushes to `main` / manual runs: SSH to Azure VM, upload `.env.production` from GitHub secrets, checkout the deployed commit, run `docker compose up -d --build`, and smoke-check `/login` plus `/api/health` from inside the VM.
+- Current blocker from this machine:
+  - `http://74.162.67.39:3000/login` times out externally.
+  - `http://74.162.67.39:8000/auth/v1/settings` times out externally.
+  - SSH with the locally available key fails: `Permission denied (publickey)`.
+  - Azure CLI is logged in, but `az vm list -d` currently returns no VMs in the active subscription, so I could not open the NSG rules from here.
 
 GitHub secrets needed:
 
 ```text
-AZURE_VM_HOST
-AZURE_VM_USER
+AZURE_VM_HOST=74.162.67.39
+AZURE_VM_USER=dhofar-az-portal
 AZURE_VM_SSH_PRIVATE_KEY
-AZURE_VM_APP_PATH
-NEXT_PUBLIC_SUPABASE_URL
+AZURE_VM_APP_PATH=/home/dhofar-az-portal/competence-portal/app
+NEXT_PUBLIC_SUPABASE_URL=http://74.162.67.39:8000
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 SUPABASE_SERVICE_ROLE_KEY
 NEXT_PUBLIC_FIREBASE_VAPID_KEY
@@ -477,11 +476,12 @@ Later improvement:
 - Build/push Docker image to GitHub Container Registry.
 - VM pulls immutable image tags instead of building on the VM.
 - Add DB migration job with manual approval.
+- Replace raw port exposure with HTTPS via Nginx/Caddy.
 
 Acceptance:
 
 - PR checks block broken builds.
-- Push to `main` deploys to VM.
+- Push to `main` deploys to VM after the SSH secret is added.
 - Failed deploy leaves prior container running.
 
 ## Phase 8 - Rollback
@@ -518,5 +518,5 @@ Rollback Supabase:
 - [ ] Phase 4 storage copied, if needed.
 - [x] Phase 5 web app deployed to VM.
 - [ ] Phase 6 HTTPS/domain configured.
-- [ ] Phase 7 GitHub CI/CD added.
+- [x] Phase 7 GitHub CI/CD added.
 - [ ] Phase 8 rollback path tested.
