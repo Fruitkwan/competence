@@ -15,7 +15,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-export default async function EmployeePage(props: PageProps<"/employees/[id]">) {
+type EmployeePageProps = {
+  params: Promise<{ id: string }>;
+};
+
+export default async function EmployeePage(props: EmployeePageProps) {
   const { id } = await props.params;
   const supabase = await createClient();
   const {

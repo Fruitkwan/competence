@@ -2,8 +2,12 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
 import { AppraisalForm } from "../appraisal-form";
 
+type NewAppraisalPageProps = {
+  searchParams: Promise<{ employee?: string | string[] }>;
+};
+
 export default async function NewAppraisalPage(
-  props: PageProps<"/appraisals/new">
+  props: NewAppraisalPageProps
 ) {
   const search = await props.searchParams;
   const employeeId = Array.isArray(search?.employee)

@@ -3,8 +3,12 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
 import { AppraisalForm } from "../appraisal-form";
 
+type EditAppraisalPageProps = {
+  params: Promise<{ id: string }>;
+};
+
 export default async function EditAppraisalPage(
-  props: PageProps<"/appraisals/[id]">
+  props: EditAppraisalPageProps
 ) {
   const { id } = await props.params;
   const supabase = await createClient();
