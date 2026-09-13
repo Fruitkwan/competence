@@ -2,36 +2,26 @@
 
 import { cn } from "@/lib/utils";
 
-const DEPARTMENTS = [
-  "Engineering",
-  "Product",
-  "Sales",
-  "Marketing",
-  "Finance",
-  "HR",
-  "Operations",
-  "Customer Success",
-  "Legal",
-  "Design",
-  "Data & Analytics",
-  "Supply Chain",
-  "IT",
-  "Strategy",
-] as const;
-
-export type Department = (typeof DEPARTMENTS)[number];
-
-export { DEPARTMENTS };
-
 interface DeptGridProps {
   selected: Set<string>;
   onToggle: (dept: string) => void;
+  departments?: string[];
 }
 
-export function DeptGrid({ selected, onToggle }: DeptGridProps) {
+export function DeptGrid({ selected, onToggle, departments }: DeptGridProps) {
+  const options = departments ?? [];
+
+  if (!options.length) {
+    return (
+      <div className="mt-1.5 rounded-lg border border-dashed px-3 py-4 text-sm text-muted-foreground">
+        No departments are available yet.
+      </div>
+    );
+  }
+
   return (
     <div className="mt-1.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
-      {DEPARTMENTS.map((dept) => {
+      {options.map((dept) => {
         const active = selected.has(dept);
         return (
           <button

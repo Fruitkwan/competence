@@ -3,15 +3,23 @@
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { RatingSelect } from "./rating-select";
-import type { CompetencyEntry, RatingValue } from "@/lib/supabase/performance-appraisal-types";
+import type { CompetencyEntry } from "@/lib/supabase/performance-appraisal-types";
 
 interface CompetencyRowProps {
   name: string;
   entry: CompetencyEntry;
   onChange: (updated: CompetencyEntry) => void;
+  canEditN1?: boolean;
+  canEditN2?: boolean;
 }
 
-export function CompetencyRow({ name, entry, onChange }: CompetencyRowProps) {
+export function CompetencyRow({
+  name,
+  entry,
+  onChange,
+  canEditN1 = true,
+  canEditN2 = true,
+}: CompetencyRowProps) {
   const update = (patch: Partial<CompetencyEntry>) =>
     onChange({ ...entry, ...patch });
 
@@ -28,6 +36,7 @@ export function CompetencyRow({ name, entry, onChange }: CompetencyRowProps) {
           <RatingSelect
             value={entry.rating_n1}
             onChange={(v) => update({ rating_n1: v })}
+            disabled={!canEditN1}
             compact
           />
         </div>
@@ -38,6 +47,7 @@ export function CompetencyRow({ name, entry, onChange }: CompetencyRowProps) {
           <RatingSelect
             value={entry.rating_n2}
             onChange={(v) => update({ rating_n2: v })}
+            disabled={!canEditN2}
             compact
           />
         </div>
@@ -55,6 +65,7 @@ export function CompetencyRow({ name, entry, onChange }: CompetencyRowProps) {
             rows={2}
             placeholder="Self-assessment comments..."
             className="text-sm"
+            disabled={!canEditN1}
           />
         </div>
         <div>
@@ -67,6 +78,7 @@ export function CompetencyRow({ name, entry, onChange }: CompetencyRowProps) {
             rows={2}
             placeholder="Manager observations..."
             className="text-sm"
+            disabled={!canEditN2}
           />
         </div>
       </div>

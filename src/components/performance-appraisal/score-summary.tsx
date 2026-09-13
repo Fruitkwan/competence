@@ -2,11 +2,8 @@
 
 import { useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RatingBadge } from "./rating-select";
-import { cn } from "@/lib/utils";
 import type {
   PerformanceAppraisalForm,
-  RatingValue,
   CompetencyEntry,
   GoalRow,
 } from "@/lib/supabase/performance-appraisal-types";

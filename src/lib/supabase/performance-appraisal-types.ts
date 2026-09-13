@@ -148,6 +148,9 @@ export const RECOMMENDED_ACTIONS = [
 
 /* ---- Full form state ---- */
 export interface PerformanceAppraisalForm {
+  id?: string;
+  cycle_id?: string | null;
+
   // Employee info
   employee_id: string;
   manager_id: string;

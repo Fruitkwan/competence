@@ -15,16 +15,47 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-export default async function EmployeePage(props: PageProps<"/employees/[id]">) {
+type EmployeePageProps = {
+  params: Promise<{ id: string }>;
+};
+
+export default async function EmployeePage(props: EmployeePageProps) {
   const { id } = await props.params;
   const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const { data: employee } = await supabase
-    .from("employees")
-    .select("employee_id, full_name, job_title, country_code, manager_name, email, active")
-    .eq("employee_id", id)
-    .single();
+  const [{ data: profile }, { data: employee }] = await Promise.all([
+    user
+      ? supabase.from("profiles").select("role, employee_id, full_name, country_code").eq("id", user.id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    supabase
+      .from("employees")
+      .select("employee_id, full_name, job_title, country_code, manager_name, email, active")
+      .eq("employee_id", id)
+      .single(),
+  ]);
   if (!employee) notFound();
+
+  if (profile?.role === "employee" && profile.employee_id !== employee.employee_id) notFound();
+  if (profile?.role === "manager") {
+    const managerEmployeeId = profile.employee_id;
+    if (!managerEmployeeId) notFound();
+    const { data: managerEmployee } = await supabase
+      .from("employees")
+      .select("full_name, country_code")
+      .eq("employee_id", managerEmployeeId)
+      .maybeSingle();
+    const managerName = managerEmployee?.full_name ?? profile.full_name;
+    const managerCountry = canonicalCountry(profile.country_code ?? managerEmployee?.country_code);
+    if (
+      !sameText(employee.manager_name, managerName) ||
+      (managerCountry && canonicalCountry(employee.country_code) !== managerCountry)
+    ) {
+      notFound();
+    }
+  }
 
   const { data: appraisals } = await supabase
     .from("appraisal_full")
@@ -128,6 +159,15 @@ function Row({ k, v }: { k: string; v: string }) {
       <span className="font-medium">{v}</span>
     </div>
   );
+}
+
+function sameText(a: string | null | undefined, b: string | null | undefined) {
+  return Boolean(a && b && a.trim().toLowerCase() === b.trim().toLowerCase());
+}
+
+function canonicalCountry(value: string | null | undefined) {
+  const country = value?.trim().toUpperCase();
+  return country === "KSA" ? "SA" : country;
 }
 
 function LatestBlock({ a }: { a: Record<string, unknown> }) {

@@ -3,9 +3,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/page-header";
 import { formatDate, statusColor } from "@/lib/format";
+import { redirect } from "next/navigation";
 
 export default async function RolloutPage() {
   const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (!profile || !["admin", "manager"].includes(profile.role)) redirect("/dashboard");
+
   const { data: tasks } = await supabase
     .from("rollout_tasks")
     .select("*")

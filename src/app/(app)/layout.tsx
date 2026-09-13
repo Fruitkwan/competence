@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AppNav } from "@/components/app-nav";
 import { UserMenu } from "@/components/user-menu";
+import { NotificationBell } from "@/components/notification-bell";
 
 export default async function AppLayout({
   children,
@@ -22,6 +23,17 @@ export default async function AppLayout({
 
   const role = profile?.role ?? "employee";
 
+  // Fetch notifications for bell
+  const { data: notifications } = await supabase
+    .from("notifications")
+    .select("id, type, title, body, link, read, created_at")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  const unreadCount =
+    notifications?.filter((n) => !n.read).length ?? 0;
+
   return (
     <div className="flex min-h-screen">
       <aside className="hidden w-60 shrink-0 border-r bg-card md:block">
@@ -29,6 +41,10 @@ export default async function AppLayout({
       </aside>
       <div className="flex min-h-screen flex-1 flex-col">
         <header className="sticky top-0 z-10 flex h-14 items-center justify-end gap-3 border-b bg-background/95 px-4 backdrop-blur">
+          <NotificationBell
+            notifications={notifications ?? []}
+            unreadCount={unreadCount}
+          />
           <UserMenu
             email={profile?.email ?? user.email ?? ""}
             fullName={profile?.full_name ?? null}
@@ -40,3 +56,4 @@ export default async function AppLayout({
     </div>
   );
 }
+

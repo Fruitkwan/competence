@@ -1,0 +1,161 @@
+name: CI/CD Azure VM
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      deploy_ref:
+        description: Git ref to deploy on the VM. Leave empty to deploy the workflow ref.
+        required: false
+        default: ""
+
+concurrency:
+  group: azure-vm-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: "22"
+  DOCKER_BUILDKIT: "1"
+
+jobs:
+  checks:
+    name: Lint, typecheck, and Docker build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL || 'http://127.0.0.1:8000' }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || 'ci-placeholder-publishable-key' }}
+      NEXT_PUBLIC_FIREBASE_VAPID_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_VAPID_KEY || '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Docker build smoke test
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_SUPABASE_URL="$NEXT_PUBLIC_SUPABASE_URL" \
+            --build-arg NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY" \
+            --build-arg NEXT_PUBLIC_FIREBASE_VAPID_KEY="$NEXT_PUBLIC_FIREBASE_VAPID_KEY" \
+            -t competence-web:${{ github.sha }} .
+
+  deploy:
+    name: Deploy web app to Azure VM
+    needs: checks
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+    environment: production
+    env:
+      AZURE_VM_HOST: ${{ secrets.AZURE_VM_HOST }}
+      AZURE_VM_USER: ${{ secrets.AZURE_VM_USER }}
+      AZURE_VM_APP_PATH: ${{ secrets.AZURE_VM_APP_PATH }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      NEXT_PUBLIC_FIREBASE_VAPID_KEY: ${{ secrets.NEXT_PUBLIC_FIREBASE_VAPID_KEY }}
+      FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+      FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+      FIREBASE_CLIENT_EMAIL: ${{ secrets.FIREBASE_CLIENT_EMAIL }}
+      FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
+      AZURE_VM_SSH_PRIVATE_KEY: ${{ secrets.AZURE_VM_SSH_PRIVATE_KEY }}
+    steps:
+      - name: Validate required secrets
+        run: |
+          missing=0
+          for name in AZURE_VM_HOST AZURE_VM_USER AZURE_VM_APP_PATH AZURE_VM_SSH_PRIVATE_KEY NEXT_PUBLIC_SUPABASE_URL NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY SUPABASE_SERVICE_ROLE_KEY; do
+            if [ -z "${!name:-}" ]; then
+              echo "Missing required GitHub secret: $name" >&2
+              missing=1
+            fi
+          done
+          exit "$missing"
+
+      - name: Prepare SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$AZURE_VM_SSH_PRIVATE_KEY" > ~/.ssh/azure_vm_key
+          chmod 600 ~/.ssh/azure_vm_key
+          ssh-keyscan -H "$AZURE_VM_HOST" >> ~/.ssh/known_hosts
+
+      - name: Write production environment file
+        run: |
+          set +x
+          {
+            printf 'NODE_ENV=production\n'
+            printf 'NEXT_PUBLIC_SUPABASE_URL=%s\n' "$NEXT_PUBLIC_SUPABASE_URL"
+            printf 'NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=%s\n' "$NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
+            printf 'SUPABASE_SERVICE_ROLE_KEY=%s\n' "$SUPABASE_SERVICE_ROLE_KEY"
+            printf 'NEXT_PUBLIC_FIREBASE_VAPID_KEY=%s\n' "$NEXT_PUBLIC_FIREBASE_VAPID_KEY"
+            printf 'FIREBASE_SERVICE_ACCOUNT_JSON=%s\n' "$FIREBASE_SERVICE_ACCOUNT_JSON"
+            printf 'FIREBASE_PROJECT_ID=%s\n' "$FIREBASE_PROJECT_ID"
+            printf 'FIREBASE_CLIENT_EMAIL=%s\n' "$FIREBASE_CLIENT_EMAIL"
+            printf 'FIREBASE_PRIVATE_KEY=%s\n' "$FIREBASE_PRIVATE_KEY"
+          } > .env.production
+          chmod 600 .env.production
+
+      - name: Upload environment file
+        run: |
+          ssh -i ~/.ssh/azure_vm_key "$AZURE_VM_USER@$AZURE_VM_HOST" "mkdir -p '$AZURE_VM_APP_PATH' && chmod 700 '$AZURE_VM_APP_PATH'"
+          scp -i ~/.ssh/azure_vm_key .env.production "$AZURE_VM_USER@$AZURE_VM_HOST:$AZURE_VM_APP_PATH/.env.production"
+
+      - name: Deploy on VM
+        env:
+          DEPLOY_REF_INPUT: ${{ github.event.inputs.deploy_ref }}
+          DEPLOY_REF_NAME: ${{ github.ref_name }}
+          DEPLOY_SHA: ${{ github.sha }}
+        run: |
+          DEPLOY_REF="${DEPLOY_REF_INPUT:-$DEPLOY_REF_NAME}"
+          USE_FETCH_HEAD="false"
+          if [ -n "${DEPLOY_REF_INPUT:-}" ]; then
+            USE_FETCH_HEAD="true"
+          fi
+          ssh -i ~/.ssh/azure_vm_key "$AZURE_VM_USER@$AZURE_VM_HOST" \
+            "APP_PATH='$AZURE_VM_APP_PATH' DEPLOY_REF='$DEPLOY_REF' DEPLOY_SHA='$DEPLOY_SHA' USE_FETCH_HEAD='$USE_FETCH_HEAD' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$APP_PATH"
+
+          if [ ! -d .git ]; then
+            echo "ERROR: $APP_PATH is not a git checkout. Clone the repo there before first CI/CD deploy." >&2
+            exit 1
+          fi
+
+          git fetch origin "$DEPLOY_REF" --prune
+          if [ "$USE_FETCH_HEAD" = "true" ]; then
+            git checkout --detach FETCH_HEAD
+          else
+            git checkout --detach "$DEPLOY_SHA"
+          fi
+          cp .env.production .env
+          docker compose up -d --build
+          docker compose ps
+
+          echo "Smoke-checking web app on the VM..."
+          curl -fsS --retry 10 --retry-delay 3 http://127.0.0.1:3000/login >/dev/null
+          curl -fsS --retry 5 --retry-delay 3 http://127.0.0.1:3000/api/health
+          REMOTE
+
+      - name: External smoke check (warn if Azure NSG/DNS is not open yet)
+        run: |
+          if ! curl -fsSI --retry 5 --retry-delay 5 "http://$AZURE_VM_HOST:3000/login" | head -n 20; then
+            echo "External smoke check failed. The app passed internal VM checks; verify Azure NSG/firewall/DNS for port 3000 or HTTPS reverse proxy."
+          fi

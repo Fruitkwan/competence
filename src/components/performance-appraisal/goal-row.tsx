@@ -3,7 +3,7 @@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { RatingSelect } from "./rating-select";
-import type { GoalRow, RatingValue } from "@/lib/supabase/performance-appraisal-types";
+import type { GoalRow } from "@/lib/supabase/performance-appraisal-types";
 import { Trash2 } from "lucide-react";
 
 interface GoalRowEditorProps {
@@ -12,6 +12,9 @@ interface GoalRowEditorProps {
   onChange: (updated: GoalRow) => void;
   onRemove: () => void;
   canRemove: boolean;
+  canEditDetails?: boolean;
+  canRateN1?: boolean;
+  canRateN2?: boolean;
 }
 
 export function GoalRowEditor({
@@ -20,6 +23,9 @@ export function GoalRowEditor({
   onChange,
   onRemove,
   canRemove,
+  canEditDetails = true,
+  canRateN1 = true,
+  canRateN2 = true,
 }: GoalRowEditorProps) {
   const update = (patch: Partial<GoalRow>) => onChange({ ...goal, ...patch });
 
@@ -29,7 +35,7 @@ export function GoalRowEditor({
         <span className="text-sm font-semibold text-muted-foreground">
           Goal {index + 1}
         </span>
-        {canRemove && (
+        {canRemove && canEditDetails && (
           <Button
             type="button"
             variant="ghost"
@@ -51,6 +57,7 @@ export function GoalRowEditor({
             value={goal.objective}
             onChange={(e) => update({ objective: e.target.value })}
             placeholder="Describe the goal..."
+            readOnly={!canEditDetails}
           />
         </div>
         <div>
@@ -61,6 +68,7 @@ export function GoalRowEditor({
             value={goal.kpi}
             onChange={(e) => update({ kpi: e.target.value })}
             placeholder="e.g. Revenue, NPS..."
+            readOnly={!canEditDetails}
           />
         </div>
         <div>
@@ -71,6 +79,7 @@ export function GoalRowEditor({
             value={goal.target}
             onChange={(e) => update({ target: e.target.value })}
             placeholder="e.g. $1M, 90%..."
+            readOnly={!canEditDetails}
           />
         </div>
         <div>
@@ -81,6 +90,7 @@ export function GoalRowEditor({
             value={goal.actual}
             onChange={(e) => update({ actual: e.target.value })}
             placeholder="Actual result..."
+            readOnly={!canEditDetails}
           />
         </div>
         <div>
@@ -91,6 +101,7 @@ export function GoalRowEditor({
             value={goal.achievement_pct}
             onChange={(e) => update({ achievement_pct: e.target.value })}
             placeholder="e.g. 95%"
+            readOnly={!canEditDetails}
           />
         </div>
       </div>
@@ -104,6 +115,7 @@ export function GoalRowEditor({
           <RatingSelect
             value={goal.rating_n1}
             onChange={(v) => update({ rating_n1: v })}
+            disabled={!canRateN1}
             compact
           />
         </div>
@@ -114,6 +126,7 @@ export function GoalRowEditor({
           <RatingSelect
             value={goal.rating_n2}
             onChange={(v) => update({ rating_n2: v })}
+            disabled={!canRateN2}
             compact
           />
         </div>

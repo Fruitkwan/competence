@@ -1,7 +1,6 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/page-header";
 import { Info, Zap, GitBranch } from "lucide-react";
@@ -69,7 +68,7 @@ export default function FormsSetupGuidePage() {
               type="Dropdown"
               detail="Options:"
               options={[
-                "Engineering", "Product", "Sales", "Marketing", "Finance",
+                "IT", "Product", "Sales", "Marketing", "Finance",
                 "HR", "Operations", "Customer Success", "Legal", "Design",
                 "Data & Analytics", "Supply Chain", "IT", "Strategy", "Other",
               ]}
@@ -98,7 +97,7 @@ export default function FormsSetupGuidePage() {
               num={6}
               text="Which departments would you like to learn from?"
               type="Checkboxes (multi-select)"
-              detail="Options: Engineering, Product, Sales, Marketing, Finance, HR, Operations, Customer Success, Legal, Design, Data & Analytics, Supply Chain, IT, Strategy"
+              detail="Options: IT, Product, Sales, Marketing, Finance, HR, Operations, Customer Success, Legal, Design, Data & Analytics, Supply Chain, IT, Strategy"
             />
             <QBlock
               num={7}

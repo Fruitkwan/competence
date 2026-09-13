@@ -11,11 +11,23 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ExternalLink } from "lucide-react";
+import { formatCourseDevelops } from "@/lib/course-format";
 
 export default async function CoursesPage() {
   const supabase = await createClient();
-  const [{ data: courses }, { data: rules }] = await Promise.all([
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", user.id)
+    .single();
+  if (!profile || !["admin", "manager", "executive"].includes(profile.role)) redirect("/dashboard");
+
+  const [{ data: courses }, { data: rules }, { data: skillGaps }] = await Promise.all([
     supabase
       .from("courses")
       .select("id, title, develops, cluster_fit, link, active")
@@ -24,6 +36,11 @@ export default async function CoursesPage() {
     supabase
       .from("course_rules")
       .select("cluster, gap_code, training_mode, course_id"),
+    supabase
+      .from("skill_gaps")
+      .select("competency_name, role_title, severity, recommended_action, created_at")
+      .order("created_at", { ascending: false })
+      .limit(8),
   ]);
 
   const assignedCount = new Map<string, number>();
@@ -35,7 +52,7 @@ export default async function CoursesPage() {
     <>
       <PageHeader
         title="Courses"
-        description="Nammy.me course directory and how they map to gap codes."
+        description="Course directory and how they map to gap codes."
       />
 
       <Card className="mb-6">
@@ -57,7 +74,7 @@ export default async function CoursesPage() {
               {courses?.map((c) => (
                 <TableRow key={c.id}>
                   <TableCell className="font-medium">{c.title}</TableCell>
-                  <TableCell className="text-muted-foreground">{c.develops}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatCourseDevelops(c.develops) || "—"}</TableCell>
                   <TableCell>
                     <div className="flex flex-wrap gap-1">
                       {c.cluster_fit.map((cf) => (
@@ -83,6 +100,46 @@ export default async function CoursesPage() {
                   </TableCell>
                 </TableRow>
               ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle>Role-Based Skill Gaps</CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Competency</TableHead>
+                <TableHead>Role</TableHead>
+                <TableHead>Severity</TableHead>
+                <TableHead>Recommendation</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {skillGaps?.length ? (
+                skillGaps.map((gap) => (
+                  <TableRow key={`${gap.role_title}-${gap.competency_name}-${gap.created_at}`}>
+                    <TableCell className="font-medium">{gap.competency_name}</TableCell>
+                    <TableCell>{gap.role_title ?? "—"}</TableCell>
+                    <TableCell>
+                      <Badge variant={gap.severity === "high" ? "destructive" : "secondary"}>
+                        {gap.severity ?? "medium"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">{gap.recommended_action ?? "Add to IDP"}</TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                    No skill gaps generated yet. Finalize or save appraisals with below-target ratings to populate recommendations.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
         </CardContent>

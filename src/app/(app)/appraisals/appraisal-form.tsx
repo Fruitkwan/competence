@@ -16,9 +16,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { EmployeePicker } from "@/components/ui/employee-picker";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Info, Loader2, Sparkles } from "lucide-react";
 import { priorityColor } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import type { Database } from "@/lib/supabase/types";
 
 type Appraisal = Database["public"]["Tables"]["appraisals"]["Row"];
@@ -29,6 +31,16 @@ const LEVEL_NUM: Record<string, number> = {
   Developing: 2,
   Competent: 3,
   Expert: 4,
+};
+
+const LEVEL_TONES: Record<string, string> = {
+  Gap: "data-[selected=true]:bg-red-100 data-[selected=true]:text-red-900 data-[selected=true]:border-red-300 dark:data-[selected=true]:bg-red-900/40 dark:data-[selected=true]:text-red-100",
+  Developing:
+    "data-[selected=true]:bg-amber-100 data-[selected=true]:text-amber-900 data-[selected=true]:border-amber-300 dark:data-[selected=true]:bg-amber-900/40 dark:data-[selected=true]:text-amber-100",
+  Competent:
+    "data-[selected=true]:bg-emerald-100 data-[selected=true]:text-emerald-900 data-[selected=true]:border-emerald-300 dark:data-[selected=true]:bg-emerald-900/40 dark:data-[selected=true]:text-emerald-100",
+  Expert:
+    "data-[selected=true]:bg-blue-100 data-[selected=true]:text-blue-900 data-[selected=true]:border-blue-300 dark:data-[selected=true]:bg-blue-900/40 dark:data-[selected=true]:text-blue-100",
 };
 
 const DIMS = [
@@ -58,7 +70,7 @@ export function AppraisalForm({
   const today = new Date().toISOString().slice(0, 10);
 
   const [form, setForm] = useState({
-    employee_id: appraisal?.employee_id ?? defaultEmployeeId ?? employees[0]?.employee_id ?? "",
+    employee_id: appraisal?.employee_id ?? defaultEmployeeId ?? "",
     appraisal_date: appraisal?.appraisal_date ?? today,
     required_level: appraisal?.required_level ?? "Competent",
     knowledge: appraisal?.knowledge ?? "Competent",
@@ -75,9 +87,11 @@ export function AppraisalForm({
     notes: appraisal?.notes ?? "",
   });
   const [loading, setLoading] = useState(false);
+  const [requiredAutoFilled, setRequiredAutoFilled] = useState(false);
 
   // Look up role's required level on employee change
   useEffect(() => {
+    if (!form.employee_id) return;
     const supabase = createClient();
     (async () => {
       const { data: emp } = await supabase
@@ -92,9 +106,11 @@ export function AppraisalForm({
         .eq("title", emp.job_title)
         .single();
       if (role?.required_level) {
-        setForm((f) =>
-          f.required_level === role.required_level ? f : { ...f, required_level: role.required_level }
-        );
+        setForm((f) => {
+          if (f.required_level === role.required_level) return f;
+          setRequiredAutoFilled(true);
+          return { ...f, required_level: role.required_level };
+        });
       }
     })();
   }, [form.employee_id]);
@@ -110,8 +126,30 @@ export function AppraisalForm({
     return { avg, req, gap, priority, dominant };
   }, [form]);
 
+  const setLevel = (key: DimKey, value: string) =>
+    setForm((f) => ({ ...f, [key]: value }) as typeof form);
+
+  const setAllLevelsTo = (value: string) =>
+    setForm((f) => ({
+      ...f,
+      knowledge: value,
+      skill: value,
+      behaviour: value,
+      desire: value,
+      attitude: value,
+    }));
+
+  const selectedEmployee = useMemo(
+    () => employees.find((e) => e.employee_id === form.employee_id) ?? null,
+    [employees, form.employee_id],
+  );
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!form.employee_id) {
+      toast.error("Please pick an employee.");
+      return;
+    }
     setLoading(true);
     const supabase = createClient();
     const payload = {
@@ -127,7 +165,9 @@ export function AppraisalForm({
       target_completion: form.target_completion || null,
       actual_completion: form.actual_completion || null,
       status: form.status as Appraisal["status"],
-      reassessment_avg: form.reassessment_avg ? Number(form.reassessment_avg) : null,
+      reassessment_avg: form.reassessment_avg
+        ? Number(form.reassessment_avg)
+        : null,
       evidence_url: form.evidence_url || null,
       notes: form.notes || null,
     };
@@ -164,41 +204,55 @@ export function AppraisalForm({
       <div className="space-y-6 lg:col-span-2">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Employee & date</CardTitle>
+            <CardTitle className="text-base">Employee &amp; date</CardTitle>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-2">
+            <div className="grid gap-2 sm:col-span-2">
               <Label>Employee</Label>
-              <Select
+              <EmployeePicker
+                options={employees}
                 value={form.employee_id}
-                onValueChange={(v) => setForm({ ...form, employee_id: String(v ?? "") })}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="max-h-80">
-                  {employees.map((e) => (
-                    <SelectItem key={e.employee_id} value={e.employee_id}>
-                      {e.employee_id} — {e.full_name} ({e.job_title})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onChange={(id) =>
+                  setForm((f) => ({ ...f, employee_id: id }))
+                }
+                clearable
+              />
+              {selectedEmployee && (
+                <p className="text-xs text-muted-foreground">
+                  Selected: {selectedEmployee.full_name} ·{" "}
+                  {selectedEmployee.job_title}
+                </p>
+              )}
             </div>
+
             <div className="grid gap-2">
               <Label>Appraisal date</Label>
               <Input
                 type="date"
                 value={form.appraisal_date}
-                onChange={(e) => setForm({ ...form, appraisal_date: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, appraisal_date: e.target.value })
+                }
                 required
               />
             </div>
+
             <div className="grid gap-2">
-              <Label>Required level</Label>
+              <Label className="flex items-center gap-2">
+                Required level
+                {requiredAutoFilled && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    <Sparkles className="size-3" />
+                    Auto from role
+                  </span>
+                )}
+              </Label>
               <Select
                 value={form.required_level}
-                onValueChange={(v) => setForm({ ...form, required_level: String(v ?? "") })}
+                onValueChange={(v) => {
+                  setRequiredAutoFilled(false);
+                  setForm({ ...form, required_level: String(v ?? "") });
+                }}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -216,30 +270,27 @@ export function AppraisalForm({
         </Card>
 
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between gap-2">
             <CardTitle className="text-base">Competency appraisal</CardTitle>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setAllLevelsTo(form.required_level)}
+              title="Set all five competencies to the required level"
+            >
+              Set all to {form.required_level}
+            </Button>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             {DIMS.map((d) => (
               <div key={d.key} className="grid gap-2">
                 <Label>{d.label}</Label>
-                <Select
+                <LevelPills
+                  levels={levels}
                   value={form[d.key as DimKey]}
-                  onValueChange={(v) =>
-                    setForm({ ...form, [d.key]: String(v ?? "") } as typeof form)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {levels.map((l) => (
-                      <SelectItem key={l} value={l}>
-                        {l}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  onChange={(v) => setLevel(d.key as DimKey, v)}
+                />
               </div>
             ))}
           </CardContent>
@@ -255,7 +306,9 @@ export function AppraisalForm({
               <Input
                 type="date"
                 value={form.training_start}
-                onChange={(e) => setForm({ ...form, training_start: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, training_start: e.target.value })
+                }
               />
             </div>
             <div className="grid gap-2">
@@ -263,7 +316,9 @@ export function AppraisalForm({
               <Input
                 type="date"
                 value={form.target_completion}
-                onChange={(e) => setForm({ ...form, target_completion: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, target_completion: e.target.value })
+                }
               />
             </div>
             <div className="grid gap-2">
@@ -271,7 +326,9 @@ export function AppraisalForm({
               <Input
                 type="date"
                 value={form.actual_completion}
-                onChange={(e) => setForm({ ...form, actual_completion: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, actual_completion: e.target.value })
+                }
               />
             </div>
             <div className="grid gap-2">
@@ -279,7 +336,10 @@ export function AppraisalForm({
               <Select
                 value={form.status}
                 onValueChange={(v) =>
-                  setForm({ ...form, status: String(v ?? "Not Started") as Appraisal["status"] })
+                  setForm({
+                    ...form,
+                    status: String(v ?? "Not Started") as Appraisal["status"],
+                  })
                 }
               >
                 <SelectTrigger>
@@ -312,7 +372,9 @@ export function AppraisalForm({
                 type="url"
                 placeholder="https://"
                 value={form.evidence_url}
-                onChange={(e) => setForm({ ...form, evidence_url: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, evidence_url: e.target.value })
+                }
               />
             </div>
             <div className="grid gap-2 sm:col-span-2">
@@ -327,18 +389,44 @@ export function AppraisalForm({
         </Card>
       </div>
 
-      <div className="space-y-6">
-        <Card>
+      <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+        <Card
+          className={cn(
+            "transition-colors",
+            computed.priority === "HIGH" &&
+              "border-red-300 dark:border-red-900",
+            computed.priority === "MEDIUM" &&
+              "border-amber-300 dark:border-amber-900",
+            computed.priority === "LOW" &&
+              "border-emerald-300 dark:border-emerald-900",
+          )}
+        >
           <CardHeader>
-            <CardTitle className="text-base">Summary (auto-computed)</CardTitle>
+            <CardTitle className="text-base">Summary</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Auto-computed from competencies.
+            </p>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
             <Row k="Current avg" v={computed.avg.toFixed(2)} />
             <Row k="Required" v={computed.req.toFixed(0)} />
-            <Row k="Gap" v={computed.gap.toFixed(2)} />
+            <Row
+              k="Gap"
+              v={computed.gap.toFixed(2)}
+              tone={
+                computed.gap >= 1.5
+                  ? "danger"
+                  : computed.gap >= 0.5
+                  ? "warning"
+                  : undefined
+              }
+            />
             <div className="flex justify-between gap-4">
               <span className="text-muted-foreground">Priority</span>
-              <Badge variant="outline" className={priorityColor[computed.priority]}>
+              <Badge
+                variant="outline"
+                className={priorityColor[computed.priority]}
+              >
                 {computed.priority}
               </Badge>
             </div>
@@ -346,20 +434,93 @@ export function AppraisalForm({
           </CardContent>
         </Card>
 
-        <Button type="submit" className="w-full" disabled={loading}>
-          {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          {mode === "create" ? "Create appraisal" : "Save changes"}
-        </Button>
+        {!form.employee_id && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+            <Info className="mt-0.5 size-4 shrink-0" />
+            Pick an employee to enable the form.
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="flex-1"
+            onClick={() => router.back()}
+            disabled={loading}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            className="flex-1"
+            disabled={loading || !form.employee_id}
+          >
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {mode === "create" ? "Create appraisal" : "Save changes"}
+          </Button>
+        </div>
       </div>
     </form>
   );
 }
 
-function Row({ k, v }: { k: string; v: string }) {
+function LevelPills({
+  levels,
+  value,
+  onChange,
+}: {
+  levels: string[];
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {levels.map((l) => {
+        const selected = l === value;
+        return (
+          <button
+            key={l}
+            type="button"
+            data-selected={selected}
+            onClick={() => onChange(l)}
+            className={cn(
+              "rounded-full border border-input bg-transparent px-3 py-1 text-xs font-medium text-muted-foreground transition-colors",
+              "hover:bg-accent hover:text-accent-foreground",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              LEVEL_TONES[l] ??
+                "data-[selected=true]:bg-foreground data-[selected=true]:text-background",
+            )}
+          >
+            {l}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function Row({
+  k,
+  v,
+  tone,
+}: {
+  k: string;
+  v: string;
+  tone?: "danger" | "warning";
+}) {
   return (
     <div className="flex justify-between gap-4">
       <span className="text-muted-foreground">{k}</span>
-      <span className="font-medium">{v}</span>
+      <span
+        className={cn(
+          "font-medium tabular-nums",
+          tone === "danger" && "text-red-600 dark:text-red-400",
+          tone === "warning" && "text-amber-600 dark:text-amber-400",
+        )}
+      >
+        {v}
+      </span>
     </div>
   );
 }

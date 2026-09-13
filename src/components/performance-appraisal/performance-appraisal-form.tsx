@@ -1,21 +1,19 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useTransition } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Progress, ProgressLabel, ProgressValue } from "@/components/ui/progress";
-import { PageHeader } from "@/components/page-header";
 import { RatingSelect, RatingScaleReference } from "./rating-select";
 import { CompetencyRow } from "./competency-row";
 import { GoalRowEditor } from "./goal-row";
 import { ScoreSummary } from "./score-summary";
 import { SavePdfButton } from "./pdf-export";
-import { ArrowLeft, ArrowRight, Plus, CheckCircle2, Save } from "lucide-react";
+import { ArrowLeft, ArrowRight, Plus, CheckCircle2, Save, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 import type {
@@ -28,18 +26,23 @@ import type {
 } from "@/lib/supabase/performance-appraisal-types";
 import {
   emptyPerformanceAppraisal,
+  emptyCompetency,
   emptyGoal,
   emptyDevPlan,
   emptyNextGoal,
-  CORE_COMPETENCIES,
-  LEADERSHIP_COMPETENCIES,
-  VALUES_COMPETENCIES,
   APPRAISAL_TYPES,
   RATING_LABELS,
   RECOMMENDED_ACTIONS,
 } from "@/lib/supabase/performance-appraisal-types";
+import { saveAppraisal } from "@/lib/actions/appraisals";
 
 type Employee = { employee_id: string; full_name: string; job_title: string };
+type RoleBenchmark = {
+  role_title: string;
+  department: string;
+  competencies: { name: string; description: string | null; behavioral_indicators: string | null }[];
+  kpis: { title: string; measure: string | null; target: string | null }[];
+};
 
 const STEPS = [
   "Employee Information",
@@ -55,14 +58,20 @@ const STEPS = [
 export function PerformanceAppraisalFormWizard({
   employees,
   initial,
+  currentUserRole = "employee",
+  roleBenchmarks = [],
 }: {
   employees: Employee[];
   initial?: PerformanceAppraisalForm;
+  currentUserRole?: string;
+  currentUserId?: string;
+  roleBenchmarks?: RoleBenchmark[];
 }) {
   const [form, setForm] = useState<PerformanceAppraisalForm>(
     initial ?? emptyPerformanceAppraisal()
   );
   const [step, setStep] = useState(0);
+  const [isSaving, startTransition] = useTransition();
 
   const patch = useCallback(
     (p: Partial<PerformanceAppraisalForm>) => setForm((f) => ({ ...f, ...p })),
@@ -76,8 +85,76 @@ export function PerformanceAppraisalFormWizard({
 
   const pct = Math.round(((step + 1) / STEPS.length) * 100);
 
-  function handleSave() {
-    toast.success("Appraisal saved (demo — connect Supabase to persist).");
+  const isFinal = form.status === "Final";
+  const isHR = currentUserRole === "admin";
+  const isEmployee = currentUserRole === "employee";
+  const isManager = currentUserRole === "manager" || currentUserRole === "executive";
+  const canEditDetails = !isEmployee && !isFinal;
+  const canEditN1 = isEmployee && !isFinal;
+  const canEditN2 = isManager && !isFinal;
+  const canEditCalibration = isHR && !isFinal;
+  const selectedEmployee = employees.find((item) => item.employee_id === form.employee_id);
+  const selectedManager = employees.find((item) => item.employee_id === form.manager_id);
+  const benchmarkByRole = new Map(roleBenchmarks.map((benchmark) => [benchmark.role_title, benchmark]));
+  const coreCompetencyNames = Object.keys(form.core_competencies);
+  const leadershipNames = Object.keys(form.leadership);
+  const valuesNames = Object.keys(form.values_culture);
+
+  function applyEmployeeBenchmark(employeeId: string) {
+    const employee = employees.find((item) => item.employee_id === employeeId);
+    const benchmark = employee ? benchmarkByRole.get(employee.job_title) : null;
+
+    if (!benchmark) {
+      patch({ employee_id: employeeId });
+      return;
+    }
+
+    const roleCompetencies = Object.fromEntries(
+      benchmark.competencies.map((competency) => [competency.name, emptyCompetency()])
+    );
+    const roleGoals = benchmark.kpis.slice(0, 6).map((kpi) => ({
+      ...emptyGoal(),
+      objective: kpi.title,
+      kpi: kpi.measure ?? kpi.title,
+      target: kpi.target ?? "",
+    }));
+
+    patch({
+      employee_id: employeeId,
+      department: benchmark.department,
+      document_ref: `Role benchmark: ${benchmark.role_title}`,
+      core_competencies: Object.keys(roleCompetencies).length ? roleCompetencies : form.core_competencies,
+      goals: roleGoals.length ? roleGoals : form.goals,
+    });
+  }
+
+  async function handleSave() {
+    let nextStatus = form.status || "Draft";
+    
+    // Auto-advance status based on signatures
+    if (form.hr_signed_at) {
+      nextStatus = "Final";
+    } else if (form.manager_signed_at) {
+      nextStatus = "N2 Complete";
+    } else if (form.employee_signed_at) {
+      nextStatus = "N1 Complete";
+    }
+
+    const payload = { ...form, status: nextStatus };
+    patch({ status: nextStatus });
+    
+    startTransition(async () => {
+      const result = await saveAppraisal(payload);
+      if (result.error) {
+        toast.error(`Error: ${result.error}`);
+        // Revert status on failure if needed
+      } else {
+        toast.success(`Appraisal saved as ${nextStatus}.`);
+        if (result.data) {
+          patch(result.data as unknown as Partial<PerformanceAppraisalForm>); // Update with server response (e.g. ID, created_at)
+        }
+      }
+    });
   }
 
   /* ---- Goal helpers ---- */
@@ -151,15 +228,28 @@ export function PerformanceAppraisalFormWizard({
           <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Employee" required>
-                <NativeSelect value={form.employee_id} onChange={(v) => patch({ employee_id: v })} placeholder="Select employee...">
+                {isEmployee ? (
+                  <Input
+                    value={selectedEmployee ? `${selectedEmployee.employee_id} - ${selectedEmployee.full_name} (${selectedEmployee.job_title})` : form.employee_id}
+                    readOnly
+                  />
+                ) : (
+                <NativeSelect value={form.employee_id} onChange={applyEmployeeBenchmark} placeholder="Select employee...">
                   {employees.map((e) => (
                     <option key={e.employee_id} value={e.employee_id}>
                       {e.employee_id} — {e.full_name} ({e.job_title})
                     </option>
                   ))}
                 </NativeSelect>
+                )}
               </Field>
               <Field label="Direct Manager (N2)">
+                {isEmployee ? (
+                  <Input
+                    value={selectedManager ? `${selectedManager.employee_id} - ${selectedManager.full_name}` : form.manager_id}
+                    readOnly
+                  />
+                ) : (
                 <NativeSelect value={form.manager_id} onChange={(v) => patch({ manager_id: v })} placeholder="Select manager...">
                   {employees.map((e) => (
                     <option key={e.employee_id} value={e.employee_id}>
@@ -167,9 +257,10 @@ export function PerformanceAppraisalFormWizard({
                     </option>
                   ))}
                 </NativeSelect>
+                )}
               </Field>
               <Field label="Department">
-                <Input value={form.department} onChange={(e) => patch({ department: e.target.value })} placeholder="e.g. Engineering" />
+                <Input value={form.department} onChange={(e) => patch({ department: e.target.value })} placeholder="e.g. Engineering" readOnly={isEmployee} />
               </Field>
               <Field label="Business Unit / Division">
                 <Input value={form.business_unit} onChange={(e) => patch({ business_unit: e.target.value })} />
@@ -203,9 +294,19 @@ export function PerformanceAppraisalFormWizard({
           </CardHeader>
           <CardContent className="space-y-4">
             {form.goals.map((g, i) => (
-              <GoalRowEditor key={i} index={i} goal={g} onChange={(u) => updateGoal(i, u)} onRemove={() => removeGoal(i)} canRemove={form.goals.length > 1} />
+              <GoalRowEditor
+                key={i}
+                index={i}
+                goal={g}
+                onChange={(u) => updateGoal(i, u)}
+                onRemove={() => removeGoal(i)}
+                canRemove={form.goals.length > 1}
+                canEditDetails={canEditDetails}
+                canRateN1={canEditN1}
+                canRateN2={canEditN2}
+              />
             ))}
-            {form.goals.length < 6 && (
+            {form.goals.length < 6 && canEditDetails && (
               <Button type="button" variant="outline" size="sm" onClick={addGoal}>
                 <Plus className="mr-1 h-3.5 w-3.5" /> Add Goal
               </Button>
@@ -222,8 +323,8 @@ export function PerformanceAppraisalFormWizard({
             <CardDescription>Weight: 30% — Rate each competency independently. Both N1 and N2 provide a rating.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {CORE_COMPETENCIES.map((c) => (
-              <CompetencyRow key={c} name={c} entry={form.core_competencies[c]} onChange={(u) => updateComp("core_competencies", c, u)} />
+            {coreCompetencyNames.map((c) => (
+              <CompetencyRow key={c} name={c} entry={form.core_competencies[c]} onChange={(u) => updateComp("core_competencies", c, u)} canEditN1={canEditN1} canEditN2={canEditN2} />
             ))}
           </CardContent>
         </Card>
@@ -238,12 +339,12 @@ export function PerformanceAppraisalFormWizard({
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center gap-3 rounded-lg border border-border bg-accent/30 p-3">
-              <Switch checked={form.leadership_applicable} onCheckedChange={(v) => patch({ leadership_applicable: !!v })} />
+              <Switch checked={form.leadership_applicable} onCheckedChange={(v) => patch({ leadership_applicable: !!v })} disabled={!canEditDetails} />
               <Label className="text-sm">This section applies to this employee</Label>
             </div>
             {form.leadership_applicable ? (
-              LEADERSHIP_COMPETENCIES.map((c) => (
-                <CompetencyRow key={c} name={c} entry={form.leadership[c]} onChange={(u) => updateComp("leadership", c, u)} />
+              leadershipNames.map((c) => (
+                <CompetencyRow key={c} name={c} entry={form.leadership[c]} onChange={(u) => updateComp("leadership", c, u)} canEditN1={canEditN1} canEditN2={canEditN2} />
               ))
             ) : (
               <p className="py-6 text-center text-sm text-muted-foreground">Section marked as N/A — employee has no direct reports or leadership responsibilities.</p>
@@ -260,8 +361,8 @@ export function PerformanceAppraisalFormWizard({
             <CardDescription>Weight: 10% — How consistently the employee demonstrates core values.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            {VALUES_COMPETENCIES.map((c) => (
-              <CompetencyRow key={c} name={c} entry={form.values_culture[c]} onChange={(u) => updateComp("values_culture", c, u)} />
+            {valuesNames.map((c) => (
+              <CompetencyRow key={c} name={c} entry={form.values_culture[c]} onChange={(u) => updateComp("values_culture", c, u)} canEditN1={canEditN1} canEditN2={canEditN2} />
             ))}
           </CardContent>
         </Card>
@@ -276,19 +377,19 @@ export function PerformanceAppraisalFormWizard({
             </CardHeader>
             <CardContent className="space-y-4">
               <Field label="What are your top 3 achievements this period?">
-                <Textarea value={form.feedback_n1.top_achievements} onChange={(e) => patch({ feedback_n1: { ...form.feedback_n1, top_achievements: e.target.value } })} rows={3} />
+                <Textarea value={form.feedback_n1.top_achievements} onChange={(e) => patch({ feedback_n1: { ...form.feedback_n1, top_achievements: e.target.value } })} rows={3} disabled={!canEditN1} />
               </Field>
               <Field label="What challenges did you face and how did you address them?">
-                <Textarea value={form.feedback_n1.challenges} onChange={(e) => patch({ feedback_n1: { ...form.feedback_n1, challenges: e.target.value } })} rows={3} />
+                <Textarea value={form.feedback_n1.challenges} onChange={(e) => patch({ feedback_n1: { ...form.feedback_n1, challenges: e.target.value } })} rows={3} disabled={!canEditN1} />
               </Field>
               <Field label="What support do you need from your manager or organization?">
-                <Textarea value={form.feedback_n1.support_needed} onChange={(e) => patch({ feedback_n1: { ...form.feedback_n1, support_needed: e.target.value } })} rows={3} />
+                <Textarea value={form.feedback_n1.support_needed} onChange={(e) => patch({ feedback_n1: { ...form.feedback_n1, support_needed: e.target.value } })} rows={3} disabled={!canEditN1} />
               </Field>
               <Field label="What are your career aspirations for the next 1–3 years?">
-                <Textarea value={form.feedback_n1.career_aspirations} onChange={(e) => patch({ feedback_n1: { ...form.feedback_n1, career_aspirations: e.target.value } })} rows={3} />
+                <Textarea value={form.feedback_n1.career_aspirations} onChange={(e) => patch({ feedback_n1: { ...form.feedback_n1, career_aspirations: e.target.value } })} rows={3} disabled={!canEditN1} />
               </Field>
               <Field label="How would you rate your overall performance this period? Why?">
-                <Textarea value={form.feedback_n1.self_rating_rationale} onChange={(e) => patch({ feedback_n1: { ...form.feedback_n1, self_rating_rationale: e.target.value } })} rows={3} />
+                <Textarea value={form.feedback_n1.self_rating_rationale} onChange={(e) => patch({ feedback_n1: { ...form.feedback_n1, self_rating_rationale: e.target.value } })} rows={3} disabled={!canEditN1} />
               </Field>
             </CardContent>
           </Card>
@@ -298,19 +399,19 @@ export function PerformanceAppraisalFormWizard({
             </CardHeader>
             <CardContent className="space-y-4">
               <Field label="What were the employee's top 3 achievements this period?">
-                <Textarea value={form.feedback_n2.top_achievements} onChange={(e) => patch({ feedback_n2: { ...form.feedback_n2, top_achievements: e.target.value } })} rows={3} />
+                <Textarea value={form.feedback_n2.top_achievements} onChange={(e) => patch({ feedback_n2: { ...form.feedback_n2, top_achievements: e.target.value } })} rows={3} disabled={!canEditN2} />
               </Field>
               <Field label="What challenges did the employee face and how effectively were they managed?">
-                <Textarea value={form.feedback_n2.challenges} onChange={(e) => patch({ feedback_n2: { ...form.feedback_n2, challenges: e.target.value } })} rows={3} />
+                <Textarea value={form.feedback_n2.challenges} onChange={(e) => patch({ feedback_n2: { ...form.feedback_n2, challenges: e.target.value } })} rows={3} disabled={!canEditN2} />
               </Field>
               <Field label="What support is this employee being provided for the next period?">
-                <Textarea value={form.feedback_n2.support_provided} onChange={(e) => patch({ feedback_n2: { ...form.feedback_n2, support_provided: e.target.value } })} rows={3} />
+                <Textarea value={form.feedback_n2.support_provided} onChange={(e) => patch({ feedback_n2: { ...form.feedback_n2, support_provided: e.target.value } })} rows={3} disabled={!canEditN2} />
               </Field>
               <Field label="What is your recommendation for this employee's career path?">
-                <Textarea value={form.feedback_n2.career_recommendation} onChange={(e) => patch({ feedback_n2: { ...form.feedback_n2, career_recommendation: e.target.value } })} rows={3} />
+                <Textarea value={form.feedback_n2.career_recommendation} onChange={(e) => patch({ feedback_n2: { ...form.feedback_n2, career_recommendation: e.target.value } })} rows={3} disabled={!canEditN2} />
               </Field>
               <Field label="Manager's overall assessment and key message to the employee:">
-                <Textarea value={form.feedback_n2.overall_assessment} onChange={(e) => patch({ feedback_n2: { ...form.feedback_n2, overall_assessment: e.target.value } })} rows={3} />
+                <Textarea value={form.feedback_n2.overall_assessment} onChange={(e) => patch({ feedback_n2: { ...form.feedback_n2, overall_assessment: e.target.value } })} rows={3} disabled={!canEditN2} />
               </Field>
             </CardContent>
           </Card>
@@ -384,17 +485,17 @@ export function PerformanceAppraisalFormWizard({
             <CardContent className="space-y-4">
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Final / Calibrated Rating">
-                  <RatingSelect value={form.calibrated_rating} onChange={(v) => patch({ calibrated_rating: v })} />
+                  <RatingSelect value={form.calibrated_rating} onChange={(v) => patch({ calibrated_rating: v })} disabled={!canEditCalibration} />
                 </Field>
                 <Field label="Overall Performance Label">
-                  <Input value={form.overall_label} onChange={(e) => patch({ overall_label: e.target.value })} placeholder={form.calibrated_rating ? RATING_LABELS[form.calibrated_rating] ?? "" : "e.g. Meets Expectations"} />
+                  <Input value={form.overall_label} onChange={(e) => patch({ overall_label: e.target.value })} placeholder={form.calibrated_rating ? RATING_LABELS[form.calibrated_rating] ?? "" : "e.g. Meets Expectations"} disabled={!canEditCalibration} />
                 </Field>
               </div>
               <Field label="Rationale for Calibration (if different from computed)">
-                <Textarea value={form.calibration_rationale} onChange={(e) => patch({ calibration_rationale: e.target.value })} rows={2} />
+                <Textarea value={form.calibration_rationale} onChange={(e) => patch({ calibration_rationale: e.target.value })} rows={2} disabled={!canEditCalibration} />
               </Field>
               <Field label="Recommended Action">
-                <NativeSelect value={form.recommended_action} onChange={(v) => patch({ recommended_action: v })} placeholder="Select action...">
+                <NativeSelect value={form.recommended_action} onChange={(v) => patch({ recommended_action: v })} placeholder="Select action..." disabled={!canEditCalibration}>
                   {RECOMMENDED_ACTIONS.map((a) => <option key={a} value={a}>{a}</option>)}
                 </NativeSelect>
               </Field>
@@ -409,7 +510,7 @@ export function PerformanceAppraisalFormWizard({
                 I acknowledge that I have read and discussed this appraisal with my manager. My signature does not necessarily indicate agreement with the ratings.
               </p>
               <Field label="Employee Comments / Disagreement (if any)">
-                <Textarea value={form.employee_comments} onChange={(e) => patch({ employee_comments: e.target.value })} rows={3} placeholder="Optional — record any disagreements here..." />
+                <Textarea value={form.employee_comments} onChange={(e) => patch({ employee_comments: e.target.value })} rows={3} placeholder="Optional — record any disagreements here..." disabled={!canEditN1} />
               </Field>
             </CardContent>
           </Card>
@@ -419,13 +520,23 @@ export function PerformanceAppraisalFormWizard({
             <CardHeader><CardTitle className="text-base">Digital Signatures</CardTitle></CardHeader>
             <CardContent>
               <div className="grid gap-4 sm:grid-cols-3">
-                <SignatureBlock label="Employee (N1)" signedAt={form.employee_signed_at} onSign={() => patch({ employee_signed_at: new Date().toISOString() })} />
-                <SignatureBlock label="Direct Manager (N2)" signedAt={form.manager_signed_at} onSign={() => patch({ manager_signed_at: new Date().toISOString() })} />
+                <SignatureBlock label="Employee (N1)" signedAt={form.employee_signed_at} onSign={() => patch({ employee_signed_at: new Date().toISOString() })} disabled={!canEditN1} />
+                <SignatureBlock label="Direct Manager (N2)" signedAt={form.manager_signed_at} onSign={() => patch({ manager_signed_at: new Date().toISOString() })} disabled={!canEditN2 || !form.employee_signed_at} />
                 <div>
-                  <SignatureBlock label="HR Representative" signedAt={form.hr_signed_at} onSign={() => patch({ hr_signed_at: new Date().toISOString() })} />
+                  <SignatureBlock 
+                    label="HR Representative" 
+                    signedAt={form.hr_signed_at} 
+                    onSign={() => patch({ hr_signed_at: new Date().toISOString() })} 
+                    disabled={!canEditCalibration || !form.employee_signed_at || !form.manager_signed_at}
+                  />
                   <div className="mt-2">
                     <Field label="HR Representative Name">
-                      <Input value={form.hr_representative} onChange={(e) => patch({ hr_representative: e.target.value })} placeholder="Name" />
+                      <Input 
+                        value={form.hr_representative} 
+                        onChange={(e) => patch({ hr_representative: e.target.value })} 
+                        placeholder="Name" 
+                        disabled={!canEditCalibration}
+                      />
                     </Field>
                   </div>
                 </div>
@@ -448,16 +559,18 @@ export function PerformanceAppraisalFormWizard({
         <Button type="button" variant="outline" onClick={() => goTo(step - 1)} disabled={step === 0}>
           <ArrowLeft className="mr-1 h-4 w-4" /> Back
         </Button>
-        <Button type="button" variant="secondary" onClick={handleSave}>
-          <Save className="mr-1 h-4 w-4" /> Save Draft
+        <Button type="button" variant="secondary" onClick={handleSave} disabled={isSaving}>
+          {isSaving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}
+          Save Draft
         </Button>
         {step < STEPS.length - 1 ? (
-          <Button type="button" onClick={() => goTo(step + 1)}>
+          <Button type="button" onClick={() => goTo(step + 1)} disabled={isSaving}>
             Continue <ArrowRight className="ml-1 h-4 w-4" />
           </Button>
         ) : (
-          <Button type="button" onClick={handleSave} className="bg-emerald-600 hover:bg-emerald-700">
-            <CheckCircle2 className="mr-1 h-4 w-4" /> Finalize Appraisal
+          <Button type="button" onClick={handleSave} className="bg-emerald-600 hover:bg-emerald-700" disabled={isSaving}>
+            {isSaving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-1 h-4 w-4" />}
+            {isEmployee ? "Save Sign-off" : isManager ? "Save Manager Sign-off" : "Finalize Appraisal"}
           </Button>
         )}
       </div>
@@ -477,16 +590,16 @@ function Field({ label, required, children }: { label: string; required?: boolea
   );
 }
 
-function NativeSelect({ value, onChange, placeholder, children }: { value: string; onChange: (v: string) => void; placeholder: string; children: React.ReactNode }) {
+function NativeSelect({ value, onChange, placeholder, disabled, children }: { value: string; onChange: (v: string) => void; placeholder: string; disabled?: boolean; children: React.ReactNode }) {
   return (
-    <select value={value} onChange={(e) => onChange(e.target.value)} className={cn("h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50", !value && "text-muted-foreground")}>
+    <select value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} className={cn("h-8 w-full rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50", !value && "text-muted-foreground", disabled && "cursor-not-allowed opacity-50")}>
       <option value="" disabled>{placeholder}</option>
       {children}
     </select>
   );
 }
 
-function SignatureBlock({ label, signedAt, onSign }: { label: string; signedAt: string | null; onSign: () => void }) {
+function SignatureBlock({ label, signedAt, onSign, disabled }: { label: string; signedAt: string | null; onSign: () => void; disabled?: boolean }) {
   return (
     <div className="rounded-lg border border-border p-3 text-center">
       <div className="text-xs font-medium text-muted-foreground">{label}</div>
@@ -498,7 +611,7 @@ function SignatureBlock({ label, signedAt, onSign }: { label: string; signedAt: 
           </div>
         </div>
       ) : (
-        <Button type="button" variant="outline" size="sm" className="mt-2" onClick={onSign}>
+        <Button type="button" variant="outline" size="sm" className="mt-2" onClick={onSign} disabled={disabled}>
           Sign
         </Button>
       )}
