@@ -830,6 +830,161 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["firebase_messaging_tokens"]["Insert"]>;
         Relationships: [];
       };
+      assessment_templates: {
+        Row: {
+          id: string;
+          kind: "skill" | "behaviour";
+          name: string;
+          role_family: string | null;
+          department: string | null;
+          job_titles: string[];
+          version: string | null;
+          status: "draft" | "published" | "archived";
+          scoring: Record<string, unknown>;
+          aspiration_questions: unknown[];
+          privacy_notice: string | null;
+          source_file_name: string | null;
+          created_by: string | null;
+          published_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          kind: "skill" | "behaviour";
+          name: string;
+          role_family?: string | null;
+          department?: string | null;
+          job_titles?: string[];
+          version?: string | null;
+          status?: "draft" | "published" | "archived";
+          scoring?: Record<string, unknown>;
+          aspiration_questions?: unknown[];
+          privacy_notice?: string | null;
+          source_file_name?: string | null;
+          created_by?: string | null;
+          published_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["assessment_templates"]["Insert"]>;
+        Relationships: [];
+      };
+      assessment_items: {
+        Row: {
+          id: string;
+          template_id: string;
+          sort_order: number;
+          group_name: string | null;
+          name: string;
+          indicator: string;
+          anchor_2: string | null;
+          anchor_3: string | null;
+          anchor_4: string | null;
+          scenario: string | null;
+          option_a: string | null;
+          option_b: string | null;
+          option_c: string | null;
+          option_d: string | null;
+          created_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["assessment_items"]["Row"], "id" | "created_at"> & {
+          id?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["assessment_items"]["Insert"]>;
+        Relationships: [];
+      };
+      assessment_item_keys: {
+        Row: {
+          item_id: string;
+          answer_key: "A" | "B" | "C" | "D" | null;
+          rationale: string | null;
+          diagnostic: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          item_id: string;
+          answer_key?: "A" | "B" | "C" | "D" | null;
+          rationale?: string | null;
+          diagnostic?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["assessment_item_keys"]["Insert"]>;
+        Relationships: [];
+      };
+      assessment_assignments: {
+        Row: {
+          id: string;
+          template_id: string;
+          employee_id: string;
+          employee_user_id: string | null;
+          wave: string | null;
+          due_date: string | null;
+          status: "assigned" | "in_progress" | "submitted" | "closed";
+          results_released: boolean;
+          aspiration: Record<string, unknown> | null;
+          assigned_by: string | null;
+          submitted_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          template_id: string;
+          employee_id: string;
+          employee_user_id?: string | null;
+          wave?: string | null;
+          due_date?: string | null;
+          status?: "assigned" | "in_progress" | "submitted" | "closed";
+          results_released?: boolean;
+          aspiration?: Record<string, unknown> | null;
+          assigned_by?: string | null;
+          submitted_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["assessment_assignments"]["Insert"]>;
+        Relationships: [];
+      };
+      assessment_raters: {
+        Row: {
+          id: string;
+          assignment_id: string;
+          rater_user_id: string;
+          rater_type: "self" | "line_manager" | "cross_dept" | "peer";
+          status: "pending" | "submitted";
+          submitted_at: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          assignment_id: string;
+          rater_user_id: string;
+          rater_type: "self" | "line_manager" | "cross_dept" | "peer";
+          status?: "pending" | "submitted";
+          submitted_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["assessment_raters"]["Insert"]>;
+        Relationships: [];
+      };
+      assessment_responses: {
+        Row: {
+          id: string;
+          rater_id: string;
+          item_id: string;
+          rating: number | null;
+          not_observed: boolean;
+          scenario_answer: "A" | "B" | "C" | "D" | null;
+          evidence: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          rater_id: string;
+          item_id: string;
+          rating?: number | null;
+          not_observed?: boolean;
+          scenario_answer?: "A" | "B" | "C" | "D" | null;
+          evidence?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["assessment_responses"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: {
       appraisal_full: {

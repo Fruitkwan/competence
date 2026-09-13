@@ -40,3 +40,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Assessment answer keys are a controlled document; they live only in the admin-only DB table.
+assessments/*Annexe*CONTROLLED*.docx
+
+# JVM crash dumps
+mobile/android/hs_err_pid*.log

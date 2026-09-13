@@ -32,6 +32,12 @@ export const NOTIFICATION_TYPES = {
   // Skill gaps
   SKILL_GAPS_DETECTED: "skill_gaps_detected",
 
+  // Skill & behaviour assessments
+  ASSESSMENT_ASSIGNED: "assessment_assigned",
+  ASSESSMENT_RATING_REQUESTED: "assessment_rating_requested",
+  ASSESSMENT_SUBMITTED: "assessment_submitted",
+  ASSESSMENT_RESULTS_RELEASED: "assessment_results_released",
+
   // PIP
   PIP_CREATED: "pip_created",
   PIP_MILESTONE_DUE: "pip_milestone_due",
@@ -64,6 +70,10 @@ export const NOTIFICATION_ICONS: Record<string, string> = {
   course_completed: "🎓",
   training_survey_submitted: "📋",
   skill_gaps_detected: "🔍",
+  assessment_assigned: "🧭",
+  assessment_rating_requested: "🗳️",
+  assessment_submitted: "📨",
+  assessment_results_released: "📈",
   pip_created: "⚠️",
   pip_milestone_due: "📌",
   pip_escalated: "🚨",

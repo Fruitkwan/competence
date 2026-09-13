@@ -19,6 +19,8 @@ import {
   UserCog,
   Bell,
   Upload,
+  Compass,
+  Library,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -76,6 +78,13 @@ const NAV: NavItem[] = [
     iconColor: "#8b5cf6",
     roles: ["employee"],
   },
+  {
+    href: "/assessments",
+    label: "My Assessments",
+    icon: Compass,
+    iconColor: "#0ea5e9",
+    roles: ["employee"],
+  },
 
   // ── Performance cycle (manager / HR / executive) ────────────────────────────
   {
@@ -122,6 +131,13 @@ const NAV: NavItem[] = [
     label: "Performance Appraisals",
     icon: FileCheck2,
     iconColor: "#14b8a6",
+    roles: ["admin", "manager", "executive"],
+  },
+  {
+    href: "/assessments",
+    label: "Assessments",
+    icon: Compass,
+    iconColor: "#0ea5e9",
     roles: ["admin", "manager", "executive"],
   },
   {
@@ -223,6 +239,13 @@ const NAV: NavItem[] = [
     label: "Departments",
     icon: Building2,
     iconColor: "#818cf8",
+    roles: ["admin"],
+  },
+  {
+    href: "/admin/assessments",
+    label: "Assessment Library",
+    icon: Library,
+    iconColor: "#0ea5e9",
     roles: ["admin"],
   },
   {
