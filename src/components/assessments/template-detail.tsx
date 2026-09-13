@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Check, Loader2, Plus, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ClipboardList, Loader2, Plus, Search, Settings2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,24 +29,52 @@ export function TemplateDetail({
   knownJobTitles: string[];
 }) {
   const keyByItem = new Map(keys.map((k) => [k.item_id, k]));
-  const groups = [...new Set(items.map((i) => i.group_name))];
+  const [view, setView] = useState<"content" | "settings">("content");
+  const [selected, setSelected] = useState(items[0]?.id ?? "");
+  const [query, setQuery] = useState("");
+  const content = useRef<HTMLDivElement>(null);
+  const activeIndex = items.findIndex(item => item.id === selected);
+  const active = items[activeIndex];
+  const filtered = items.filter(item => `${item.name} ${item.group_name ?? ""}`.toLowerCase().includes(query.toLowerCase()));
+  const selectItem = (id: string) => {
+    setSelected(id);
+    requestAnimationFrame(() => { content.current?.focus(); content.current?.scrollIntoView({ behavior: "smooth", block: "start" }); });
+  };
+  const scenarioCount = items.filter(item => item.scenario).length;
+  const missingKeys = items.filter(item => item.scenario && !keyByItem.get(item.id)?.answer_key).length;
 
   return (
-    <div className="grid gap-6 lg:grid-cols-3">
-      <div className="space-y-6 lg:col-span-2">
-        {groups.map((g) => (
-          <div key={g ?? "all"} className="space-y-4">
-            {g && <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">{g}</h2>}
-            {items
-              .filter((i) => i.group_name === g)
-              .map((item) => (
-                <ItemCard key={item.id} item={item} itemKey={keyByItem.get(item.id) ?? null} />
-              ))}
-          </div>
-        ))}
+    <div className="mx-auto max-w-6xl space-y-6">
+      <div className="grid gap-4 rounded-2xl border bg-muted/20 p-5 sm:grid-cols-3 sm:p-6">
+        <div><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Competencies</p><p className="mt-2 text-2xl font-semibold">{items.length}</p></div>
+        <div><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Scenario checks</p><p className="mt-2 text-2xl font-semibold">{scenarioCount}</p></div>
+        <div><p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Answer keys</p><p className={cn("mt-2 text-sm font-medium", missingKeys > 0 ? "text-amber-700 dark:text-amber-300" : "text-emerald-700 dark:text-emerald-300")}>{missingKeys > 0 ? `${missingKeys} need attention` : scenarioCount ? "All scenarios have an answer key" : "No scenario keys required"}</p></div>
       </div>
-
-      <div className="space-y-6">
+      <div className="flex flex-wrap gap-2 border-b pb-4" aria-label="Template views">
+        <Button variant={view === "content" ? "default" : "outline"} aria-pressed={view === "content"} onClick={() => setView("content")}><ClipboardList className="size-4" /> Assessment content</Button>
+        <Button variant={view === "settings" ? "default" : "outline"} aria-pressed={view === "settings"} onClick={() => setView("settings")}><Settings2 className="size-4" /> Template settings</Button>
+      </div>
+      <div hidden={view !== "content"}>
+        <div className="grid items-start gap-6 lg:grid-cols-[250px_minmax(0,1fr)]">
+          <aside className="rounded-2xl border bg-muted/20 p-4 lg:sticky lg:top-6">
+            <h2 className="mb-3 text-sm font-semibold">Competencies</h2>
+            <div className="relative mb-4"><Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" /><Input aria-label="Search competencies" placeholder="Find a competency..." className="pl-9" value={query} onChange={event => setQuery(event.target.value)} /></div>
+            <nav aria-label="Competencies" className="flex max-h-72 gap-2 overflow-auto lg:max-h-[55vh] lg:flex-col">
+              {filtered.map(item => <button key={item.id} onClick={() => selectItem(item.id)} aria-current={selected === item.id ? "true" : undefined} className={cn("flex shrink-0 items-start gap-3 rounded-xl p-3 text-left text-sm hover:bg-muted focus-visible:outline-2", selected === item.id && "bg-background font-medium shadow-sm ring-1 ring-border")}><span className="flex size-6 shrink-0 items-center justify-center rounded-full border text-xs">{item.sort_order}</span><span>{item.name}{item.group_name && <span className="mt-1 block text-xs font-normal text-muted-foreground">{item.group_name}</span>}{item.scenario && !keyByItem.get(item.id)?.answer_key && <span className="mt-1 block text-xs text-amber-700 dark:text-amber-300">Answer key needed</span>}</span></button>)}
+            </nav>
+            {filtered.length === 0 && <p className="text-sm text-muted-foreground">No matching competencies.</p>}
+          </aside>
+          <div ref={content} tabIndex={-1} className="min-w-0 scroll-mt-6 space-y-4 outline-none">
+            {active ? <>
+              <div className="flex items-center justify-between gap-3"><p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Competency {activeIndex + 1} of {items.length}</p><Badge variant="outline">Admin preview</Badge></div>
+              <ItemCard key={active.id} item={active} itemKey={keyByItem.get(active.id) ?? null} />
+              <div className="flex justify-between gap-3 rounded-xl border bg-background p-3"><Button variant="outline" disabled={activeIndex <= 0} onClick={() => selectItem(items[activeIndex - 1].id)}><ArrowLeft className="size-4" /> Previous</Button><Button disabled={activeIndex >= items.length - 1} onClick={() => selectItem(items[activeIndex + 1].id)}>Next competency <ArrowRight className="size-4" /></Button></div>
+            </> : <Card><CardHeader><CardTitle>No competencies yet</CardTitle><CardDescription>This template does not contain any assessment items.</CardDescription></CardHeader></Card>}
+          </div>
+        </div>
+      </div>
+      <div hidden={view !== "settings"}>
+      <div className="grid items-start gap-6 md:grid-cols-2">
         {template.kind === "skill" && (
           <JobTitlesCard templateId={template.id} initial={template.job_titles} known={knownJobTitles} />
         )}
@@ -83,6 +111,7 @@ export function TemplateDetail({
           </Card>
         )}
       </div>
+      </div>
     </div>
   );
 }
@@ -103,7 +132,7 @@ function ScoringSummary({ scoring, kind }: { scoring: Record<string, unknown>; k
     ["Minimum raters", String(s.min_raters ?? 3)],
   ];
   return (
-    <dl className="grid grid-cols-[1fr_auto] gap-x-4 gap-y-1">
+    <dl className="grid grid-cols-[1fr_auto] gap-x-6 gap-y-3">
       {rows.map(([k, v]) => (
         <div key={k} className="contents">
           <dt className="text-muted-foreground">{k}</dt>
@@ -142,15 +171,17 @@ function ItemCard({ item, itemKey }: { item: Item; itemKey: Key | null }) {
   ];
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">
-          {item.sort_order}. {item.name}
+    <Card className="overflow-hidden rounded-2xl py-0">
+      <CardHeader className="gap-3 border-b bg-muted/20 px-6 py-6 sm:px-8">
+        <CardTitle className="text-xl tracking-tight">
+          {item.name}
         </CardTitle>
-        <CardDescription>{item.indicator}</CardDescription>
+        <CardDescription className="leading-relaxed">{item.indicator}</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4 text-sm">
-        <div className="grid gap-2 rounded-md bg-muted/40 p-3">
+      <CardContent className="space-y-6 px-6 pb-8 text-sm sm:px-8">
+        <details className="rounded-xl border bg-muted/20 p-4">
+          <summary className="cursor-pointer font-medium">Rating guide · Levels 2–4</summary>
+          <div className="mt-4 grid gap-4 leading-relaxed">
           {[
             ["2", "Developing", item.anchor_2],
             ["3", "Meets expectations", item.anchor_3],
@@ -163,21 +194,24 @@ function ItemCard({ item, itemKey }: { item: Item; itemKey: Key | null }) {
               </span>
             </div>
           ))}
-        </div>
+          </div>
+        </details>
 
         {item.scenario && (
-          <div className="space-y-2">
+          <div className="space-y-4">
             <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Scenario check</div>
-            <p>{item.scenario}</p>
-            <div className="grid gap-1.5">
+            <p className="rounded-xl bg-muted/40 p-5 leading-7">{item.scenario}</p>
+            <p className="text-xs text-muted-foreground">The highlighted option is the correct answer. Selecting another option updates the answer key immediately.</p>
+            <div className="grid gap-3">
               {options.map(([letter, text]) => (
                 <button
                   key={letter}
                   type="button"
                   disabled={saving}
+                  aria-pressed={key === letter}
                   onClick={() => setAnswer(letter)}
                   className={cn(
-                    "flex items-start gap-2 rounded-md border px-3 py-2 text-left transition-colors hover:bg-accent",
+                    "flex items-start gap-3 rounded-xl border p-4 text-left leading-relaxed transition-colors hover:bg-accent",
                     key === letter && "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40"
                   )}
                 >
@@ -199,13 +233,13 @@ function ItemCard({ item, itemKey }: { item: Item; itemKey: Key | null }) {
               )}
             </div>
             {itemKey?.rationale && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm leading-relaxed text-muted-foreground">
                 <span className="font-medium text-foreground">Why: </span>
                 {itemKey.rationale}
               </p>
             )}
             {itemKey?.diagnostic && (
-              <p className="text-xs text-muted-foreground">
+              <p className="text-sm leading-relaxed text-muted-foreground">
                 <span className="font-medium text-foreground">Diagnostic: </span>
                 {itemKey.diagnostic}
               </p>
@@ -264,6 +298,7 @@ function JobTitlesCard({ templateId, initial, known }: { templateId: string; ini
         </div>
         <div className="flex gap-2">
           <Input
+            aria-label="Job title"
             value={draft}
             placeholder="Add a job title…"
             onChange={(e) => setDraft(e.target.value)}
