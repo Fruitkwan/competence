@@ -16,7 +16,7 @@ export default async function TakeAssessmentPage(props: PageProps<"/assessments/
 
   const { data: assignment } = await supabase
     .from("assessment_assignments")
-    .select("id, template_id, employee_id, employee_user_id, status, due_date, wave, aspiration")
+    .select("id, template_id, employee_id, employee_user_id, status, due_date, wave, aspiration, started_at")
     .eq("id", id)
     .maybeSingle();
   if (!assignment) notFound();
@@ -42,6 +42,10 @@ export default async function TakeAssessmentPage(props: PageProps<"/assessments/
     ? await supabase.from("assessment_responses").select("item_id, rating, not_observed, scenario_answer, evidence").eq("rater_id", rater.id)
     : { data: [] as ExistingResponse[] };
 
+  // Server Components render once per request, so this is the server's view of "now" for the countdown.
+  // eslint-disable-next-line react-hooks/purity
+  const serverNow = Date.now();
+
   return (
     <>
       <PageHeader
@@ -58,6 +62,8 @@ export default async function TakeAssessmentPage(props: PageProps<"/assessments/
           assignmentId: assignment.id,
           aspirationQuestions: template.aspiration_questions as string[],
           aspiration: (assignment.aspiration as Record<string, string> | null) ?? {},
+          startedAt: assignment.started_at,
+          serverNow,
         }}
       />
     </>

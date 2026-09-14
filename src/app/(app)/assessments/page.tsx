@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClipboardCheck, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { ASSESSMENT_PURPOSE } from "@/lib/assessments/copy";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -75,7 +76,7 @@ export default async function MyAssessmentsPage() {
     <>
       <PageHeader
         title="Assessments"
-        description="Training-needs diagnostics. Results are used for development planning only, never for title, promotion or disciplinary decisions."
+        description={ASSESSMENT_PURPOSE}
         actions={
           role !== "employee" ? (
             <>
@@ -106,7 +107,7 @@ export default async function MyAssessmentsPage() {
             <CardTitle className="flex items-center gap-2 text-base">
               <ClipboardCheck className="h-4 w-4 text-primary" /> My assessments
             </CardTitle>
-            <CardDescription>Rate yourself honestly and answer each scenario. Your self-rating carries 10% of the score.</CardDescription>
+            <CardDescription>Rate yourself honestly and answer each scenario. Each assessment is timed: 30 minutes from Start. Your self-rating carries 10% of the score.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {(mine ?? []).length === 0 && <p className="text-sm text-muted-foreground">Nothing assigned to you yet.</p>}

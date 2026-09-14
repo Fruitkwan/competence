@@ -9,6 +9,7 @@ import { parseAnnexeDocx, parseInstrumentDocx, type ParsedKey } from "@/lib/asse
 import { matchSkillTemplate, normalizeName } from "@/lib/assessments/match";
 import { defaultJobTitlesFor } from "@/lib/assessments/role-mapping";
 import { DEFAULT_SCORING } from "@/lib/assessments/scoring";
+import { isExpired } from "@/lib/assessments/time-limit";
 
 type Letter = "A" | "B" | "C" | "D";
 type RaterType = "self" | "line_manager" | "cross_dept" | "peer";
@@ -531,25 +532,49 @@ export async function deleteAssignment(assignmentId: string) {
 export type SelfAnswer = { item_id: string; rating: number | null; scenario_answer: Letter | null };
 export type RaterAnswer = { item_id: string; rating: number | null; not_observed: boolean; evidence: string | null };
 
+async function ownSelfAssignment(assignmentId: string) {
+  const profile = await currentProfile();
+  if (!profile) return { error: "Not authenticated" as const };
+  const supabase = await createClient();
+  const { data: assignment } = await supabase
+    .from("assessment_assignments")
+    .select("id, employee_id, employee_user_id, status, assigned_by, template_id, started_at")
+    .eq("id", assignmentId)
+    .maybeSingle();
+  if (!assignment) return { error: "Assessment not found." as const };
+  const isMine = assignment.employee_user_id === profile.id || (profile.employee_id != null && assignment.employee_id === profile.employee_id);
+  if (!isMine) return { error: "This assessment is not assigned to you." as const };
+  if (assignment.status === "submitted" || assignment.status === "closed") return { error: "This assessment has already been submitted." as const };
+  return { profile, supabase, assignment };
+}
+
+/** Starts the 30-minute clock. Idempotent: a second call returns the original start time. */
+export async function startSelfAssessment(assignmentId: string) {
+  const ctx = await ownSelfAssignment(assignmentId);
+  if ("error" in ctx) return { error: ctx.error };
+  const { profile, supabase, assignment } = ctx;
+  if (assignment.started_at) return { success: true, started_at: assignment.started_at, server_now: Date.now() };
+
+  const started_at = new Date().toISOString();
+  const { error } = await supabase
+    .from("assessment_assignments")
+    .update({ started_at, status: "in_progress", employee_user_id: assignment.employee_user_id ?? profile.id })
+    .eq("id", assignmentId);
+  if (error) return { error: error.message };
+  revalidateAll();
+  return { success: true, started_at, server_now: Date.now() };
+}
+
 export async function saveSelfAssessment(
   assignmentId: string,
   answers: SelfAnswer[],
   aspiration: Record<string, string> | null,
   submit: boolean
 ) {
-  const profile = await currentProfile();
-  if (!profile) return { error: "Not authenticated" };
-  const supabase = await createClient();
-
-  const { data: assignment } = await supabase
-    .from("assessment_assignments")
-    .select("id, employee_id, employee_user_id, status, assigned_by, template_id")
-    .eq("id", assignmentId)
-    .maybeSingle();
-  if (!assignment) return { error: "Assessment not found." };
-  const isMine = assignment.employee_user_id === profile.id || (profile.employee_id != null && assignment.employee_id === profile.employee_id);
-  if (!isMine) return { error: "This assessment is not assigned to you." };
-  if (assignment.status === "submitted" || assignment.status === "closed") return { error: "This assessment has already been submitted." };
+  const ctx = await ownSelfAssignment(assignmentId);
+  if ("error" in ctx) return { error: ctx.error };
+  const { profile, supabase, assignment } = ctx;
+  if (!assignment.started_at) return { error: "Press Start to begin the assessment." };
 
   let { data: rater } = await supabase
     .from("assessment_raters")
@@ -569,7 +594,10 @@ export async function saveSelfAssessment(
   }
   if (rater.status === "submitted") return { error: "Already submitted." };
 
-  if (submit) {
+  // Once the time limit has passed, any save finalises whatever has been answered.
+  const timedOut = isExpired(assignment.started_at);
+  const finalise = submit || timedOut;
+  if (submit && !timedOut) {
     const incomplete = answers.filter((a) => a.rating == null || a.scenario_answer == null);
     if (incomplete.length) return { error: `Answer every rating and scenario before submitting (${incomplete.length} remaining).` };
   }
@@ -587,14 +615,14 @@ export async function saveSelfAssessment(
     .from("assessment_assignments")
     .update({
       aspiration: aspiration ?? undefined,
-      status: submit ? "submitted" : "in_progress",
-      submitted_at: submit ? now : null,
+      status: finalise ? "submitted" : "in_progress",
+      submitted_at: finalise ? now : null,
       employee_user_id: assignment.employee_user_id ?? profile.id,
     })
     .eq("id", assignmentId);
   if (updateError) return { error: updateError.message };
 
-  if (submit) {
+  if (finalise) {
     await supabase.from("assessment_raters").update({ status: "submitted", submitted_at: now }).eq("id", rater.id);
     if (assignment.assigned_by && assignment.assigned_by !== profile.id) {
       const { data: tpl } = await supabase.from("assessment_templates").select("name").eq("id", assignment.template_id).single();
@@ -602,7 +630,9 @@ export async function saveSelfAssessment(
         user_id: assignment.assigned_by,
         type: NOTIFICATION_TYPES.ASSESSMENT_SUBMITTED,
         title: `${profile.full_name ?? profile.email} submitted ${tpl?.name ?? "an assessment"}`,
-        body: "Self-assessment complete. Rater inputs may still be pending.",
+        body: timedOut
+          ? "Time limit reached; the self-assessment was submitted automatically. Rater inputs may still be pending."
+          : "Self-assessment complete. Rater inputs may still be pending.",
         link: `/assessments/${assignmentId}/report`,
         metadata: { assignment_id: assignmentId },
       });
@@ -610,7 +640,7 @@ export async function saveSelfAssessment(
   }
 
   revalidateAll();
-  return { success: true };
+  return { success: true, finalised: finalise, timedOut };
 }
 
 export async function saveRaterAssessment(raterId: string, answers: RaterAnswer[], submit: boolean) {

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { COMPANY_EMAIL_DOMAIN, COMPANY_EMAIL_ERROR, isCompanyEmail } from "@/lib/auth/email-policy";
 import { createClient } from "@/lib/supabase/client";
 
 type Mode = "signin" | "signup" | "otp" | "verify-otp" | "forgot" | "reset" | "reset-link";
@@ -21,6 +22,7 @@ function LoginInner() {
   const router = useRouter();
   const params = useSearchParams();
   const redirectTo = params.get("redirectTo") ?? "/dashboard";
+  const blockedDomain = params.get("error") === "domain";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -52,6 +54,11 @@ function LoginInner() {
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    // reset-link arrives from an emailed recovery link with an existing session; the email field is not used.
+    if (mode !== "reset-link" && !isCompanyEmail(email)) {
+      toast.error(COMPANY_EMAIL_ERROR);
+      return;
+    }
     setLoading(true);
     const supabase = createClient();
     try {
@@ -115,9 +122,24 @@ function LoginInner() {
         </CardHeader>
         <CardContent>
           <form onSubmit={submit} className="grid gap-4">
+            {blockedDomain && (
+              <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+                {COMPANY_EMAIL_ERROR} You have been signed out.
+              </p>
+            )}
             <div className="grid gap-2">
               <Label htmlFor="email">Work email</Label>
-              <Input id="email" type="email" autoComplete="email" required disabled={needsOtp || mode === "reset-link"} value={email} onChange={(event) => setEmail(event.target.value)} />
+              <Input
+                id="email"
+                type="email"
+                autoComplete="email"
+                required
+                placeholder={`name@${COMPANY_EMAIL_DOMAIN}`}
+                disabled={needsOtp || mode === "reset-link"}
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Company accounts only (@{COMPANY_EMAIL_DOMAIN}).</p>
             </div>
 
             {needsOtp && (

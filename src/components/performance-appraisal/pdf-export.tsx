@@ -29,8 +29,17 @@ function avgGoals(goals: { rating_n1: number | null; rating_n2: number | null }[
   return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 }
 
+export type PdfExportOptions = {
+  header?: string;
+  footer?: string;
+  /** Scale the whole capture onto a single A4 page (orientation chosen to match the content). */
+  fitToPage?: boolean;
+  /** Viewport width used when evaluating the element's layout (defaults to the live window). */
+  windowWidth?: number;
+};
+
 /* ---- Export function ---- */
-export async function exportToPdf(element: HTMLElement, fileName: string) {
+export async function exportToPdf(element: HTMLElement, fileName: string, options: PdfExportOptions = {}) {
   const html2canvas = (await import("html2canvas-pro")).default;
   const { jsPDF } = await import("jspdf");
 
@@ -39,25 +48,82 @@ export async function exportToPdf(element: HTMLElement, fileName: string) {
     useCORS: true,
     logging: false,
     backgroundColor: "#ffffff",
+    windowWidth: options.windowWidth,
   });
 
-  const imgData = canvas.toDataURL("image/png");
-  const imgWidth = 210; // A4 width in mm
-  const pageHeight = 297; // A4 height in mm
-  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+  const decorated = Boolean(options.header || options.footer);
+  const margin = decorated ? 12 : 0;
+  const headerHeight = decorated ? 12 : 0;
+  const footerHeight = decorated ? 10 : 0;
 
+  if (options.fitToPage) {
+    const landscape = canvas.width / canvas.height > 1;
+    const pageWidth = landscape ? 297 : 210;
+    const pageHeight = landscape ? 210 : 297;
+    const boxWidth = pageWidth - margin * 2;
+    const boxHeight = pageHeight - margin * 2 - headerHeight - footerHeight;
+    const scale = Math.min(boxWidth / canvas.width, boxHeight / canvas.height);
+    const width = canvas.width * scale;
+    const height = canvas.height * scale;
+    const x = margin + (boxWidth - width) / 2;
+    const y = margin + headerHeight;
+    const pdf = new jsPDF(landscape ? "l" : "p", "mm", "a4");
+    if (decorated) {
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text(options.header ?? "", margin, margin + 4);
+      pdf.setDrawColor(15, 118, 110);
+      pdf.setLineWidth(0.5);
+      pdf.line(margin, margin + 7, pageWidth - margin, margin + 7);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(7);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text(options.footer ?? "Confidential", margin, pageHeight - margin + 1);
+      pdf.text("Page 1 of 1", pageWidth - margin, pageHeight - margin + 1, { align: "right" });
+    }
+    pdf.addImage(canvas.toDataURL("image/png"), "PNG", x, y, width, height);
+    pdf.save(fileName);
+    return;
+  }
+
+  const pageWidth = 210;
+  const pageHeight = 297;
+  const contentWidth = pageWidth - margin * 2;
+  const contentHeight = pageHeight - margin * 2 - headerHeight - footerHeight;
+  const pixelsPerMm = canvas.width / contentWidth;
+  const sliceHeight = Math.max(1, Math.floor(contentHeight * pixelsPerMm));
+  const totalPages = Math.ceil(canvas.height / sliceHeight);
   const pdf = new jsPDF("p", "mm", "a4");
-  let heightLeft = imgHeight;
-  let position = 0;
+  for (let page = 0; page < totalPages; page += 1) {
+    if (page > 0) pdf.addPage();
+    const sourceY = page * sliceHeight;
+    const currentSliceHeight = Math.min(sliceHeight, canvas.height - sourceY);
+    const pageCanvas = document.createElement("canvas");
+    pageCanvas.width = canvas.width;
+    pageCanvas.height = currentSliceHeight;
+    pageCanvas.getContext("2d")?.drawImage(canvas, 0, sourceY, canvas.width, currentSliceHeight, 0, 0, canvas.width, currentSliceHeight);
 
-  pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-  heightLeft -= pageHeight;
+    if (decorated) {
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(8);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text(options.header ?? "", margin, margin + 4);
+      pdf.setDrawColor(15, 118, 110);
+      pdf.setLineWidth(0.5);
+      pdf.line(margin, margin + 7, pageWidth - margin, margin + 7);
+    }
 
-  while (heightLeft > 0) {
-    position = heightLeft - imgHeight;
-    pdf.addPage();
-    pdf.addImage(imgData, "PNG", 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
+    const renderedHeight = currentSliceHeight / pixelsPerMm;
+    pdf.addImage(pageCanvas.toDataURL("image/png"), "PNG", margin, margin + headerHeight, contentWidth, renderedHeight);
+
+    if (decorated) {
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(7);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text(options.footer ?? "Confidential", margin, pageHeight - margin + 1);
+      pdf.text(`Page ${page + 1} of ${totalPages}`, pageWidth - margin, pageHeight - margin + 1, { align: "right" });
+    }
   }
 
   pdf.save(fileName);

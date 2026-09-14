@@ -921,6 +921,7 @@ export type Database = {
           results_released: boolean;
           aspiration: Record<string, unknown> | null;
           assigned_by: string | null;
+          started_at: string | null;
           submitted_at: string | null;
           created_at: string;
           updated_at: string;
@@ -936,6 +937,7 @@ export type Database = {
           results_released?: boolean;
           aspiration?: Record<string, unknown> | null;
           assigned_by?: string | null;
+          started_at?: string | null;
           submitted_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["assessment_assignments"]["Insert"]>;
