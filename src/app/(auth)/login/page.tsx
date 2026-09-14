@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import Image from "next/image";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 
-type Mode = "signin" | "signup" | "otp" | "verify-otp" | "forgot" | "reset";
+type Mode = "signin" | "signup" | "otp" | "verify-otp" | "forgot" | "reset" | "reset-link";
 
 export default function LoginPage() {
   return <Suspense fallback={null}><LoginInner /></Suspense>;
@@ -27,6 +27,21 @@ function LoginInner() {
   const [otp, setOtp] = useState("");
   const [mode, setMode] = useState<Mode>("signin");
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const supabase = createClient();
+    const { data: listener } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") setMode("reset-link");
+    });
+
+    if (params.get("recovery") === "1") {
+      void supabase.auth.getSession().then(({ data }) => {
+        if (data.session) setMode("reset-link");
+      });
+    }
+
+    return () => listener.subscription.unsubscribe();
+  }, [params]);
 
   function changeMode(next: Mode) {
     setMode(next);
@@ -60,14 +75,18 @@ function LoginInner() {
         router.replace(redirectTo);
         router.refresh();
       } else if (mode === "forgot") {
-        const { error } = await supabase.auth.resetPasswordForEmail(email);
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/login?recovery=1`,
+        });
         if (error) throw error;
         setMode("reset");
         toast.success("Password reset code sent.");
       } else {
         if (password !== confirmPassword) throw new Error("Passwords do not match.");
-        const { error: verificationError } = await supabase.auth.verifyOtp({ email, token: otp, type: "recovery" });
-        if (verificationError) throw verificationError;
+        if (mode === "reset") {
+          const { error: verificationError } = await supabase.auth.verifyOtp({ email, token: otp, type: "recovery" });
+          if (verificationError) throw verificationError;
+        }
         const { error: updateError } = await supabase.auth.updateUser({ password });
         if (updateError) throw updateError;
         await supabase.auth.signOut();
@@ -82,7 +101,7 @@ function LoginInner() {
   }
 
   const needsOtp = mode === "verify-otp" || mode === "reset";
-  const needsPassword = mode === "signin" || mode === "signup" || mode === "reset";
+  const needsPassword = mode === "signin" || mode === "signup" || mode === "reset" || mode === "reset-link";
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30 p-6">
@@ -98,7 +117,7 @@ function LoginInner() {
           <form onSubmit={submit} className="grid gap-4">
             <div className="grid gap-2">
               <Label htmlFor="email">Work email</Label>
-              <Input id="email" type="email" autoComplete="email" required disabled={needsOtp} value={email} onChange={(event) => setEmail(event.target.value)} />
+              <Input id="email" type="email" autoComplete="email" required disabled={needsOtp || mode === "reset-link"} value={email} onChange={(event) => setEmail(event.target.value)} />
             </div>
 
             {needsOtp && (
@@ -110,12 +129,12 @@ function LoginInner() {
 
             {needsPassword && (
               <div className="grid gap-2">
-                <Label htmlFor="password">{mode === "reset" ? "New password" : "Password"}</Label>
+                <Label htmlFor="password">{mode === "reset" || mode === "reset-link" ? "New password" : "Password"}</Label>
                 <Input id="password" type="password" autoComplete={mode === "signin" ? "current-password" : "new-password"} required minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} />
               </div>
             )}
 
-            {mode === "reset" && (
+            {(mode === "reset" || mode === "reset-link") && (
               <div className="grid gap-2">
                 <Label htmlFor="confirm-password">Confirm new password</Label>
                 <Input id="confirm-password" type="password" autoComplete="new-password" required minLength={8} value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)} />
@@ -157,6 +176,7 @@ function descriptionFor(mode: Mode, email: string) {
   if (mode === "verify-otp") return `Enter the code sent to ${email}`;
   if (mode === "forgot") return "Enter your email to reset your password";
   if (mode === "reset") return `Enter the recovery code sent to ${email}`;
+  if (mode === "reset-link") return "Choose a new password for your account";
   return "Sign in to continue";
 }
 
@@ -165,6 +185,6 @@ function submitLabel(mode: Mode) {
   if (mode === "otp") return "Send verification code";
   if (mode === "verify-otp") return "Verify and sign in";
   if (mode === "forgot") return "Send password reset code";
-  if (mode === "reset") return "Reset password";
+  if (mode === "reset" || mode === "reset-link") return "Reset password";
   return "Sign in";
 }
