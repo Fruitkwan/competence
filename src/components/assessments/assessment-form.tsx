@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ArrowLeft, ArrowRight, Check, ClipboardCheck, Clock3, Loader2, Save, Send } from "lucide-react";
+import { AlarmClock, ArrowLeft, ArrowRight, Check, ClipboardCheck, Clock3, Loader2, Play, Save, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { saveRaterAssessment, saveSelfAssessment, type RaterAnswer, type SelfAnswer } from "@/lib/actions/assessments";
+import { saveRaterAssessment, saveSelfAssessment, startSelfAssessment, type RaterAnswer, type SelfAnswer } from "@/lib/actions/assessments";
+import { ASSESSMENT_TIME_LIMIT_MINUTES, deadlineFor } from "@/lib/assessments/time-limit";
 import { cn } from "@/lib/utils";
 
 type Letter = "A" | "B" | "C" | "D";
@@ -45,11 +46,29 @@ const SCALE: { value: number; label: string; hint: string }[] = [
   { value: 5, label: "Role model", hint: "Others are sent to this person to learn it." },
 ];
 
-type Mode = { kind: "self"; assignmentId: string; aspirationQuestions: string[]; aspiration: Record<string, string> } | { kind: "rater"; raterId: string; subjectName: string };
+type Mode =
+  | {
+      kind: "self";
+      assignmentId: string;
+      aspirationQuestions: string[];
+      aspiration: Record<string, string>;
+      /** Null until the employee presses Start. */
+      startedAt: string | null;
+      /** Server clock at render time, used to cancel out client clock skew. */
+      serverNow: number;
+    }
+  | { kind: "rater"; raterId: string; subjectName: string };
 
 type Draft = { rating: number | null; not_observed: boolean; scenario_answer: Letter | null; evidence: string };
 
-function AssessmentTimer() {
+function formatClock(totalSeconds: number) {
+  const s = Math.max(0, totalSeconds);
+  const hours = Math.floor(s / 3600);
+  const minutes = Math.floor((s % 3600) / 60);
+  return [hours, minutes, s % 60].map((value) => String(value).padStart(2, "0")).join(":");
+}
+
+function ElapsedTimer() {
   const [seconds, setSeconds] = useState(0);
 
   useEffect(() => {
@@ -60,15 +79,105 @@ function AssessmentTimer() {
     return () => window.clearInterval(interval);
   }, []);
 
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const time = [hours, minutes, seconds % 60].map(value => String(value).padStart(2, "0")).join(":");
-
   return (
     <div className="flex items-center gap-2 text-xs text-muted-foreground" title="Time spent in this session. Resets when you reload or leave the assessment.">
       <Clock3 aria-hidden="true" className="size-4" />
       <span>Time spent</span>
-      <span role="timer" aria-label="Time spent in this assessment session" className="font-mono font-medium tabular-nums text-foreground">{time}</span>
+      <span role="timer" aria-label="Time spent in this assessment session" className="font-mono font-medium tabular-nums text-foreground">{formatClock(seconds)}</span>
+    </div>
+  );
+}
+
+const WARN_AT_SECONDS = [5 * 60, 60];
+
+/** `remainingMs` is measured on the server so the countdown is immune to a wrong client clock. */
+function CountdownTimer({ remainingMs, onExpire }: { remainingMs: number; onExpire: () => void }) {
+  const [remaining, setRemaining] = useState(Math.ceil(remainingMs / 1000));
+  const warned = useRef(new Set<number>());
+  const expired = useRef(false);
+
+  useEffect(() => {
+    // Wall clock (not performance.now) so the deadline survives laptop sleep.
+    const endAt = Date.now() + remainingMs;
+    const tick = () => {
+      const r = Math.ceil((endAt - Date.now()) / 1000);
+      setRemaining(r);
+      for (const at of WARN_AT_SECONDS) {
+        if (r <= at && r > at - 2 && !warned.current.has(at)) {
+          warned.current.add(at);
+          toast.warning(at >= 60 ? `${at / 60} minutes remaining.` : "One minute remaining. Your answers will be submitted automatically.");
+        }
+      }
+      if (r <= 0 && !expired.current) {
+        expired.current = true;
+        onExpire();
+      }
+    };
+    tick();
+    const interval = window.setInterval(tick, 1000);
+    return () => window.clearInterval(interval);
+  }, [remainingMs, onExpire]);
+
+  const tone = remaining <= 60 ? "text-red-600 dark:text-red-400" : remaining <= 5 * 60 ? "text-amber-600 dark:text-amber-400" : "text-foreground";
+
+  return (
+    <div className="flex items-center gap-2 text-xs text-muted-foreground" title={`You have ${ASSESSMENT_TIME_LIMIT_MINUTES} minutes from Start. The clock keeps running if you leave this page.`}>
+      <AlarmClock aria-hidden="true" className={cn("size-4", remaining <= 60 && "animate-pulse text-red-600")} />
+      <span>Time remaining</span>
+      <span role="timer" aria-live={remaining <= 60 ? "assertive" : "off"} aria-label="Time remaining" className={cn("font-mono font-semibold tabular-nums", tone)}>
+        {formatClock(remaining)}
+      </span>
+    </div>
+  );
+}
+
+function StartGate({ title, intro, itemCount, hasAspiration, onStart }: { title: string; intro: string | null; itemCount: number; hasAspiration: boolean; onStart: () => Promise<void> }) {
+  const [starting, setStarting] = useState(false);
+  return (
+    <div className="mx-auto max-w-2xl space-y-6 pb-4">
+      <Card className="rounded-2xl">
+        <CardHeader className="gap-3">
+          <div className="flex items-center gap-3">
+            <div className="rounded-xl bg-teal-100 p-3 text-teal-700 dark:bg-teal-900 dark:text-teal-200"><AlarmClock className="size-6" /></div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest text-teal-700 dark:text-teal-300">Timed assessment</p>
+              <CardTitle className="mt-1 text-xl">{title}</CardTitle>
+            </div>
+          </div>
+          <CardDescription className="text-sm leading-relaxed">
+            You have <span className="font-semibold text-foreground">{ASSESSMENT_TIME_LIMIT_MINUTES} minutes</span> to complete {itemCount} skill{itemCount === 1 ? "" : "s"}
+            {hasAspiration ? " and a short aspiration section" : ""}. The clock starts when you press Start and keeps running even if you leave the page.
+            When time runs out, whatever you have answered is submitted automatically.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <ul className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
+            <li className="rounded-xl border bg-muted/20 p-3"><span className="font-medium text-foreground">Rate each skill</span> on the 1–5 scale, then answer its scenario check. Each scenario has one best answer.</li>
+            <li className="rounded-xl border bg-muted/20 p-3"><span className="font-medium text-foreground">Save as you go.</span> Drafts are kept, but the timer does not pause.</li>
+          </ul>
+          {intro && (
+            <details className="text-sm text-muted-foreground">
+              <summary className="cursor-pointer font-medium text-foreground">Privacy notice</summary>
+              <p className="mt-2 whitespace-pre-line leading-relaxed">{intro}</p>
+            </details>
+          )}
+          <Button
+            size="lg"
+            className="w-full"
+            disabled={starting}
+            onClick={async () => {
+              setStarting(true);
+              try {
+                await onStart();
+              } finally {
+                setStarting(false);
+              }
+            }}
+          >
+            {starting ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />} Start assessment ({ASSESSMENT_TIME_LIMIT_MINUTES} min)
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 }
@@ -90,6 +199,11 @@ export function AssessmentForm({
   const [step, setStep] = useState(0);
   const heading = useRef<HTMLDivElement>(null);
   const hasAspiration = mode.kind === "self" && mode.aspirationQuestions.length > 0;
+  // Start time paired with the server clock that observed it, so remaining time never depends on the client clock.
+  const [session, setSession] = useState<{ startedAt: string; serverNow: number } | null>(
+    mode.kind === "self" && mode.startedAt ? { startedAt: mode.startedAt, serverNow: mode.serverNow } : null
+  );
+  const [timedOut, setTimedOut] = useState(false);
   const reviewStep = items.length + (hasAspiration ? 1 : 0);
   const goTo = (next: number) => {
     setStep(next);
@@ -119,11 +233,11 @@ export function AssessmentForm({
 
   const progress = { done: items.filter(complete).length, total: items.length };
 
-  async function persist(submit: boolean) {
-    if (submit && !confirm("Submit now? You will not be able to change your answers afterwards.")) return;
+  async function persist(submit: boolean, opts: { auto?: boolean } = {}) {
+    if (submit && !opts.auto && !confirm("Submit now? You will not be able to change your answers afterwards.")) return;
     setBusy(submit ? "submit" : "save");
     try {
-      let result: { error?: string; success?: boolean };
+      let result: { error?: string; success?: boolean; finalised?: boolean; timedOut?: boolean };
       if (mode.kind === "self") {
         const answers: SelfAnswer[] = items.map((i) => ({
           item_id: i.id,
@@ -140,9 +254,14 @@ export function AssessmentForm({
         }));
         result = await saveRaterAssessment(mode.raterId, answers, submit);
       }
-      if (result.error) return toast.error(result.error);
-      toast.success(submit ? "Submitted. Thank you." : "Draft saved.");
-      if (submit) router.push("/assessments");
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      const finalised = submit || result.finalised === true;
+      if (result.timedOut) toast.info("Time is up. Your answers have been submitted.");
+      else toast.success(finalised ? "Submitted. Thank you." : "Draft saved.");
+      if (finalised) router.push("/assessments");
       router.refresh();
     } catch {
       toast.error("Could not save your answers. Please try again.");
@@ -151,7 +270,33 @@ export function AssessmentForm({
     }
   }
 
+  // The countdown fires once; route it through a ref so it always submits the latest drafts.
+  const persistRef = useRef(persist);
+  useEffect(() => {
+    persistRef.current = persist;
+  });
+  const onExpire = useCallback(() => {
+    setTimedOut(true);
+    void persistRef.current(true, { auto: true });
+  }, []);
 
+  async function start() {
+    if (mode.kind !== "self") return;
+    const result = await startSelfAssessment(mode.assignmentId);
+    if (result.error || !result.started_at) {
+      toast.error(result.error ?? "Could not start the assessment.");
+      return;
+    }
+    setSession({ startedAt: result.started_at, serverNow: result.server_now });
+    toast.success(`Started. You have ${ASSESSMENT_TIME_LIMIT_MINUTES} minutes.`);
+  }
+
+  if (mode.kind === "self" && !session) {
+    return <StartGate title={title} intro={intro} itemCount={items.length} hasAspiration={hasAspiration} onStart={start} />;
+  }
+
+  const remainingMs = session ? deadlineFor(session.startedAt) - session.serverNow : null;
+  const locked = busy != null || timedOut;
   const ratePrompt = mode.kind === "self" ? "Rate your ability" : `Rate ${mode.subjectName}`;
 
   return (
@@ -162,7 +307,7 @@ export function AssessmentForm({
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-widest text-teal-700 dark:text-teal-300">Your development starts here</p>
             <h2 className="mt-1 text-lg font-semibold">{title}</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">{mode.kind === "self" ? "Take one skill at a time. Reflect on your experience, choose a rating, then work through the scenario." : `Share your observations of ${mode.subjectName}, one skill at a time.`}</p>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">{mode.kind === "self" ? `Take one skill at a time. Reflect on your experience, choose a rating, then work through the scenario. You have ${ASSESSMENT_TIME_LIMIT_MINUTES} minutes in total.` : `Share your observations of ${mode.subjectName}, one skill at a time.`}</p>
             <details className="mt-3 text-sm text-muted-foreground">
               <summary className="cursor-pointer font-medium text-foreground">How to complete this assessment{intro ? " & privacy" : ""}</summary>
               <p className="mt-3 max-w-2xl leading-relaxed">Use the full rating scale and choose the level that best reflects consistent performance. Each scenario has one best answer. You can revisit any section before submitting. Save a draft before leaving to continue later.{mode.kind === "rater" && ' Choose “Not observed” if you have not had enough visibility; it is excluded from the score.'}</p>
@@ -350,16 +495,22 @@ export function AssessmentForm({
               </CardContent>
             </Card>
           )}
+          {timedOut && (
+            <div role="alert" className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/30 dark:text-red-100">
+              <Loader2 className="size-4 shrink-0 animate-spin" />
+              Time is up. Submitting the answers you have given so far…
+            </div>
+          )}
           <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-background/95 p-3 backdrop-blur sm:p-4">
             <div className="flex flex-wrap items-center gap-3">
-            <AssessmentTimer />
-            <Button variant="ghost" disabled={step === 0 || busy != null} onClick={() => goTo(step - 1)}><ArrowLeft className="size-4" /> Back</Button>
+            {remainingMs != null ? <CountdownTimer remainingMs={remainingMs} onExpire={onExpire} /> : <ElapsedTimer />}
+            <Button variant="ghost" disabled={step === 0 || locked} onClick={() => goTo(step - 1)}><ArrowLeft className="size-4" /> Back</Button>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" disabled={busy != null} onClick={() => persist(false)}>
+              <Button variant="outline" disabled={locked} onClick={() => persist(false)}>
                 {busy === "save" ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Save draft
               </Button>
-              {step < reviewStep ? <Button disabled={busy != null} onClick={() => goTo(step + 1)}>{step + 1 === reviewStep ? "Review" : "Continue"}<ArrowRight className="size-4" /></Button> : <Button disabled={busy != null || progress.total === 0 || progress.done < progress.total} onClick={() => persist(true)}>{busy === "submit" ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />} Submit</Button>}
+              {step < reviewStep ? <Button disabled={locked} onClick={() => goTo(step + 1)}>{step + 1 === reviewStep ? "Review" : "Continue"}<ArrowRight className="size-4" /></Button> : <Button disabled={locked || progress.total === 0 || progress.done < progress.total} onClick={() => persist(true)}>{busy === "submit" ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />} Submit</Button>}
             </div>
           </div>
         </div>

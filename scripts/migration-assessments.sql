@@ -118,6 +118,9 @@ CREATE TABLE IF NOT EXISTS public.assessment_assignments (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Self-assessments are timed; the clock starts when the employee presses Start.
+ALTER TABLE public.assessment_assignments ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_assessment_assignments_open
   ON public.assessment_assignments(template_id, employee_id)
   WHERE status <> 'closed';

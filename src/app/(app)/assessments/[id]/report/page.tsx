@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { ASSESSMENT_PURPOSE } from "@/lib/assessments/copy";
 import { getViewer, loadEmployeeReport } from "@/lib/assessments/results";
 import { AssessmentReport } from "@/components/assessments/assessment-report";
 import { buttonVariants } from "@/components/ui/button";
@@ -17,7 +18,7 @@ export default async function AssessmentReportPage(props: PageProps<"/assessment
     <>
       <PageHeader
         title="Assessment report"
-        description="Training-needs diagnostic. Not the formal performance appraisal; not used for title, promotion or disciplinary decisions."
+        description={ASSESSMENT_PURPOSE}
         actions={
           <Link href={viewer.role === "employee" ? "/assessments" : "/assessments/results"} className={buttonVariants({ variant: "outline" })}>
             Back

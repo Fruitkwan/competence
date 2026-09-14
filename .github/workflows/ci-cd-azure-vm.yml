@@ -47,7 +47,9 @@ jobs:
         run: npm run lint
 
       - name: Typecheck
-        run: npx tsc --noEmit
+        # next typegen writes the PageProps/LayoutProps route helpers to .next/types,
+        # which tsc needs and which a fresh checkout does not have.
+        run: npx next typegen && npx tsc --noEmit
 
       - name: Docker build smoke test
         run: |
