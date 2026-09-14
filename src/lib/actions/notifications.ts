@@ -30,6 +30,7 @@ export async function markAsRead(notificationId: string) {
   if (error) return { error: error.message };
 
   revalidatePath("/notifications");
+  revalidatePath("/dashboard");
   return { success: true };
 }
 
@@ -49,6 +50,7 @@ export async function markAllAsRead() {
   if (error) return { error: error.message };
 
   revalidatePath("/notifications");
+  revalidatePath("/dashboard");
   return { success: true };
 }
 

@@ -149,6 +149,7 @@ export default async function DashboardPage() {
       { data: performanceAppraisals },
       { data: skillGaps },
       { data: notifications },
+      { count: unreadCount },
     ] = await Promise.all([
       supabase
         .from("employees")
@@ -193,6 +194,11 @@ export default async function DashboardPage() {
         .eq("user_id", user?.id ?? "")
         .order("created_at", { ascending: false })
         .limit(5),
+      supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user?.id ?? "")
+        .eq("read", false),
     ]);
 
     return (
@@ -206,6 +212,7 @@ export default async function DashboardPage() {
         performanceAppraisals={(performanceAppraisals ?? []) as PerformanceSummaryRow[]}
         skillGaps={(skillGaps ?? []) as SkillGapSummaryRow[]}
         notifications={(notifications ?? []) as NotificationSummaryRow[]}
+        unreadCount={unreadCount ?? 0}
       />
     );
   }
@@ -498,6 +505,7 @@ function EmployeeDashboard({
   performanceAppraisals,
   skillGaps,
   notifications,
+  unreadCount,
 }: {
   employee: EmployeeProfileRow | null;
   userName: string;
@@ -508,6 +516,7 @@ function EmployeeDashboard({
   performanceAppraisals: PerformanceSummaryRow[];
   skillGaps: SkillGapSummaryRow[];
   notifications: NotificationSummaryRow[];
+  unreadCount: number;
 }) {
   const displayName = employee?.full_name ?? userName ?? "Employee";
   const activeCourses = courses.filter((course) => !["Completed", "Dropped"].includes(course.status));
@@ -515,7 +524,6 @@ function EmployeeDashboard({
   const objectivesNeedingWork = objectives.filter((objective) =>
     ["draft", "revision_requested"].includes(objective.status)
   );
-  const unreadNotifications = notifications.filter((notification) => !notification.read);
   const highSkillGaps = skillGaps.filter((gap) => gap.severity === "high");
   const latestPerformance = performanceAppraisals[0] ?? null;
 
@@ -547,7 +555,7 @@ function EmployeeDashboard({
             <EmployeeStatCard label="Completed" value={completedCourses.length.toString()} icon={ClipboardCheck} tone="green" />
             <EmployeeStatCard label="Objectives" value={objectivesNeedingWork.length.toString()} icon={Target} tone="amber" />
             <EmployeeStatCard label="High gaps" value={highSkillGaps.length.toString()} icon={AlertTriangle} tone="red" />
-            <EmployeeStatCard label="Unread" value={unreadNotifications.length.toString()} icon={Bell} tone="neutral" />
+            <EmployeeStatCard label="Unread" value={unreadCount.toString()} icon={Bell} tone="neutral" />
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">

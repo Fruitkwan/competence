@@ -31,8 +31,11 @@ export default async function AppLayout({
     .order("created_at", { ascending: false })
     .limit(10);
 
-  const unreadCount =
-    notifications?.filter((n) => !n.read).length ?? 0;
+  const { count: unreadCount } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .eq("read", false);
 
   return (
     <div className="flex min-h-screen">
@@ -43,7 +46,7 @@ export default async function AppLayout({
         <header className="sticky top-0 z-10 flex h-14 items-center justify-end gap-3 border-b bg-background/95 px-4 backdrop-blur">
           <NotificationBell
             notifications={notifications ?? []}
-            unreadCount={unreadCount}
+            unreadCount={unreadCount ?? 0}
           />
           <UserMenu
             email={profile?.email ?? user.email ?? ""}
