@@ -702,3 +702,38 @@ export async function suggestTemplatesForEmployee(employeeId: string) {
 export async function isAdminClientConfigured() {
   return createAdminClient() != null;
 }
+
+/** Records a report acknowledgement signature for the given role slot. */
+export async function signAssessmentReport(assignmentId: string, slot: "employee" | "manager" | "hr", date?: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not authenticated" };
+
+  const { data: profile } = await supabase.from("profiles").select("role, employee_id, full_name").eq("id", user.id).single();
+  if (!profile) return { error: "Profile not found." };
+
+  const { data: assignment } = await supabase
+    .from("assessment_assignments")
+    .select("id, employee_id, employee_user_id, report_signatures")
+    .eq("id", assignmentId)
+    .maybeSingle();
+  if (!assignment) return { error: "Assessment not found." };
+
+  const isSelf =
+    assignment.employee_user_id === user.id || (profile.employee_id != null && assignment.employee_id === profile.employee_id);
+  const allowed =
+    (slot === "employee" && isSelf) || (slot === "hr" && profile.role === "admin") || (slot === "manager" && profile.role !== "employee");
+  if (!allowed) return { error: "You cannot sign this section." };
+
+  const at = date && !Number.isNaN(Date.parse(date)) ? new Date(date).toISOString() : new Date().toISOString();
+  const report_signatures = {
+    ...((assignment.report_signatures ?? {}) as Record<string, unknown>),
+    [slot]: { name: profile.full_name ?? user.email ?? "Signed", at },
+  };
+  const { error } = await supabase.from("assessment_assignments").update({ report_signatures }).eq("id", assignmentId);
+  if (error) return { error: error.message };
+  revalidatePath(`/assessments/${assignmentId}/report`);
+  return { success: true };
+}

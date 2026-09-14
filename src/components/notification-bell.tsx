@@ -30,6 +30,7 @@ type Notification = {
 
 export function NotificationBell({
   notifications,
+  unreadCount,
 }: {
   notifications: Notification[];
   unreadCount: number;
@@ -37,6 +38,7 @@ export function NotificationBell({
   const router = useRouter();
   const [now] = useState(() => Date.now());
   const [optimisticReadIds, setOptimisticReadIds] = useState<Set<string>>(() => new Set());
+  const [allRead, setAllRead] = useState(false);
   const [isPending, startTransition] = useTransition();
   const items = useMemo(
     () =>
@@ -45,7 +47,7 @@ export function NotificationBell({
       ),
     [notifications, optimisticReadIds]
   );
-  const count = items.filter((notification) => !notification.read).length;
+  const count = allRead ? 0 : Math.max(0, unreadCount - optimisticReadIds.size);
 
   function handleClick(n: Notification) {
     if (!n.read) {
@@ -67,6 +69,7 @@ export function NotificationBell({
     startTransition(async () => {
       await markAllAsRead();
     });
+    setAllRead(true);
     setOptimisticReadIds((prev) => {
       const next = new Set(prev);
       for (const notification of notifications) next.add(notification.id);

@@ -20,7 +20,12 @@ export default async function NotificationsPage() {
     .order("created_at", { ascending: false })
     .limit(50);
 
-  const unreadCount = notifications?.filter((n) => !n.read).length ?? 0;
+  const { count } = await supabase
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user!.id)
+    .eq("read", false);
+  const unreadCount = count ?? 0;
 
   return (
     <>

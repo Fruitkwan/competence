@@ -923,6 +923,7 @@ export type Database = {
           assigned_by: string | null;
           started_at: string | null;
           submitted_at: string | null;
+          report_signatures: Record<string, unknown>;
           created_at: string;
           updated_at: string;
         };
@@ -939,6 +940,7 @@ export type Database = {
           assigned_by?: string | null;
           started_at?: string | null;
           submitted_at?: string | null;
+          report_signatures?: Record<string, unknown>;
         };
         Update: Partial<Database["public"]["Tables"]["assessment_assignments"]["Insert"]>;
         Relationships: [];

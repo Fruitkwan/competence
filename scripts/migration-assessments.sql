@@ -121,6 +121,9 @@ CREATE TABLE IF NOT EXISTS public.assessment_assignments (
 -- Self-assessments are timed; the clock starts when the employee presses Start.
 ALTER TABLE public.assessment_assignments ADD COLUMN IF NOT EXISTS started_at TIMESTAMPTZ;
 
+-- Report acknowledgement e-signatures: {"employee"|"manager"|"hr": {"name","at"}}.
+ALTER TABLE public.assessment_assignments ADD COLUMN IF NOT EXISTS report_signatures JSONB NOT NULL DEFAULT '{}'::jsonb;
+
 CREATE UNIQUE INDEX IF NOT EXISTS idx_assessment_assignments_open
   ON public.assessment_assignments(template_id, employee_id)
   WHERE status <> 'closed';

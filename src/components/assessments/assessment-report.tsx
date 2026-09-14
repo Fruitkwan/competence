@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AlertTriangle, Brain, CheckCircle2, CircleDashed, Download, Info, Loader2, Scale, ShieldAlert, Target } from "lucide-react";
 import {
@@ -19,14 +20,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { exportToPdf } from "@/components/performance-appraisal/pdf-export";
-import { ASSESSMENT_PURPOSE } from "@/lib/assessments/copy";
-import type { EmployeeReport, AssignmentResult } from "@/lib/assessments/results";
+import { signAssessmentReport } from "@/lib/actions/assessments";
+import type { EmployeeReport, AssignmentResult, ReportSignature, SignSlot } from "@/lib/assessments/results";
 import type { Band, ItemScore, Warning } from "@/lib/assessments/scoring";
 import { cn } from "@/lib/utils";
 
-const BAND_COLOR: Record<Band, string> = {
+export const BAND_COLOR: Record<Band, string> = {
   Strength: "#059669",
   "Meets standard": "#2563eb",
   "Development gap": "#d97706",
@@ -40,21 +41,18 @@ const BAND_BADGE: Record<Band, string> = {
   "Material gap": "border-red-300 bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300",
 };
 
-const GROUP_COLOR: Record<string, string[]> = {
+export const GROUP_COLOR: Record<string, string[]> = {
   Behaviour: ["#4f46e5", "#6366f1", "#818cf8"],
   Desire: ["#db2777", "#f472b6"],
   Attitude: ["#d97706", "#fbbf24"],
 };
 
-const STANDARD = 60;
-
-/** Width of the off-screen print layout; wide enough for A4 landscape at ~2.1 mm per 10 px. */
-const PRINT_WIDTH = 1400;
+export const STANDARD = 60;
 
 export function AssessmentReport({ report }: { report: EmployeeReport }) {
-  const printRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
   const [exporting, setExporting] = useState(false);
-  const { employee, skill, behaviour, grid, isSelf } = report;
+  const { employee, skill, behaviour, grid, isSelf, signatures, canSign, assignmentId } = report;
   const roleFamily = skill?.template.role_family ?? employee.job_title;
   const date = formatDate((skill ?? behaviour)?.assignment.submitted_at ?? (skill ?? behaviour)?.assignment.created_at ?? null);
   const wave = (skill ?? behaviour)?.assignment.wave;
@@ -65,17 +63,31 @@ export function AssessmentReport({ report }: { report: EmployeeReport }) {
   );
 
   async function download() {
-    if (!printRef.current) return;
     setExporting(true);
     try {
-      await exportToPdf(printRef.current, `Assessment_${employee.employee_id}_${(wave ?? "report").replace(/\s+/g, "_")}.pdf`, {
-        fitToPage: true,
-        windowWidth: PRINT_WIDTH,
-      });
+      const [{ pdf }, { AssessmentReportPdf }] = await Promise.all([import("@react-pdf/renderer"), import("./assessment-report-pdf")]);
+      const blob = await pdf(
+        <AssessmentReportPdf report={report} warnings={warnings} roleFamily={roleFamily} date={date} wave={wave ?? null} provisional={provisional} />
+      ).toBlob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Assessment_${employee.employee_id}_${(wave ?? "report").replace(/\s+/g, "_")}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Export failed");
     } finally {
       setExporting(false);
+    }
+  }
+
+  async function sign(slot: SignSlot, date: string) {
+    const res = await signAssessmentReport(assignmentId, slot, date);
+    if (res.error) toast.error(res.error);
+    else {
+      toast.success("Report signed.");
+      router.refresh();
     }
   }
 
@@ -296,9 +308,9 @@ export function AssessmentReport({ report }: { report: EmployeeReport }) {
             </p>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-3">
-            <SignatureField role="Employee" name={employee.full_name} />
-            <SignatureField role="Line manager" />
-            <SignatureField role="HR representative" />
+            <SignatureField role="Employee" name={employee.full_name} signature={signatures.employee} canSign={canSign.employee} onSign={(d) => sign("employee", d)} />
+            <SignatureField role="Line manager" signature={signatures.manager} canSign={canSign.manager} onSign={(d) => sign("manager", d)} />
+            <SignatureField role="HR representative" signature={signatures.hr} canSign={canSign.hr} onSign={(d) => sign("hr", d)} />
           </CardContent>
         </Card>
 
@@ -314,333 +326,49 @@ export function AssessmentReport({ report }: { report: EmployeeReport }) {
           <span>Confidential employee record · Generated {new Date().toLocaleDateString("en-GB")}</span>
         </footer>
       </div>
-
-      {/* Off-screen one-page layout captured by "Download PDF". */}
-      <div aria-hidden inert className="pointer-events-none fixed left-[-20000px] top-0 select-none">
-        <PrintReport
-          ref={printRef}
-          report={report}
-          warnings={warnings}
-          roleFamily={roleFamily}
-          date={date}
-          wave={wave ?? null}
-          provisional={provisional}
-        />
-      </div>
-    </div>
-  );
-}
-
-/* ---------------- one-page print layout ---------------- */
-
-function PrintReport({
-  ref,
-  report,
-  warnings,
-  roleFamily,
-  date,
-  wave,
-  provisional,
-}: {
-  ref: React.Ref<HTMLDivElement>;
-  report: EmployeeReport;
-  warnings: Warning[];
-  roleFamily: string;
-  date: string;
-  wave: string | null;
-  provisional: boolean;
-}) {
-  const { employee, skill, behaviour, grid, isSelf } = report;
-  const aspiration = Object.entries((behaviour?.assignment.aspiration as Record<string, string> | null) ?? {}).filter(([, v]) => v);
-  const reportDate = date || new Date().toLocaleDateString("en-GB");
-
-  return (
-    <div ref={ref} style={{ width: PRINT_WIDTH }} className="space-y-3 bg-white p-8 text-[11px] leading-snug text-slate-900">
-      <header className="flex items-center justify-between gap-6 rounded-lg border border-teal-200 bg-gradient-to-r from-teal-50 to-white px-5 py-3">
-        <div>
-          <div className="text-[9px] font-semibold uppercase tracking-[0.2em] text-teal-700">Dhofar Global</div>
-          <div className="text-lg font-semibold leading-tight">Employee assessment report</div>
-          <div className="max-w-[640px] text-[10px] leading-snug text-slate-600">{ASSESSMENT_PURPOSE}</div>
-        </div>
-        <div className="flex items-center gap-8">
-          <PrintMeta label="Employee" value={employee.full_name} />
-          <PrintMeta label="Assessment wave" value={wave ?? "Not specified"} />
-          <PrintMeta label="Report date" value={reportDate} />
-          <span className="rounded-full border border-teal-300 px-2.5 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-teal-800">Confidential</span>
-        </div>
-      </header>
-
-      <div className="grid grid-cols-[1.05fr_1.35fr_1fr] gap-3">
-        <PrintBox>
-          <div className="flex items-start justify-between gap-2">
-            <div>
-              <div className="text-base font-semibold leading-tight">{employee.full_name}</div>
-              <div className="text-[10px] text-slate-500">
-                {employee.employee_id} · {employee.job_title}
-                {employee.department ? ` · ${employee.department}` : ""}
-              </div>
-            </div>
-            {provisional && <span className="rounded-full border border-amber-300 px-2 py-0.5 text-[9px] font-medium text-amber-700">Provisional</span>}
-          </div>
-          <div className="mt-3 text-[9px] font-semibold uppercase tracking-wider text-slate-500">Capability profile</div>
-          {skill ? (
-            <div className="mt-2 space-y-2.5">
-              <Stat ring={<ScoreRing value={skill.score.index} band={skill.score.items.length ? bandOf(skill.score.index) : null} size="sm" />} title="Skill Index" text={indexText(skill.score.index)} compact />
-              <Stat
-                ring={<IconRing icon={<Brain className="h-4 w-4" />} tone="#7c3aed" size="sm" />}
-                title="Judgement"
-                text={skill.score.scenarios_answered ? `${skill.score.scenarios_correct} of ${skill.score.scenarios_answered} scenario checks answered with the best option.` : "Scenario checks not yet answered."}
-                compact
-              />
-              <Stat ring={<IconRing icon={<Scale className="h-4 w-4" />} tone="#0891b2" size="sm" />} title="Self-awareness" text={selfAwarenessText(skill.score.items)} compact />
-            </div>
-          ) : (
-            <PrintMissing type="Skill" />
-          )}
-        </PrintBox>
-
-        <PrintBox title="Behavioural profile">
-          {behaviour ? <BehaviourDonut result={behaviour} initials={initials(employee.full_name)} size={150} interactive={false} /> : <PrintMissing type="Behaviour" />}
-        </PrintBox>
-
-        <PrintBox title="Advisory warnings">
-          {warnings.length === 0 && <p className="text-slate-500">No divergence flags raised.</p>}
-          <div className="space-y-2">
-            {warnings.map((w) => (
-              <div key={w.code} className="flex gap-1.5">
-                <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0 text-amber-600" />
-                <div>
-                  <div className="font-medium leading-tight">{w.title}</div>
-                  <div className="text-[10px] leading-snug text-slate-500">{w.detail}</div>
-                  {w.items.length > 0 && <div className="text-[10px]">{w.items.join(" · ")}</div>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </PrintBox>
-      </div>
-
-      <PrintBox title={`Role match: ${roleFamily}`} subtitle="Role placement combines capability (Skill) with motivation and adaptability (Will).">
-        <div className="grid grid-cols-[1fr_1fr_auto] gap-4">
-          <PrintDimension
-            title="Skill"
-            description={`Competency score vs the ${STANDARD}% role standard.`}
-            value={skill?.score.index ?? null}
-            color="#4f46e5"
-            missingText="No active Skill assessment could be paired with this report."
-            chart={skill?.score.items.length ? <RadarBlock data={skill.score.items.map((i) => ({ name: shortName(i.name), candidate: i.score ?? 0, role: STANDARD }))} color="#4f46e5" width={400} height={190} /> : null}
-          />
-          <PrintDimension
-            title="Will"
-            description={`Desire and Attitude score vs the ${STANDARD}% role standard.`}
-            value={behaviour?.score.will_index ?? null}
-            color="#db2777"
-            missingText="No active Behaviour assessment could be paired with this report."
-            chart={behaviour?.score.items.length ? <RadarBlock data={behaviour.score.items.map((i) => ({ name: shortName(i.name), candidate: i.score ?? 0, role: STANDARD }))} color="#db2777" width={400} height={190} /> : null}
-          />
-          <div className="flex w-56 flex-col items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-center">
-            {grid ? (
-              <>
-                <SkillWillGrid group={grid.group} compact />
-                <div>
-                  <div className="text-[9px] font-semibold uppercase tracking-widest text-slate-500">Placement</div>
-                  <div className="font-semibold">{grid.group}</div>
-                  <div className="mt-0.5 text-[10px] leading-snug text-slate-600">{grid.action}</div>
-                </div>
-              </>
-            ) : (
-              <div className="text-[10px] leading-snug text-slate-500">Placement on the four-quadrant grid needs both a Skill and a Will score.</div>
-            )}
-          </div>
-        </div>
-      </PrintBox>
-
-      {(skill || behaviour) && (
-        <div className={cn("grid gap-3", skill && behaviour ? "grid-cols-2" : "grid-cols-1")}>
-          {skill && <PrintScoreTable result={skill} isSelf={isSelf} title="Skill competencies" />}
-          {behaviour && <PrintScoreTable result={behaviour} isSelf={isSelf} title="Behaviour, Desire and Attitude" />}
-        </div>
-      )}
-
-      {aspiration.length > 0 && (
-        <PrintBox title="Aspiration and intent" subtitle="Self-reported, unscored.">
-          <div className="grid grid-cols-2 gap-x-6 gap-y-1.5">
-            {aspiration.map(([q, v]) => (
-              <div key={q} className="max-h-12 overflow-hidden">
-                <div className="text-[9px] text-slate-500">{q}</div>
-                <div className="text-[10px] leading-snug">{v}</div>
-              </div>
-            ))}
-          </div>
-        </PrintBox>
-      )}
-
-      <div className="grid grid-cols-3 gap-3">
-        <PrintSignature role="Employee" name={employee.full_name} />
-        <PrintSignature role="Line manager" />
-        <PrintSignature role="HR representative" />
-      </div>
-
-      <footer className="flex items-start justify-between gap-8 border-t border-slate-200 pt-2 text-[9px] leading-snug text-slate-500">
-        <p className="max-w-[880px]">
-          Scores are weighted percentages ({skill ? "cross-departmental 40 / line manager 20 / scenario 30 / self 10" : ""}
-          {skill && behaviour ? "; " : ""}
-          {behaviour ? "peer 45 / line manager 20 / scenario 25 / self 10" : ""}). Bands: Strength ≥75, Meets standard ≥60, Development gap ≥45, Material gap &lt;45.
-          Individual rater scores are never disclosed; a result is provisional below three rater responses. Signatures confirm the report was reviewed, not agreement with every result.
-        </p>
-        <span className="shrink-0 text-right">
-          Dhofar Global Performance Hub
-          <br />
-          Confidential employee record · Generated {new Date().toLocaleDateString("en-GB")}
-        </span>
-      </footer>
-    </div>
-  );
-}
-
-function PrintMeta({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="text-[10px]">
-      <div className="text-[8px] uppercase tracking-wider text-slate-500">{label}</div>
-      <div className="font-medium text-slate-800">{value}</div>
-    </div>
-  );
-}
-
-function PrintBox({ title, subtitle, children }: { title?: string; subtitle?: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-lg border border-slate-200 bg-white p-3.5">
-      {title && (
-        <div className="mb-2">
-          <div className="font-semibold">{title}</div>
-          {subtitle && <div className="text-[10px] text-slate-500">{subtitle}</div>}
-        </div>
-      )}
-      {children}
-    </section>
-  );
-}
-
-function PrintMissing({ type }: { type: "Skill" | "Behaviour" }) {
-  return (
-    <div className="flex gap-2 rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
-      <CircleDashed className="mt-0.5 h-3.5 w-3.5 shrink-0 text-slate-400" />
-      <div>
-        <div className="font-medium">{type} assessment unavailable</div>
-        <p className="text-[10px] leading-snug text-slate-500">No visible active {type.toLowerCase()} assessment was found for this employee.</p>
-      </div>
-    </div>
-  );
-}
-
-function PrintDimension({
-  title,
-  description,
-  value,
-  color,
-  missingText,
-  chart,
-}: {
-  title: string;
-  description: string;
-  value: number | null;
-  color: string;
-  missingText: string;
-  chart: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-lg border border-slate-200 p-3">
-      <div className="flex items-center gap-3">
-        <PercentDonut value={value} color={color} size={64} />
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-semibold">{title}</span>
-            {value != null && <span className="rounded-full border border-slate-300 px-1.5 py-px text-[9px]">{bandOf(value)}</span>}
-          </div>
-          <p className="text-[10px] leading-snug text-slate-500">{description}</p>
-        </div>
-      </div>
-      {value == null ? <div className="mt-3 rounded-md bg-slate-50 p-3 text-[10px] text-slate-500">{missingText}</div> : <div className="mt-1 flex justify-center">{chart}</div>}
-    </div>
-  );
-}
-
-function PrintScoreTable({ result, isSelf, title }: { result: AssignmentResult; isSelf: boolean; title: string }) {
-  const isSkill = result.template.kind === "skill";
-  const th = "pb-1 pr-2 text-[9px] font-medium uppercase tracking-wider text-slate-500";
-  const td = "py-[3px] pr-2 align-top";
-  return (
-    <PrintBox title={title}>
-      <table className="w-full border-collapse text-[10px]">
-        <thead>
-          <tr className="text-left">
-            <th className={th}>Item</th>
-            {!isSelf && <th className={cn(th, "text-right")}>Self</th>}
-            {!isSelf && <th className={cn(th, "text-right")}>Line mgr</th>}
-            {!isSelf && <th className={cn(th, "text-right")}>{isSkill ? "Cross-dept" : "Peers"}</th>}
-            <th className={cn(th, "text-center")}>Scenario</th>
-            <th className={cn(th, "text-right")}>Score</th>
-            <th className={th}>Band</th>
-            <th className={cn(th, "pr-0")}>Flag</th>
-          </tr>
-        </thead>
-        <tbody>
-          {result.score.items.map((i) => (
-            <tr key={i.item_id} className="border-t border-slate-100">
-              <td className={td}>
-                <span className="font-medium">{i.name}</span>
-                {i.group_name && <span className="ml-1 text-slate-400">{i.group_name}</span>}
-              </td>
-              {!isSelf && <td className={cn(td, "text-right tabular-nums")}>{i.self ?? "—"}</td>}
-              {!isSelf && <td className={cn(td, "text-right tabular-nums")}>{i.line_manager ?? "—"}</td>}
-              {!isSelf && (
-                <td className={cn(td, "text-right tabular-nums")}>
-                  {i.others_avg ?? "—"}
-                  {i.others_count > 0 && <span className="ml-0.5 text-slate-400">({i.others_count})</span>}
-                </td>
-              )}
-              <td className={cn(td, "text-center")}>{i.scenario_correct == null ? "—" : i.scenario_correct ? <span className="text-emerald-600">✓</span> : <span className="text-red-600">✗</span>}</td>
-              <td className={cn(td, "text-right font-semibold tabular-nums")}>{i.score ?? "—"}</td>
-              <td className={td}>
-                {i.band && (
-                  <span className="rounded px-1.5 py-px text-[9px] font-medium" style={{ color: BAND_COLOR[i.band], backgroundColor: `${BAND_COLOR[i.band]}1a` }}>
-                    {i.band}
-                  </span>
-                )}
-              </td>
-              <td className={cn(td, "pr-0 text-[9px] text-slate-500")}>{i.flag ?? "—"}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </PrintBox>
-  );
-}
-
-function PrintSignature({ role, name }: { role: string; name?: string }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-      <div className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">{role}</div>
-      <div className="mt-4 border-b border-slate-400 pb-0.5 text-[10px]">{name ?? ""}</div>
-      <div className="mt-1.5 grid grid-cols-2 gap-3 text-[9px] text-slate-500">
-        <span>Signature</span>
-        <span className="border-b border-slate-300">Date</span>
-      </div>
     </div>
   );
 }
 
 /* ---------------- blocks ---------------- */
 
-function SignatureField({ role, name }: { role: string; name?: string }) {
+function SignatureField({
+  role,
+  name,
+  signature,
+  canSign,
+  onSign,
+}: {
+  role: string;
+  name?: string;
+  signature?: ReportSignature;
+  canSign: boolean;
+  onSign: (date: string) => Promise<void>;
+}) {
+  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [pending, startTransition] = useTransition();
   return (
     <div className="rounded-lg border bg-muted/20 p-4">
       <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{role}</div>
-      <div className="mt-6 border-b border-foreground/40 pb-1 text-sm">{name ?? ""}</div>
-      <div className="mt-3 grid grid-cols-2 gap-3 text-[10px] text-muted-foreground">
-        <span>Signature</span>
-        <span className="border-b">Date</span>
-      </div>
+      <div className="mt-6 border-b border-foreground/40 pb-1 text-sm">{signature?.name ?? name ?? ""}</div>
+      {signature ? (
+        <div className="mt-3 grid grid-cols-2 gap-3 text-[10px] text-muted-foreground">
+          <span className="font-medium text-emerald-700 dark:text-emerald-300">Signed</span>
+          <span className="border-b">{new Date(signature.at).toLocaleDateString("en-GB")}</span>
+        </div>
+      ) : canSign ? (
+        <div className="mt-3 flex items-end gap-2">
+          <Input type="date" aria-label={`${role} signature date`} value={date} onChange={(e) => setDate(e.target.value)} className="h-8 text-xs" />
+          <Button type="button" size="sm" variant="outline" disabled={pending || !date} onClick={() => startTransition(() => onSign(date))}>
+            {pending ? <Loader2 className="size-4 animate-spin" /> : "Sign"}
+          </Button>
+        </div>
+      ) : (
+        <div className="mt-3 grid grid-cols-2 gap-3 text-[10px] text-muted-foreground">
+          <span>Signature</span>
+          <span className="border-b">Date</span>
+        </div>
+      )}
     </div>
   );
 }
@@ -1000,7 +728,7 @@ function DetailTable({ result, isSelf, title }: { result: AssignmentResult; isSe
 
 /* ---------------- helpers ---------------- */
 
-function bandOf(score: number | null): Band | null {
+export function bandOf(score: number | null): Band | null {
   if (score == null) return null;
   if (score >= 75) return "Strength";
   if (score >= 60) return "Meets standard";
@@ -1008,7 +736,7 @@ function bandOf(score: number | null): Band | null {
   return "Material gap";
 }
 
-function indexText(v: number | null) {
+export function indexText(v: number | null) {
   const b = bandOf(v);
   if (b === "Strength") return "Above the standard. Use this person to help train others.";
   if (b === "Meets standard") return "Meets the standard for the role. No targeted action required.";
@@ -1017,7 +745,7 @@ function indexText(v: number | null) {
   return "Not enough inputs yet to compute an index.";
 }
 
-function selfAwarenessText(items: ItemScore[]) {
+export function selfAwarenessText(items: ItemScore[]) {
   const gaps = items.map((i) => i.self_vs_rater_gap).filter((g): g is number => g != null);
   if (!gaps.length) return "Awaiting rater input for comparison.";
   const mean = gaps.reduce((a, b) => a + b, 0) / gaps.length;
@@ -1036,11 +764,11 @@ function dedupeWarnings(ws: Warning[]): Warning[] {
   return [...byCode.values()];
 }
 
-function shortName(name: string) {
+export function shortName(name: string) {
   return name.length > 22 ? `${name.slice(0, 20)}…` : name;
 }
 
-function initials(name: string) {
+export function initials(name: string) {
   return name
     .split(" ")
     .filter(Boolean)

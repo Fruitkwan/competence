@@ -36,6 +36,9 @@ export type AssignmentResult = {
   raters: { type: Rater["rater_type"]; status: Rater["status"] }[];
 };
 
+export type SignSlot = "employee" | "manager" | "hr";
+export type ReportSignature = { name: string; at: string };
+
 export type EmployeeReport = {
   employee: { employee_id: string; full_name: string; job_title: string; department: string | null; country_code: string | null; manager_name: string | null };
   skill: AssignmentResult | null;
@@ -43,6 +46,10 @@ export type EmployeeReport = {
   grid: { group: SkillWillGroup; action: string } | null;
   /** Whether the viewer is the assessed employee (limits detail shown). */
   isSelf: boolean;
+  /** Primary assignment the report (and its signatures) belongs to. */
+  assignmentId: string;
+  signatures: Partial<Record<SignSlot, ReportSignature>>;
+  canSign: Record<SignSlot, boolean>;
 };
 
 export async function getViewer(): Promise<Viewer | null> {
@@ -188,11 +195,26 @@ export async function loadEmployeeReport(assignmentId: string, viewer: Viewer): 
     primary.assignment.employee_user_id === viewer.userId ||
     (viewer.employeeId != null && primary.assignment.employee_id === viewer.employeeId);
 
+  const [{ data: managesByName }, { data: managesByProfile }] =
+    viewer.role === "manager"
+      ? await Promise.all([
+          user.from("employees").select("employee_id").eq("employee_id", employee.employee_id).eq("manager_name", viewer.fullName ?? "").maybeSingle(),
+          user.from("profiles").select("id").eq("employee_id", employee.employee_id).eq("manager_id", viewer.userId).maybeSingle(),
+        ])
+      : [{ data: null }, { data: null }];
+
   return {
     employee: { ...employee, department: employee.department ?? null },
     skill,
     behaviour,
     grid: group ? { group, action: SKILL_WILL_ACTIONS[group] } : null,
     isSelf: isSelf && viewer.role === "employee",
+    assignmentId: primary.assignment.id,
+    signatures: (primary.assignment.report_signatures ?? {}) as Partial<Record<SignSlot, ReportSignature>>,
+    canSign: {
+      employee: isSelf,
+      manager: viewer.role === "admin" || Boolean(managesByName || managesByProfile),
+      hr: viewer.role === "admin",
+    },
   };
 }
