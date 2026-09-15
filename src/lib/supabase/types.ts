@@ -952,6 +952,7 @@ export type Database = {
           rater_user_id: string;
           rater_type: "self" | "line_manager" | "cross_dept" | "peer";
           status: "pending" | "submitted";
+          started_at: string | null;
           submitted_at: string | null;
           created_at: string;
         };
@@ -961,6 +962,7 @@ export type Database = {
           rater_user_id: string;
           rater_type: "self" | "line_manager" | "cross_dept" | "peer";
           status?: "pending" | "submitted";
+          started_at?: string | null;
           submitted_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["assessment_raters"]["Insert"]>;

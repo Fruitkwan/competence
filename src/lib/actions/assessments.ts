@@ -9,7 +9,7 @@ import { parseAnnexeDocx, parseInstrumentDocx, type ParsedKey } from "@/lib/asse
 import { matchSkillTemplate, normalizeName } from "@/lib/assessments/match";
 import { defaultJobTitlesFor } from "@/lib/assessments/role-mapping";
 import { DEFAULT_SCORING } from "@/lib/assessments/scoring";
-import { isExpired } from "@/lib/assessments/time-limit";
+import { isExpired, peerTiming } from "@/lib/assessments/time-limit";
 
 type Letter = "A" | "B" | "C" | "D";
 type RaterType = "self" | "line_manager" | "cross_dept" | "peer";
@@ -643,6 +643,30 @@ export async function saveSelfAssessment(
   return { success: true, finalised: finalise, timedOut };
 }
 
+export async function startPeerAssessment(raterId: string) {
+  const profile = await currentProfile();
+  if (!profile) return { error: "Not authenticated" };
+  const supabase = await createClient();
+  const { data: rater, error } = await supabase.from("assessment_raters")
+    .select("id, assignment_id, status, started_at")
+    .eq("id", raterId).eq("rater_user_id", profile.id).eq("rater_type", "peer").maybeSingle();
+  if (error) return { error: error.message };
+  if (!rater || rater.status === "submitted") return { error: "Peer assessment is unavailable." };
+  const { data: assignment } = await supabase.from("assessment_assignments")
+    .select("status").eq("id", rater.assignment_id).maybeSingle();
+  if (!assignment || assignment.status === "closed") return { error: "Assessment is closed." };
+  if (rater.started_at) return { started_at: rater.started_at, server_now: Date.now() };
+  // Compare-and-set keeps simultaneous tabs from restarting the clock.
+  const { error: startError } = await supabase.from("assessment_raters")
+    .update({ started_at: new Date().toISOString() })
+    .eq("id", raterId).eq("rater_user_id", profile.id).eq("status", "pending").is("started_at", null);
+  if (startError) return { error: startError.message };
+  const { data: started, error: readError } = await supabase.from("assessment_raters")
+    .select("started_at").eq("id", raterId).eq("rater_user_id", profile.id).single();
+  if (readError || !started?.started_at) return { error: "Could not start the assessment." };
+  return { started_at: started.started_at, server_now: Date.now() };
+}
+
 export async function saveRaterAssessment(raterId: string, answers: RaterAnswer[], submit: boolean) {
   const profile = await currentProfile();
   if (!profile) return { error: "Not authenticated" };
@@ -650,19 +674,30 @@ export async function saveRaterAssessment(raterId: string, answers: RaterAnswer[
 
   const { data: rater } = await supabase
     .from("assessment_raters")
-    .select("id, status, rater_type, assignment_id")
+    .select("id, status, rater_type, assignment_id, started_at")
     .eq("id", raterId)
     .eq("rater_user_id", profile.id)
     .maybeSingle();
   if (!rater) return { error: "Rating request not found." };
   if (rater.status === "submitted") return { error: "Already submitted." };
+  if (rater.rater_type === "self") return { error: "Use the self-assessment form." };
+  const { data: assignment } = await supabase.from("assessment_assignments")
+    .select("status").eq("id", rater.assignment_id).maybeSingle();
+  if (!assignment || assignment.status === "closed") return { error: "Assessment is closed." };
+  const peer = rater.rater_type === "peer";
+  if (peer && !rater.started_at) return { error: "Press Start to begin the peer assessment." };
+  const { timedOut, acceptAnswers } = peer && rater.started_at
+    ? peerTiming(rater.started_at)
+    : { timedOut: false, acceptAnswers: true };
+  const finalised = submit || timedOut;
 
-  if (submit) {
+  if (submit && !timedOut) {
     const incomplete = answers.filter((a) => a.rating == null && !a.not_observed);
     if (incomplete.length) return { error: `Rate every item or mark it "Not observed" (${incomplete.length} remaining).` };
   }
 
-  if (answers.length) {
+  // After the delivery grace period, finalise the saved draft without accepting late edits.
+  if (answers.length && acceptAnswers) {
     const { error } = await supabase.from("assessment_responses").upsert(
       answers.map((a) => ({
         rater_id: rater.id,
@@ -676,7 +711,7 @@ export async function saveRaterAssessment(raterId: string, answers: RaterAnswer[
     if (error) return { error: error.message };
   }
 
-  if (submit) {
+  if (finalised) {
     const { error } = await supabase
       .from("assessment_raters")
       .update({ status: "submitted", submitted_at: new Date().toISOString() })
@@ -685,7 +720,7 @@ export async function saveRaterAssessment(raterId: string, answers: RaterAnswer[
   }
 
   revalidateAll();
-  return { success: true };
+  return { success: true, finalised, timedOut };
 }
 
 /** Suggests published templates for an employee based on their job title. */

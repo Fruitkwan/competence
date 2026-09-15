@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { updateItemAnswerKey, updateTemplateJobTitles } from "@/lib/actions/assessments";
 import type { Database } from "@/lib/supabase/types";
 import { cn } from "@/lib/utils";
+import { resolveScoring } from "@/lib/assessments/scoring";
 
 type Template = Database["public"]["Tables"]["assessment_templates"]["Row"];
 type Item = Database["public"]["Tables"]["assessment_items"]["Row"];
@@ -117,7 +118,7 @@ export function TemplateDetail({
 }
 
 function ScoringSummary({ scoring, kind }: { scoring: Record<string, unknown>; kind: Template["kind"] }) {
-  const s = scoring as { weights?: Record<string, number>; thresholds?: Record<string, number>; grid_cutoff?: number; min_raters?: number };
+  const s = resolveScoring(kind, scoring);
   const w = s.weights ?? {};
   const t = s.thresholds ?? {};
   const rows: [string, string][] = [

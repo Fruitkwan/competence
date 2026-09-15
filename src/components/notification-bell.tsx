@@ -96,11 +96,11 @@ export function NotificationBell({
         }
       >
         <Bell className="h-4 w-4" />
-        {count > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+        <span className="t-badge" data-open={count > 0}>
+          <span className="t-badge-dot h-4 min-w-4 rounded-full bg-red-500 px-1 text-center text-[10px] font-bold leading-4 text-white">
             {count > 99 ? "99+" : count}
           </span>
-        )}
+        </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" side="bottom" sideOffset={8} className="w-80">
         <DropdownMenuGroup>

@@ -321,7 +321,7 @@ export function AssessmentReportPdf({
   const footer = (
     <View fixed style={{ position: "absolute", bottom: 14, left: 24, right: 24, borderTop: `0.6 solid ${C.line}`, paddingTop: 4, flexDirection: "row", justifyContent: "space-between", gap: 16 }}>
       <Text style={{ fontSize: 5.8, color: C.muted, lineHeight: 1.3, maxWidth: 640 }}>
-        {`Scores are weighted percentages (${skill ? "cross-departmental 40 / line manager 20 / scenario 30 / self 10" : ""}${skill && behaviour ? "; " : ""}${behaviour ? "peer 45 / line manager 20 / scenario 25 / self 10" : ""}). Bands: Strength >=75, Meets standard >=60, Development gap >=45, Material gap <45. Individual rater scores are never disclosed; a result is provisional below three rater responses. Signatures confirm the report was reviewed, not agreement with every result.`}
+        {`Scores are weighted percentages (${skill ? "cross-departmental 40 / line manager 20 / scenario 30 / self 10" : ""}${skill && behaviour ? "; " : ""}${behaviour ? "peer 30 / line manager 35 / scenario 25 / self 10" : ""}). Bands: Strength >=75, Meets standard >=60, Development gap >=45, Material gap <45. Individual rater scores are never disclosed; a result is provisional below three rater responses. Signatures confirm the report was reviewed, not agreement with every result.`}
       </Text>
       <Text
         style={{ fontSize: 5.8, color: C.muted, textAlign: "right" }}

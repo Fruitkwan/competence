@@ -21,7 +21,7 @@ export default async function RateAssessmentPage(props: PageProps<"/assessments/
 
   const { data: rater } = await supabase
     .from("assessment_raters")
-    .select("id, assignment_id, rater_type, status")
+    .select("id, assignment_id, rater_type, status, started_at")
     .eq("id", raterId)
     .eq("rater_user_id", user.id)
     .maybeSingle();
@@ -44,6 +44,9 @@ export default async function RateAssessmentPage(props: PageProps<"/assessments/
   if (!template || !items) notFound();
 
   const subject = employee?.full_name ?? assignment.employee_id;
+  // Capture the server clock for this request, as on the self-assessment page.
+  // eslint-disable-next-line react-hooks/purity
+  const serverNow = Date.now();
 
   return (
     <>
@@ -56,7 +59,7 @@ export default async function RateAssessmentPage(props: PageProps<"/assessments/
         intro={template.privacy_notice}
         items={items}
         existing={responses ?? []}
-        mode={{ kind: "rater", raterId: rater.id, subjectName: subject }}
+        mode={{ kind: "rater", raterId: rater.id, subjectName: subject, timed: rater.rater_type === "peer", startedAt: rater.started_at, serverNow }}
       />
     </>
   );

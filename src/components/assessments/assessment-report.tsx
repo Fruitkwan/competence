@@ -317,7 +317,7 @@ export function AssessmentReport({ report }: { report: EmployeeReport }) {
         <p className="px-2 text-[10px] text-muted-foreground">
           Scores are weighted percentages ({skill ? "cross-departmental 40 / line manager 20 / scenario 30 / self 10" : ""}
           {skill && behaviour ? "; " : ""}
-          {behaviour ? "peer 45 / line manager 20 / scenario 25 / self 10" : ""}). Bands: Strength ≥75, Meets standard ≥60,
+          {behaviour ? "peer 30 / line manager 35 / scenario 25 / self 10" : ""}). Bands: Strength ≥75, Meets standard ≥60,
           Development gap ≥45, Material gap &lt;45. Individual rater scores are never disclosed; a result is provisional below three
           rater responses.
         </p>
@@ -348,7 +348,7 @@ function SignatureField({
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [pending, startTransition] = useTransition();
   return (
-    <div className="rounded-lg border bg-muted/20 p-4">
+    <div className="t-resize rounded-lg border bg-muted/20 p-4">
       <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{role}</div>
       <div className="mt-6 border-b border-foreground/40 pb-1 text-sm">{signature?.name ?? name ?? ""}</div>
       {signature ? (
