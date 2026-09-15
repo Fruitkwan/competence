@@ -8,8 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { saveRaterAssessment, saveSelfAssessment, startSelfAssessment, type RaterAnswer, type SelfAnswer } from "@/lib/actions/assessments";
-import { ASSESSMENT_TIME_LIMIT_MINUTES, deadlineFor } from "@/lib/assessments/time-limit";
+import { saveRaterAssessment, saveSelfAssessment, startSelfAssessment, startPeerAssessment, type RaterAnswer, type SelfAnswer } from "@/lib/actions/assessments";
+import { ASSESSMENT_TIME_LIMIT_MINUTES, PEER_TIME_LIMIT_MINUTES, deadlineFor } from "@/lib/assessments/time-limit";
 import { cn } from "@/lib/utils";
 
 type Letter = "A" | "B" | "C" | "D";
@@ -57,7 +57,7 @@ type Mode =
       /** Server clock at render time, used to cancel out client clock skew. */
       serverNow: number;
     }
-  | { kind: "rater"; raterId: string; subjectName: string };
+  | { kind: "rater"; raterId: string; subjectName: string; timed: boolean; startedAt: string | null; serverNow: number };
 
 type Draft = { rating: number | null; not_observed: boolean; scenario_answer: Letter | null; evidence: string };
 
@@ -91,7 +91,7 @@ function ElapsedTimer() {
 const WARN_AT_SECONDS = [5 * 60, 60];
 
 /** `remainingMs` is measured on the server so the countdown is immune to a wrong client clock. */
-function CountdownTimer({ remainingMs, onExpire }: { remainingMs: number; onExpire: () => void }) {
+function CountdownTimer({ remainingMs, onExpire, minutes }: { remainingMs: number; onExpire: () => void; minutes: number }) {
   const [remaining, setRemaining] = useState(Math.ceil(remainingMs / 1000));
   const warned = useRef(new Set<number>());
   const expired = useRef(false);
@@ -121,7 +121,7 @@ function CountdownTimer({ remainingMs, onExpire }: { remainingMs: number; onExpi
   const tone = remaining <= 60 ? "text-red-600 dark:text-red-400" : remaining <= 5 * 60 ? "text-amber-600 dark:text-amber-400" : "text-foreground";
 
   return (
-    <div className="flex items-center gap-2 text-xs text-muted-foreground" title={`You have ${ASSESSMENT_TIME_LIMIT_MINUTES} minutes from Start. The clock keeps running if you leave this page.`}>
+    <div className="flex items-center gap-2 text-xs text-muted-foreground" title={`You have ${minutes} minutes from Start. The clock keeps running if you leave this page.`}>
       <AlarmClock aria-hidden="true" className={cn("size-4", remaining <= 60 && "animate-pulse text-red-600")} />
       <span>Time remaining</span>
       <span role="timer" aria-live={remaining <= 60 ? "assertive" : "off"} aria-label="Time remaining" className={cn("font-mono font-semibold tabular-nums", tone)}>
@@ -131,7 +131,7 @@ function CountdownTimer({ remainingMs, onExpire }: { remainingMs: number; onExpi
   );
 }
 
-function StartGate({ title, intro, itemCount, hasAspiration, onStart }: { title: string; intro: string | null; itemCount: number; hasAspiration: boolean; onStart: () => Promise<void> }) {
+function StartGate({ title, intro, itemCount, hasAspiration, onStart, minutes, peer }: { title: string; intro: string | null; itemCount: number; hasAspiration: boolean; onStart: () => Promise<void>; minutes: number; peer: boolean }) {
   const [starting, setStarting] = useState(false);
   return (
     <div className="mx-auto max-w-2xl space-y-6 pb-4">
@@ -145,14 +145,14 @@ function StartGate({ title, intro, itemCount, hasAspiration, onStart }: { title:
             </div>
           </div>
           <CardDescription className="text-sm leading-relaxed">
-            You have <span className="font-semibold text-foreground">{ASSESSMENT_TIME_LIMIT_MINUTES} minutes</span> to complete {itemCount} skill{itemCount === 1 ? "" : "s"}
+            You have <span className="font-semibold text-foreground">{minutes} minutes</span> to complete {itemCount} skill{itemCount === 1 ? "" : "s"}
             {hasAspiration ? " and a short aspiration section" : ""}. The clock starts when you press Start and keeps running even if you leave the page.
             When time runs out, whatever you have answered is submitted automatically.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <ul className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-            <li className="rounded-xl border bg-muted/20 p-3"><span className="font-medium text-foreground">Rate each skill</span> on the 1–5 scale, then answer its scenario check. Each scenario has one best answer.</li>
+            <li className="rounded-xl border bg-muted/20 p-3"><span className="font-medium text-foreground">Rate each skill</span> {peer ? "on the 1–5 scale, or choose Not observed if you have not seen enough to rate it." : "on the 1–5 scale, then answer its scenario check. Each scenario has one best answer."}</li>
             <li className="rounded-xl border bg-muted/20 p-3"><span className="font-medium text-foreground">Save as you go.</span> Drafts are kept, but the timer does not pause.</li>
           </ul>
           {intro && (
@@ -174,7 +174,7 @@ function StartGate({ title, intro, itemCount, hasAspiration, onStart }: { title:
               }
             }}
           >
-            {starting ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />} Start assessment ({ASSESSMENT_TIME_LIMIT_MINUTES} min)
+            {starting ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />} Start assessment ({minutes} min)
           </Button>
         </CardContent>
       </Card>
@@ -198,10 +198,12 @@ export function AssessmentForm({
   const router = useRouter();
   const [step, setStep] = useState(0);
   const heading = useRef<HTMLDivElement>(null);
+  const isTimed = mode.kind === "self" || mode.timed;
+  const minutes = mode.kind === "rater" ? PEER_TIME_LIMIT_MINUTES : ASSESSMENT_TIME_LIMIT_MINUTES;
   const hasAspiration = mode.kind === "self" && mode.aspirationQuestions.length > 0;
   // Start time paired with the server clock that observed it, so remaining time never depends on the client clock.
   const [session, setSession] = useState<{ startedAt: string; serverNow: number } | null>(
-    mode.kind === "self" && mode.startedAt ? { startedAt: mode.startedAt, serverNow: mode.serverNow } : null
+    isTimed && mode.startedAt ? { startedAt: mode.startedAt, serverNow: mode.serverNow } : null
   );
   const [timedOut, setTimedOut] = useState(false);
   const reviewStep = items.length + (hasAspiration ? 1 : 0);
@@ -281,21 +283,21 @@ export function AssessmentForm({
   }, []);
 
   async function start() {
-    if (mode.kind !== "self") return;
-    const result = await startSelfAssessment(mode.assignmentId);
+    if (!isTimed) return;
+    const result = mode.kind === "self" ? await startSelfAssessment(mode.assignmentId) : await startPeerAssessment(mode.raterId);
     if (result.error || !result.started_at) {
       toast.error(result.error ?? "Could not start the assessment.");
       return;
     }
     setSession({ startedAt: result.started_at, serverNow: result.server_now });
-    toast.success(`Started. You have ${ASSESSMENT_TIME_LIMIT_MINUTES} minutes.`);
+    toast.success(`Started. You have ${minutes} minutes.`);
   }
 
-  if (mode.kind === "self" && !session) {
-    return <StartGate title={title} intro={intro} itemCount={items.length} hasAspiration={hasAspiration} onStart={start} />;
+  if (isTimed && !session) {
+    return <StartGate title={title} intro={intro} itemCount={items.length} hasAspiration={hasAspiration} onStart={start} minutes={minutes} peer={mode.kind === "rater"} />;
   }
 
-  const remainingMs = session ? deadlineFor(session.startedAt) - session.serverNow : null;
+  const remainingMs = session ? deadlineFor(session.startedAt, minutes) - session.serverNow : null;
   const locked = busy != null || timedOut;
   const ratePrompt = mode.kind === "self" ? "Rate your ability" : `Rate ${mode.subjectName}`;
 
@@ -497,13 +499,14 @@ export function AssessmentForm({
           )}
           {timedOut && (
             <div role="alert" className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/30 dark:text-red-100">
-              <Loader2 className="size-4 shrink-0 animate-spin" />
-              Time is up. Submitting the answers you have given so far…
+              {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : <AlarmClock className="size-4 shrink-0" />}
+              {busy ? "Time is up. Submitting your answers…" : "Time is up. If submission failed, retry below."}
+              {!busy && <Button variant="outline" onClick={() => persist(true, { auto: true })}>Retry submission</Button>}
             </div>
           )}
           <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-background/95 p-3 backdrop-blur sm:p-4">
             <div className="flex flex-wrap items-center gap-3">
-            {remainingMs != null ? <CountdownTimer remainingMs={remainingMs} onExpire={onExpire} /> : <ElapsedTimer />}
+            {remainingMs != null ? <CountdownTimer remainingMs={remainingMs} onExpire={onExpire} minutes={minutes} /> : <ElapsedTimer />}
             <Button variant="ghost" disabled={step === 0 || locked} onClick={() => goTo(step - 1)}><ArrowLeft className="size-4" /> Back</Button>
             </div>
             <div className="flex gap-2">

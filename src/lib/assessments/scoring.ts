@@ -1,5 +1,6 @@
 /**
- * Scoring model from DG_Assessment_Scoring_Workbook.xlsx (Model sheet).
+ * Scoring model based on DG_Assessment_Scoring_Workbook.xlsx (Model sheet),
+ * with behaviour weights revised to peer 30 / manager 35 / scenario 25 / self 10.
  * Missing inputs are excluded and the remaining weights re-scaled, so a
  * missing input lowers confidence rather than the score.
  */
@@ -25,7 +26,7 @@ export const DEFAULT_SCORING: Record<AssessmentKind, ScoringModel> = {
     divergence: 2,
   },
   behaviour: {
-    weights: { other: 0.45, line_manager: 0.2, scenario: 0.25, self: 0.1 },
+    weights: { other: 0.3, line_manager: 0.35, scenario: 0.25, self: 0.1 },
     thresholds: { strength: 75, meets: 60, development: 45 },
     grid_cutoff: 60,
     min_raters: 3,
@@ -37,8 +38,13 @@ export function resolveScoring(kind: AssessmentKind, stored: unknown): ScoringMo
   const base = DEFAULT_SCORING[kind];
   if (!stored || typeof stored !== "object") return base;
   const s = stored as Partial<ScoringModel>;
+  const weights = { ...base.weights, ...(s.weights ?? {}) };
+  // Existing templates saved the previous default weights at import time.
+  if (kind === "behaviour" && weights.other === 0.45 && weights.line_manager === 0.2 && weights.scenario === 0.25 && weights.self === 0.1) {
+    Object.assign(weights, base.weights);
+  }
   return {
-    weights: { ...base.weights, ...(s.weights ?? {}) },
+    weights,
     thresholds: { ...base.thresholds, ...(s.thresholds ?? {}) },
     grid_cutoff: s.grid_cutoff ?? base.grid_cutoff,
     min_raters: s.min_raters ?? base.min_raters,

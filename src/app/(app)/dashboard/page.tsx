@@ -6,7 +6,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
 import { formatPct, priorityColor } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { BookOpen, ClipboardCheck, Target, Bell, AlertTriangle } from "lucide-react";
+import { BookOpen, ClipboardCheck, ClipboardList, Target, AlertTriangle } from "lucide-react";
 import { DashboardCharts } from "./charts";
 
 type AppraisalFullRow = {
@@ -149,7 +149,7 @@ export default async function DashboardPage() {
       { data: performanceAppraisals },
       { data: skillGaps },
       { data: notifications },
-      { count: unreadCount },
+      { count: pendingAssessmentCount, error: assessmentCountError },
     ] = await Promise.all([
       supabase
         .from("employees")
@@ -195,10 +195,12 @@ export default async function DashboardPage() {
         .order("created_at", { ascending: false })
         .limit(5),
       supabase
-        .from("notifications")
+        .from("assessment_assignments")
         .select("id", { count: "exact", head: true })
-        .eq("user_id", user?.id ?? "")
-        .eq("read", false),
+        .or(employeeId
+          ? `employee_user_id.eq.${user?.id},employee_id.eq.${employeeId}`
+          : `employee_user_id.eq.${user?.id}`)
+        .in("status", ["assigned", "in_progress"]),
     ]);
 
     return (
@@ -212,7 +214,7 @@ export default async function DashboardPage() {
         performanceAppraisals={(performanceAppraisals ?? []) as PerformanceSummaryRow[]}
         skillGaps={(skillGaps ?? []) as SkillGapSummaryRow[]}
         notifications={(notifications ?? []) as NotificationSummaryRow[]}
-        unreadCount={unreadCount ?? 0}
+        pendingAssessmentCount={assessmentCountError ? null : pendingAssessmentCount ?? 0}
       />
     );
   }
@@ -505,7 +507,7 @@ function EmployeeDashboard({
   performanceAppraisals,
   skillGaps,
   notifications,
-  unreadCount,
+  pendingAssessmentCount,
 }: {
   employee: EmployeeProfileRow | null;
   userName: string;
@@ -516,7 +518,7 @@ function EmployeeDashboard({
   performanceAppraisals: PerformanceSummaryRow[];
   skillGaps: SkillGapSummaryRow[];
   notifications: NotificationSummaryRow[];
-  unreadCount: number;
+  pendingAssessmentCount: number | null;
 }) {
   const displayName = employee?.full_name ?? userName ?? "Employee";
   const activeCourses = courses.filter((course) => !["Completed", "Dropped"].includes(course.status));
@@ -555,7 +557,9 @@ function EmployeeDashboard({
             <EmployeeStatCard label="Completed" value={completedCourses.length.toString()} icon={ClipboardCheck} tone="green" />
             <EmployeeStatCard label="Objectives" value={objectivesNeedingWork.length.toString()} icon={Target} tone="amber" />
             <EmployeeStatCard label="High gaps" value={highSkillGaps.length.toString()} icon={AlertTriangle} tone="red" />
-            <EmployeeStatCard label="Unread" value={unreadCount.toString()} icon={Bell} tone="neutral" />
+            <Link href="/assessments" className="rounded-xl transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={pendingAssessmentCount == null ? "View my assessments. Count unavailable." : `View my assessments: ${pendingAssessmentCount} pending`}>
+              <EmployeeStatCard label="Pending assessments" value={pendingAssessmentCount?.toString() ?? "—"} icon={ClipboardList} tone="blue" />
+            </Link>
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
