@@ -24,13 +24,18 @@ export default async function AdminDepartmentsPage() {
     .select("*")
     .order("name");
 
-  const { data: profiles } = await supabase.from("profiles").select("department_id");
+  const { data: employees } = await supabase
+    .from("employees")
+    .select("department")
+    .eq("active", true);
 
+  const deptIdByName = new Map(
+    (departments ?? []).map((d) => [d.name.replace(/\s+/g, " ").trim().toLowerCase(), d.id])
+  );
   const deptCounts = new Map<string, number>();
-  profiles?.forEach((p) => {
-    if (p.department_id) {
-      deptCounts.set(p.department_id, (deptCounts.get(p.department_id) ?? 0) + 1);
-    }
+  employees?.forEach((e) => {
+    const id = e.department ? deptIdByName.get(e.department.replace(/\s+/g, " ").trim().toLowerCase()) : undefined;
+    if (id) deptCounts.set(id, (deptCounts.get(id) ?? 0) + 1);
   });
 
   const headIds = departments?.filter((d) => d.head_id).map((d) => d.head_id!) ?? [];
