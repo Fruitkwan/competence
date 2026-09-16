@@ -211,36 +211,37 @@ export function EmployeeImportForm() {
 
           <PreviewTable
             title="New Employees"
-            detailLabel="Department"
             rows={preview.newEmployees.slice(0, 10).map((employee) => ({
               id: employee.employee_id,
               name: employee.full_name,
               job: employee.job_title,
-              detail: employee.department ?? employee.manager_name ?? "No manager",
+              detail: employee.department ?? "—",
             }))}
             empty="No new employees."
           />
 
           <PreviewTable
             title="Updated Employees"
-            detailLabel="Changes"
+            extraLabel="Changes"
             rows={preview.updatedEmployees.slice(0, 10).map((item) => ({
               id: item.after.employee_id,
               name: item.after.full_name,
               job: item.after.job_title,
-              detail: item.changes.join(", "),
+              detail: item.after.department ?? "—",
+              extra: item.changes.join(", "),
             }))}
             empty="No employee updates."
           />
 
           <PreviewTable
             title="Employees To Deactivate"
-            detailLabel="Reason"
+            extraLabel="Reason"
             rows={preview.deactivatedEmployees.slice(0, 10).map((employee) => ({
               id: employee.employee_id,
               name: employee.full_name,
               job: employee.job_title,
-              detail: "Missing from uploaded file",
+              detail: employee.department ?? "—",
+              extra: "Missing from uploaded file",
             }))}
             empty={deactivateMissing ? "No employees will be deactivated." : "Deactivation is off for this preview."}
           />
@@ -263,13 +264,13 @@ function Metric({ label, value }: { label: string; value: number }) {
 
 function PreviewTable({
   title,
-  detailLabel,
+  extraLabel,
   rows,
   empty,
 }: {
   title: string;
-  detailLabel: string;
-  rows: { id: string; name: string; job: string; detail: string }[];
+  extraLabel?: string;
+  rows: { id: string; name: string; job: string; detail: string; extra?: string }[];
   empty: string;
 }) {
   return (
@@ -284,10 +285,11 @@ function PreviewTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Employee ID</TableHead>
-              <TableHead>Name</TableHead>
+              <TableHead>Employee Code</TableHead>
+              <TableHead>Employee Name as in Passport</TableHead>
               <TableHead>Designation</TableHead>
-              <TableHead>{detailLabel}</TableHead>
+              <TableHead>Department</TableHead>
+              {extraLabel && <TableHead>{extraLabel}</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -298,11 +300,12 @@ function PreviewTable({
                   <TableCell>{row.name}</TableCell>
                   <TableCell>{row.job}</TableCell>
                   <TableCell className="text-muted-foreground">{row.detail}</TableCell>
+                  {extraLabel && <TableCell className="text-muted-foreground">{row.extra}</TableCell>}
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={extraLabel ? 5 : 4} className="py-8 text-center text-muted-foreground">
                   {empty}
                 </TableCell>
               </TableRow>
