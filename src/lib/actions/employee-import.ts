@@ -238,19 +238,22 @@ async function parseEmployeeFile(formData: FormData) {
 }
 
 function mapBasisRow(row: Record<string, unknown>): ParsedEmployee {
+  const fullName = text(row["Employee Name as in Passport"]);
+  const importedManagerName = nullableText(row["Reporting Manager"]);
+  const selfManaged = importedManagerName != null && samePerson(importedManagerName, fullName);
   return {
     employee_id: text(row["Employee Code"]),
-    full_name: text(row["Employee Name as in Passport"]),
+    full_name: fullName,
     job_title: text(row["Designation"]),
     department: departmentFromRow(row),
     email: nullableText(row["Company Email"] ?? row["Email"] ?? row["Work Email"] ?? row["Business Email"]),
     country_code: mapCountry(text(row["Country"])),
-    manager_name: nullableText(row["Reporting Manager"]),
+    manager_name: selfManaged ? null : importedManagerName,
     grade: nullableText(row["Grade"]),
     grade_band: nullableText(row["Band"] ?? row["Grade."]),
     grade_type: nullableText(row["Type of Grade"]),
     joining_date: toIsoDate(row["Joining Date"]),
-    manager_position: nullableText(row["Manager Position"]),
+    manager_position: selfManaged ? null : nullableText(row["Manager Position"]),
     active: true,
   };
 }
@@ -316,6 +319,13 @@ function changedFields(current: EmployeeRow, next: ParsedEmployee) {
   ];
 
   return fields.filter((field) => (current[field] ?? null) !== (next[field] ?? null));
+}
+
+function samePerson(a: string, b: string) {
+  const parts = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9 ]/g, "").split(/\s+/).filter(Boolean);
+  const left = parts(a);
+  const right = parts(b);
+  return left[0] === right[0] && left.at(-1) === right.at(-1);
 }
 
 async function upsertEmployeesWithDepartmentFallback(
