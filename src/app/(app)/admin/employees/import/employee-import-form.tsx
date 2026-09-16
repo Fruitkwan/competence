@@ -211,6 +211,7 @@ export function EmployeeImportForm() {
 
           <PreviewTable
             title="New Employees"
+            detailLabel="Department"
             rows={preview.newEmployees.slice(0, 10).map((employee) => ({
               id: employee.employee_id,
               name: employee.full_name,
@@ -222,6 +223,7 @@ export function EmployeeImportForm() {
 
           <PreviewTable
             title="Updated Employees"
+            detailLabel="Changes"
             rows={preview.updatedEmployees.slice(0, 10).map((item) => ({
               id: item.after.employee_id,
               name: item.after.full_name,
@@ -233,6 +235,7 @@ export function EmployeeImportForm() {
 
           <PreviewTable
             title="Employees To Deactivate"
+            detailLabel="Reason"
             rows={preview.deactivatedEmployees.slice(0, 10).map((employee) => ({
               id: employee.employee_id,
               name: employee.full_name,
@@ -260,10 +263,12 @@ function Metric({ label, value }: { label: string; value: number }) {
 
 function PreviewTable({
   title,
+  detailLabel,
   rows,
   empty,
 }: {
   title: string;
+  detailLabel: string;
   rows: { id: string; name: string; job: string; detail: string }[];
   empty: string;
 }) {
@@ -282,7 +287,7 @@ function PreviewTable({
               <TableHead>Employee ID</TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Designation</TableHead>
-              <TableHead>Department</TableHead>
+              <TableHead>{detailLabel}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
