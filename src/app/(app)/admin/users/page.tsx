@@ -21,7 +21,7 @@ export default async function AdminUsersPage() {
 
   const { data: users } = await supabase
     .from("profiles")
-    .select("id, email, full_name, role, employee_id, is_active, department_id, manager_id, created_at")
+    .select("id, email, full_name, role, employee_id, job_title, country_code, is_active, department_id, manager_id, created_at")
     .order("full_name", { ascending: true });
 
   const { data: departments } = await supabase
@@ -31,7 +31,7 @@ export default async function AdminUsersPage() {
   const { data: employees } = employeeIds.length
     ? await supabase
         .from("employees")
-        .select("employee_id, department, manager_name")
+        .select("employee_id, job_title, department, country_code, manager_name")
         .in("employee_id", employeeIds)
     : { data: [] };
   const deptMap = new Map(departments?.map((d) => [d.id, d.name]) ?? []);
@@ -61,7 +61,9 @@ export default async function AdminUsersPage() {
                   <th className="px-4 py-3 text-left font-medium">Name</th>
                   <th className="px-4 py-3 text-left font-medium">Email</th>
                   <th className="px-4 py-3 text-left font-medium">Role</th>
+                  <th className="px-4 py-3 text-left font-medium">Job title</th>
                   <th className="px-4 py-3 text-left font-medium">Department</th>
+                  <th className="px-4 py-3 text-left font-medium">Country</th>
                   <th className="px-4 py-3 text-left font-medium">Manager</th>
                   <th className="px-4 py-3 text-left font-medium">Status</th>
                 </tr>
@@ -69,6 +71,8 @@ export default async function AdminUsersPage() {
               <tbody>
                 {users?.map((u) => {
                   const employee = u.employee_id ? employeeMap.get(u.employee_id) : null;
+                  const managerName = u.manager_id ? nameMap.get(u.manager_id) : employee?.manager_name;
+                  const visibleManager = managerName && !samePerson(managerName, u.full_name) ? managerName : null;
                   return (
                   <tr key={u.id} className="border-b transition-colors hover:bg-muted/30">
                     <td className="px-4 py-3 font-medium">
@@ -88,11 +92,13 @@ export default async function AdminUsersPage() {
                         {ROLE_LABELS[u.role as AppRole] ?? u.role}
                       </Badge>
                     </td>
+                    <td className="px-4 py-3 text-muted-foreground">{u.job_title ?? employee?.job_title ?? EM_DASH}</td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {u.department_id ? deptMap.get(u.department_id) ?? EM_DASH : employee?.department ?? EM_DASH}
                     </td>
+                    <td className="px-4 py-3 text-muted-foreground">{u.country_code ?? employee?.country_code ?? EM_DASH}</td>
                     <td className="px-4 py-3 text-muted-foreground">
-                      {u.manager_id ? nameMap.get(u.manager_id) ?? EM_DASH : employee?.manager_name ?? EM_DASH}
+                      {visibleManager ?? EM_DASH}
                     </td>
                     <td className="px-4 py-3">
                       {u.is_active !== false ? (
@@ -111,4 +117,12 @@ export default async function AdminUsersPage() {
       </Card>
     </>
   );
+}
+
+function samePerson(a: string, b: string | null) {
+  if (!b) return false;
+  const parts = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9 ]/g, "").split(/\s+/).filter(Boolean);
+  const left = parts(a);
+  const right = parts(b);
+  return left[0] === right[0] && left.at(-1) === right.at(-1);
 }
