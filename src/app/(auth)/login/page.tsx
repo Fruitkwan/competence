@@ -68,8 +68,19 @@ function LoginInner() {
         router.replace(redirectTo);
         router.refresh();
       } else if (mode === "signup") {
-        const { error } = await supabase.auth.signUp({ email, password });
-        if (error) throw error;
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error) {
+          if (error.code === "user_already_exists" || /already registered/i.test(error.message)) {
+            toast.error("This email is already registered. Sign in or reset your password instead.");
+            return;
+          }
+          throw error;
+        }
+        // Supabase returns a stub user with no identities when the email already exists.
+        if (data.user && data.user.identities?.length === 0) {
+          toast.error("This email is already registered. Sign in or reset your password instead.");
+          return;
+        }
         toast.success("Check your email to confirm your account.");
       } else if (mode === "otp") {
         const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
