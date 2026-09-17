@@ -525,6 +525,107 @@ export async function deleteAssignment(assignmentId: string) {
   return { success: true };
 }
 
+export type UpdateAssignmentRatersInput = {
+  assignment_id: string;
+  include_line_manager: boolean;
+  other_user_ids: string[];
+};
+
+export async function updateAssignmentRaters(input: UpdateAssignmentRatersInput) {
+  const { error: authError } = await requireStaff();
+  if (authError) return { error: authError };
+  if (!input.assignment_id) return { error: "Assignment is required." };
+
+  const supabase = await createClient();
+  const { data: assignment, error: assignmentError } = await supabase
+    .from("assessment_assignments")
+    .select("id, employee_id, employee_user_id, template_id, due_date, status, results_released")
+    .eq("id", input.assignment_id)
+    .single();
+  if (assignmentError || !assignment) return { error: "Assignment not found." };
+  if (assignment.status === "closed") return { error: "Closed assessments cannot be changed." };
+  if (assignment.results_released) return { error: "Hide the released results before changing raters." };
+
+  const [{ data: employee }, { data: template }, { data: profiles }, { data: existing }] = await Promise.all([
+    supabase.from("employees").select("full_name, manager_name").eq("employee_id", assignment.employee_id).single(),
+    supabase.from("assessment_templates").select("id, name, kind").eq("id", assignment.template_id).single(),
+    supabase.from("profiles").select("id, full_name, is_active").eq("is_active", true),
+    supabase
+      .from("assessment_raters")
+      .select("id, rater_user_id, rater_type, status")
+      .eq("assignment_id", assignment.id)
+      .neq("rater_type", "self"),
+  ]);
+  if (!employee || !template) return { error: "Employee or assessment template not found." };
+
+  const activeProfiles = profiles ?? [];
+  const activeIds = new Set(activeProfiles.map((p) => p.id));
+  const managerUserId = employee.manager_name
+    ? activeProfiles.find((p) => p.full_name === employee.manager_name)?.id ?? null
+    : null;
+  const otherType: RaterType = template.kind === "skill" ? "cross_dept" : "peer";
+  const desired = new Map<string, RaterType>();
+  if (input.include_line_manager && managerUserId && managerUserId !== assignment.employee_user_id) {
+    desired.set(managerUserId, "line_manager");
+  }
+  for (const userId of new Set(input.other_user_ids)) {
+    if (
+      activeIds.has(userId) &&
+      userId !== assignment.employee_user_id &&
+      userId !== managerUserId
+    ) {
+      desired.set(userId, otherType);
+    }
+  }
+
+  const current = existing ?? [];
+  const currentKeys = new Set(current.map((r) => `${r.rater_user_id}:${r.rater_type}`));
+  const additions = [...desired].filter(([userId, type]) => !currentKeys.has(`${userId}:${type}`));
+  if (additions.length) {
+    const { data: inserted, error } = await supabase
+      .from("assessment_raters")
+      .insert(additions.map(([rater_user_id, rater_type]) => ({ assignment_id: assignment.id, rater_user_id, rater_type })))
+      .select("rater_user_id, rater_type");
+    if (error) return { error: dbError(error) };
+
+    const due = assignment.due_date ? ` Due ${assignment.due_date}.` : "";
+    await Promise.all(
+      (inserted ?? []).map((r) =>
+        createNotification({
+          user_id: r.rater_user_id,
+          type: NOTIFICATION_TYPES.ASSESSMENT_RATING_REQUESTED,
+          title: `Please rate ${employee.full_name}`,
+          body: `${template.name} - your input as ${RATER_LABELS[r.rater_type]} is requested.${due}`,
+          link: "/assessments",
+          metadata: {
+            assignment_id: assignment.id,
+            template_id: template.id,
+            employee_id: assignment.employee_id,
+            rater_type: r.rater_type,
+          },
+        })
+      )
+    );
+  }
+
+  const removableIds = current
+    .filter((r) => r.status === "pending" && desired.get(r.rater_user_id) !== r.rater_type)
+    .map((r) => r.id);
+  if (removableIds.length) {
+    const { error } = await supabase.from("assessment_raters").delete().in("id", removableIds);
+    if (error) return { error: dbError(error) };
+  }
+
+  revalidateAll();
+  return {
+    success: true,
+    added: additions.length,
+    removed: removableIds.length,
+    preserved: current.filter((r) => r.status === "submitted").length,
+    warning: input.include_line_manager && !managerUserId ? `${employee.manager_name ?? "The line manager"} has no active user account.` : null,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Taking the assessment (employee / raters)
 // ---------------------------------------------------------------------------
