@@ -45,6 +45,11 @@ export const NOTIFICATION_TYPES = {
 
   // Concerns
   CONCERN_RAISED: "concern_raised",
+
+  // Confidential complaints
+  COMPLAINT_SUBMITTED: "complaint_submitted",
+  COMPLAINT_UPDATED: "complaint_updated",
+  COMPLAINT_ESCALATED: "complaint_escalated",
 } as const;
 
 export type NotificationType =
@@ -78,6 +83,9 @@ export const NOTIFICATION_ICONS: Record<string, string> = {
   pip_milestone_due: "📌",
   pip_escalated: "🚨",
   concern_raised: "🔔",
+  complaint_submitted: "🔒",
+  complaint_updated: "💬",
+  complaint_escalated: "🚨",
   idp_suggestion: "💡",
   system: "⚙️",
 };

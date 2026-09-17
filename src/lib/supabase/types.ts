@@ -767,6 +767,80 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["notifications"]["Insert"]>;
         Relationships: [];
       };
+      complaints: {
+        Row: {
+          id: string;
+          case_number: number;
+          reporter_id: string;
+          reporter_role: "admin" | "manager" | "employee" | "executive";
+          reporter_name: string;
+          reporter_employee_id: string | null;
+          subject_employee_id: string | null;
+          subject_name: string | null;
+          category: "workplace" | "management" | "conduct" | "harassment" | "discrimination" | "safety" | "ethics" | "other";
+          title: string;
+          description: string;
+          requested_outcome: string | null;
+          priority: "low" | "normal" | "high" | "urgent";
+          status: "submitted" | "under_review" | "escalated" | "resolved" | "closed";
+          hr_owner_id: string | null;
+          escalated_to: string | null;
+          escalated_to_name: string | null;
+          escalated_at: string | null;
+          resolved_at: string | null;
+          resolution_summary: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          case_number?: number;
+          reporter_id: string;
+          reporter_role: "admin" | "manager" | "employee" | "executive";
+          reporter_name: string;
+          reporter_employee_id?: string | null;
+          subject_employee_id?: string | null;
+          subject_name?: string | null;
+          category: "workplace" | "management" | "conduct" | "harassment" | "discrimination" | "safety" | "ethics" | "other";
+          title: string;
+          description: string;
+          requested_outcome?: string | null;
+          priority?: "low" | "normal" | "high" | "urgent";
+          status?: "submitted" | "under_review" | "escalated" | "resolved" | "closed";
+          hr_owner_id?: string | null;
+          escalated_to?: string | null;
+          escalated_to_name?: string | null;
+          escalated_at?: string | null;
+          resolved_at?: string | null;
+          resolution_summary?: string | null;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["complaints"]["Insert"]>;
+        Relationships: [];
+      };
+      complaint_updates: {
+        Row: {
+          id: string;
+          complaint_id: string;
+          author_id: string;
+          author_name: string;
+          kind: "comment" | "status" | "escalation" | "resolution";
+          visibility: "reporter" | "internal";
+          body: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          complaint_id: string;
+          author_id: string;
+          author_name: string;
+          kind?: "comment" | "status" | "escalation" | "resolution";
+          visibility?: "reporter" | "internal";
+          body: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["complaint_updates"]["Insert"]>;
+        Relationships: [];
+      };
       training_requests: {
         Row: {
           id: string;
