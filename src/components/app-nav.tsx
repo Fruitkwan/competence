@@ -21,6 +21,7 @@ import {
   Upload,
   Compass,
   Library,
+  MessageSquareWarning,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -208,6 +209,25 @@ const NAV: NavItem[] = [
   },
 
   // ── Notifications ───────────────────────────────────────────────────────────
+  {
+    href: "/complaints",
+    label: "Raise a Complaint",
+    icon: MessageSquareWarning,
+    iconColor: "#dc2626",
+    divider: true,
+    dividerLabel: "Confidential",
+    roles: ["employee", "manager"],
+  },
+  {
+    href: "/complaints",
+    label: "Complaint Cases",
+    icon: MessageSquareWarning,
+    iconColor: "#dc2626",
+    divider: true,
+    dividerLabel: "Confidential",
+    roles: ["admin", "executive"],
+  },
+
   {
     href: "/notifications",
     label: "Notifications",
