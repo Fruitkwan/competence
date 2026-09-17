@@ -4,15 +4,16 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CheckCircle2, Eye, EyeOff, Loader2, Send, Trash2, X } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, Loader2, Send, Settings2, Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EmployeePicker } from "@/components/ui/employee-picker";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { assignAssessments, deleteAssignment, releaseResults, suggestTemplatesForEmployee } from "@/lib/actions/assessments";
+import { assignAssessments, deleteAssignment, releaseResults, suggestTemplatesForEmployee, updateAssignmentRaters } from "@/lib/actions/assessments";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { DepartmentAssignPanel } from "./department-assign-panel";
@@ -35,6 +36,8 @@ export type AssignmentRow = {
   self_done: boolean;
   raters_total: number;
   raters_done: number;
+  raters: { user_id: string; type: "self" | "line_manager" | "cross_dept" | "peer"; status: "pending" | "submitted" }[];
+  manager_user_id: string | null;
 };
 
 const STATUS_STYLE: Record<AssignmentRow["status"], string> = {
@@ -71,6 +74,7 @@ export function AssignAssessmentForm({
   const [saving, setSaving] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [filter, setFilter] = useState("");
+  const [editingRaters, setEditingRaters] = useState<AssignmentRow | null>(null);
 
   const employee = employees.find((e) => e.employee_id === employeeId) ?? null;
   const employeeUser = users.find((u) => u.employee_id === employeeId) ?? null;
@@ -361,6 +365,12 @@ export function AssignAssessmentForm({
                       <Link href={`/assessments/${a.id}/report`} className={buttonVariants({ variant: "outline", size: "sm" })}>
                         Report
                       </Link>
+                      {a.status !== "closed" && (
+                        <Button size="sm" variant="outline" disabled={busyId === a.id} onClick={() => setEditingRaters(a)}>
+                          <Settings2 className="h-3.5 w-3.5" />
+                          Raters
+                        </Button>
+                      )}
                       {canDelete && (
                         <Button size="icon-sm" variant="ghost" disabled={busyId === a.id} onClick={() => remove(a)} aria-label="Delete">
                           <Trash2 className="h-3.5 w-3.5 text-destructive" />
@@ -374,7 +384,107 @@ export function AssignAssessmentForm({
           </Table>
         </CardContent>
       </Card>
+      <ManageRatersDialog
+        key={editingRaters?.id ?? "closed"}
+        assignment={editingRaters}
+        users={users}
+        onOpenChange={(open) => !open && setEditingRaters(null)}
+        onSaved={() => {
+          setEditingRaters(null);
+          router.refresh();
+        }}
+      />
     </div>
+  );
+}
+
+function ManageRatersDialog({
+  assignment,
+  users,
+  onOpenChange,
+  onSaved,
+}: {
+  assignment: AssignmentRow | null;
+  users: UserOption[];
+  onOpenChange: (open: boolean) => void;
+  onSaved: () => void;
+}) {
+  const [includeManager, setIncludeManager] = useState(
+    () => assignment?.raters.some((r) => r.type === "line_manager") ?? false
+  );
+  const [others, setOthers] = useState(
+    () => assignment?.raters.filter((r) => r.type !== "line_manager").map((r) => r.user_id) ?? []
+  );
+  const [saving, setSaving] = useState(false);
+
+  function initialise(open: boolean) {
+    onOpenChange(open);
+  }
+
+  async function save() {
+    if (!assignment) return;
+    setSaving(true);
+    const result = await updateAssignmentRaters({
+      assignment_id: assignment.id,
+      include_line_manager: includeManager,
+      other_user_ids: others,
+    });
+    setSaving(false);
+    if (result.error) return toast.error(result.error);
+    if (result.warning) toast.warning(result.warning);
+    const changes = [result.added ? `${result.added} added` : "", result.removed ? `${result.removed} removed` : ""].filter(Boolean);
+    toast.success(changes.length ? `Raters updated: ${changes.join(", ")}.` : "Raters are already up to date.");
+    onSaved();
+  }
+
+  const submitted = assignment?.raters.filter((r) => r.status === "submitted") ?? [];
+  const subjectUserId = users.find((u) => u.employee_id === assignment?.employee_id)?.id;
+  const manager = users.find((u) => u.id === assignment?.manager_user_id) ?? null;
+
+  return (
+    <Dialog open={!!assignment} onOpenChange={initialise}>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Manage raters</DialogTitle>
+          <DialogDescription>
+            {assignment?.employee_name} · {assignment?.template_name}. Newly added raters are notified immediately.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-5">
+          <div className="grid gap-2">
+            <Label>Line manager</Label>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={includeManager}
+                onChange={(event) => setIncludeManager(event.target.checked)}
+                disabled={!manager || submitted.some((r) => r.type === "line_manager")}
+              />
+              {manager ? manager.label : "No registered manager account"}
+              {submitted.some((r) => r.type === "line_manager") && <span className="text-xs text-muted-foreground">submitted</span>}
+            </label>
+          </div>
+          <UserMultiPicker
+            label={assignment?.kind === "skill" ? "Cross-departmental raters" : "Peer raters"}
+            hint="Submitted responses are preserved and cannot be removed."
+            users={users}
+            exclude={[subjectUserId, assignment?.manager_user_id]}
+            value={others}
+            onChange={(ids) => {
+              const submittedIds = new Set(submitted.filter((r) => r.type !== "line_manager").map((r) => r.user_id));
+              setOthers([...new Set([...ids, ...submittedIds])]);
+            }}
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => initialise(false)} disabled={saving}>Cancel</Button>
+          <Button onClick={save} disabled={saving}>
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            Save and notify
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
