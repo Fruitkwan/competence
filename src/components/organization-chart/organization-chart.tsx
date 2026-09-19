@@ -1,27 +1,22 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { Building2, ChevronDown, ChevronRight, CircleAlert, Expand, Search, Shrink, UserRound, UsersRound } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { useMemo, useState, type CSSProperties } from "react";
+import { Building2, ChevronDown, ChevronRight, CircleAlert, Expand, MapPin, Search, Shrink, UserRound, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import type { OrgNode } from "@/lib/organization-chart";
 import { cn } from "@/lib/utils";
+import styles from "./organization-chart.module.css";
 
-type Props = {
-  nodes: OrgNode[];
-  roots: string[];
-  unresolvedManagers: number;
-  currentEmployeeId: string | null;
-};
+type Props = { nodes: OrgNode[]; roots: string[]; unresolvedManagers: number; currentEmployeeId: string | null };
 
 export function OrganizationChart({ nodes, roots, unresolvedManagers, currentEmployeeId }: Props) {
   const [query, setQuery] = useState("");
   const [department, setDepartment] = useState("");
   const [country, setCountry] = useState("");
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(nodes.filter((node) => node.total_reports > 10).map((node) => node.employee_id)));
+  const [selectedId, setSelectedId] = useState<string | null>(currentEmployeeId ?? roots[0] ?? null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(nodes.filter((node) => node.total_reports > 18).map((node) => node.employee_id)));
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.employee_id, node])), [nodes]);
   const childrenById = useMemo(() => {
     const map = new Map<string, string[]>();
@@ -32,7 +27,6 @@ export function OrganizationChart({ nodes, roots, unresolvedManagers, currentEmp
     for (const ids of map.values()) ids.sort((a, b) => nodeById.get(a)!.full_name.localeCompare(nodeById.get(b)!.full_name));
     return map;
   }, [nodes, nodeById]);
-
   const departments = useMemo(() => unique(nodes.map((node) => node.department)), [nodes]);
   const countries = useMemo(() => unique(nodes.map((node) => node.country_code)), [nodes]);
   const visible = useMemo(() => {
@@ -41,9 +35,7 @@ export function OrganizationChart({ nodes, roots, unresolvedManagers, currentEmp
     const ids = new Set<string>();
     for (const node of nodes) {
       const matchesText = !term || `${node.full_name} ${node.employee_id} ${node.job_title} ${node.department ?? ""}`.toLowerCase().includes(term);
-      const matchesDepartment = !department || node.department === department;
-      const matchesCountry = !country || node.country_code === country;
-      if (!matchesText || !matchesDepartment || !matchesCountry) continue;
+      if (!matchesText || (department && node.department !== department) || (country && node.country_code !== country)) continue;
       ids.add(node.employee_id);
       let parentId = node.parent_id;
       while (parentId) {
@@ -54,9 +46,7 @@ export function OrganizationChart({ nodes, roots, unresolvedManagers, currentEmp
     }
     return ids;
   }, [country, department, nodeById, nodes, query]);
-
-  const employeeCount = nodes.filter((node) => !node.placeholder).length;
-  const leaderCount = nodes.filter((node) => !node.placeholder && node.direct_reports > 0).length;
+  const selected = selectedId ? nodeById.get(selectedId) ?? null : null;
 
   function toggle(id: string) {
     setCollapsed((current) => {
@@ -67,70 +57,69 @@ export function OrganizationChart({ nodes, roots, unresolvedManagers, currentEmp
   }
 
   return (
-    <div className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <Summary label="Employees" value={employeeCount} icon={UsersRound} />
-        <Summary label="People managers" value={leaderCount} icon={UserRound} />
-        <Summary label="Departments" value={departments.length} icon={Building2} />
-        <Summary label="Unmatched managers" value={unresolvedManagers} icon={CircleAlert} warning={unresolvedManagers > 0} />
+    <div className="space-y-4">
+      <div className="flex flex-col gap-3 rounded-2xl border bg-card p-3 shadow-sm lg:flex-row lg:items-center">
+        <div className="relative min-w-0 flex-1"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input className="border-0 bg-muted/45 pl-9 shadow-none" placeholder="Search name, employee ID, title, or department…" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
+        <select aria-label="Department" className="h-9 rounded-lg border bg-background px-3 text-sm" value={department} onChange={(event) => setDepartment(event.target.value)}><option value="">All departments</option>{departments.map((value) => <option key={value}>{value}</option>)}</select>
+        <select aria-label="Country" className="h-9 rounded-lg border bg-background px-3 text-sm" value={country} onChange={(event) => setCountry(event.target.value)}><option value="">All countries</option>{countries.map((value) => <option key={value}>{value}</option>)}</select>
+        <Button size="sm" variant="outline" onClick={() => setCollapsed(new Set())}><Expand /> Expand</Button>
+        <Button size="sm" variant="outline" onClick={() => setCollapsed(new Set(nodes.filter((node) => node.direct_reports > 0).map((node) => node.employee_id)))}><Shrink /> Collapse</Button>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3"><CardTitle className="text-base">Find a position</CardTitle></CardHeader>
-        <CardContent className="flex flex-col gap-3 lg:flex-row">
-          <div className="relative flex-1"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input className="pl-9" placeholder="Search name, employee ID, title, or department…" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
-          <select className="h-9 rounded-lg border border-input bg-background px-3 text-sm" value={department} onChange={(event) => setDepartment(event.target.value)}><option value="">All departments</option>{departments.map((value) => <option key={value} value={value}>{value}</option>)}</select>
-          <select className="h-9 rounded-lg border border-input bg-background px-3 text-sm" value={country} onChange={(event) => setCountry(event.target.value)}><option value="">All countries</option>{countries.map((value) => <option key={value} value={value}>{value}</option>)}</select>
-          <Button variant="outline" onClick={() => setCollapsed(new Set())}><Expand className="h-4 w-4" /> Expand all</Button>
-          <Button variant="outline" onClick={() => setCollapsed(new Set(nodes.filter((node) => node.direct_reports > 0).map((node) => node.employee_id)))}><Shrink className="h-4 w-4" /> Collapse all</Button>
-        </CardContent>
-      </Card>
+      {unresolvedManagers > 0 && <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0" /><p>{unresolvedManagers} manager {unresolvedManagers === 1 ? "record is" : "records are"} missing from the active employee directory. Their reporting lines remain visible as dashed cards.</p></div>}
 
-      {unresolvedManagers > 0 && <div className="flex gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0" /><p>{unresolvedManagers} reporting manager {unresolvedManagers === 1 ? "name is" : "names are"} not present as an active employee. Placeholder manager cards keep those reporting lines visible until the directory is corrected.</p></div>}
+      <section className={styles.canvas} aria-label="Company organization chart">
+        <div className={styles.canvasInner}>
+          {roots.filter((id) => !visible || visible.has(id)).map((id) => <OrgBranch key={id} id={id} nodeById={nodeById} childrenById={childrenById} collapsed={collapsed} visible={visible} selectedId={selectedId} currentEmployeeId={currentEmployeeId} onToggle={toggle} onSelect={setSelectedId} />)}
+          {visible && visible.size === 0 && <div className="py-24 text-center text-sm text-muted-foreground">No positions match the current filters.</div>}
+        </div>
+      </section>
 
-      <Card>
-        <CardContent className="overflow-x-auto p-4 sm:p-6">
-          <div className="min-w-[680px] space-y-3">
-            {roots.filter((id) => !visible || visible.has(id)).map((id) => (
-              <OrgTree key={id} id={id} depth={0} nodeById={nodeById} childrenById={childrenById} collapsed={collapsed} visible={visible} currentEmployeeId={currentEmployeeId} onToggle={toggle} />
-            ))}
-            {visible && visible.size === 0 && <div className="py-12 text-center text-sm text-muted-foreground">No positions match the current filters.</div>}
-          </div>
-        </CardContent>
-      </Card>
+      {selected && <EmployeeDetails node={selected} current={selected.employee_id === currentEmployeeId} />}
     </div>
   );
 }
 
-function OrgTree({ id, depth, nodeById, childrenById, collapsed, visible, currentEmployeeId, onToggle }: { id: string; depth: number; nodeById: Map<string, OrgNode>; childrenById: Map<string, string[]>; collapsed: Set<string>; visible: Set<string> | null; currentEmployeeId: string | null; onToggle: (id: string) => void }) {
+function OrgBranch({ id, nodeById, childrenById, collapsed, visible, selectedId, currentEmployeeId, onToggle, onSelect }: { id: string; nodeById: Map<string, OrgNode>; childrenById: Map<string, string[]>; collapsed: Set<string>; visible: Set<string> | null; selectedId: string | null; currentEmployeeId: string | null; onToggle: (id: string) => void; onSelect: (id: string) => void }) {
   const node = nodeById.get(id);
   if (!node || (visible && !visible.has(id))) return null;
   const children = (childrenById.get(id) ?? []).filter((childId) => !visible || visible.has(childId));
   const closed = !visible && collapsed.has(id);
-  return (
-    <div className="relative">
-      <div className="flex items-stretch" style={{ paddingLeft: `${depth * 32}px` }}>
-        {depth > 0 && <div className="relative w-6 shrink-0 before:absolute before:-top-3 before:bottom-1/2 before:left-0 before:border-l before:border-border after:absolute after:left-0 after:top-1/2 after:w-6 after:border-t after:border-border" />}
-        <button type="button" aria-label={children.length ? `${closed ? "Expand" : "Collapse"} ${node.full_name}` : undefined} onClick={() => children.length && onToggle(id)} className={cn("mr-2 flex w-7 shrink-0 items-center justify-center text-muted-foreground", !children.length && "cursor-default")}>
-          {children.length ? closed ? <ChevronRight className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" /> : <span className="h-1.5 w-1.5 rounded-full bg-border" />}
-        </button>
-        <div className={cn("flex min-w-0 flex-1 items-center gap-3 rounded-xl border bg-card p-3 shadow-sm", node.employee_id === currentEmployeeId && "border-primary ring-2 ring-primary/15", node.placeholder && "border-dashed bg-amber-50/50")}>
-          <div className={cn("flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary", node.placeholder && "bg-amber-100 text-amber-800")}>{initials(node.full_name)}</div>
-          <div className="min-w-0 flex-1">
-            {node.placeholder ? <p className="truncate font-medium">{node.full_name}</p> : <Link href={`/employees/${node.employee_id}`} className="truncate font-medium hover:underline">{node.full_name}</Link>}
-            <p className="truncate text-sm text-muted-foreground">{node.job_title}</p>
-            <div className="mt-1 flex flex-wrap gap-1.5 text-xs text-muted-foreground">{node.department && <span>{node.department}</span>}{node.country_code && <span>· {node.country_code}</span>}{node.employee_id === currentEmployeeId && <Badge variant="outline" className="h-5">You</Badge>}</div>
-          </div>
-          {node.direct_reports > 0 && <div className="shrink-0 text-right"><p className="text-lg font-semibold tabular-nums">{node.direct_reports}</p><p className="text-[11px] text-muted-foreground">direct · {node.total_reports} total</p></div>}
-        </div>
-      </div>
-      {!closed && children.length > 0 && <div className="mt-3 space-y-3">{children.map((childId) => <OrgTree key={childId} id={childId} depth={depth + 1} nodeById={nodeById} childrenById={childrenById} collapsed={collapsed} visible={visible} currentEmployeeId={currentEmployeeId} onToggle={onToggle} />)}</div>}
-    </div>
-  );
+  return <div className={styles.branch}>
+    <EmployeeCard node={node} selected={selectedId === id} current={currentEmployeeId === id} closed={closed} hasChildren={children.length > 0} onSelect={() => onSelect(id)} onToggle={() => onToggle(id)} />
+    {!closed && children.length > 0 && <div className={styles.children} style={{ "--children": children.length } as CSSProperties}>{children.map((childId) => <OrgBranch key={childId} id={childId} nodeById={nodeById} childrenById={childrenById} collapsed={collapsed} visible={visible} selectedId={selectedId} currentEmployeeId={currentEmployeeId} onToggle={onToggle} onSelect={onSelect} />)}</div>}
+  </div>;
 }
 
-function Summary({ label, value, icon: Icon, warning = false }: { label: string; value: number; icon: typeof UsersRound; warning?: boolean }) {
-  return <Card><CardContent className="flex items-center gap-3 p-4"><div className={cn("rounded-lg bg-primary/10 p-2 text-primary", warning && "bg-amber-100 text-amber-700")}><Icon className="h-5 w-5" /></div><div><p className="text-2xl font-semibold tabular-nums">{value}</p><p className="text-xs text-muted-foreground">{label}</p></div></CardContent></Card>;
+function EmployeeCard({ node, selected, current, closed, hasChildren, onSelect, onToggle }: { node: OrgNode; selected: boolean; current: boolean; closed: boolean; hasChildren: boolean; onSelect: () => void; onToggle: () => void }) {
+  return <div className={cn(styles.personCard, selected && styles.selected, node.placeholder && styles.placeholder)}>
+    <button type="button" className={styles.personMain} onClick={onSelect} aria-label={`View ${node.full_name}`}>
+      <span className={styles.avatar}>{initials(node.full_name)}</span>
+      <span className={styles.personText}><span className={styles.personName}>{node.full_name}</span><span className={styles.personTitle}>{node.job_title}</span></span>
+      {current && <span className={styles.you}>You</span>}
+    </button>
+    {hasChildren && <button type="button" className={styles.toggle} onClick={onToggle} aria-label={`${closed ? "Expand" : "Collapse"} ${node.full_name}`}>{closed ? <ChevronRight /> : <ChevronDown />}</button>}
+  </div>;
+}
+
+function EmployeeDetails({ node, current }: { node: OrgNode; current: boolean }) {
+  return <section className={styles.detailPanel} aria-label={`${node.full_name} details`}>
+    <div className={styles.detailIdentity}>
+      <div className={styles.detailAvatar}>{initials(node.full_name)}{current && <span className={styles.verified}>✓</span>}</div>
+      <div className="min-w-0"><p className="truncate text-lg font-semibold">{node.full_name}</p><p className="truncate text-sm text-muted-foreground">{node.job_title}</p></div>
+      {!node.placeholder && <Link href={`/employees/${node.employee_id}`} className="mt-3 inline-flex h-8 w-full items-center justify-center rounded-md bg-violet-600 px-3 text-sm font-medium text-white transition-colors hover:bg-violet-700 sm:w-fit">View profile</Link>}
+    </div>
+    <div className={styles.metrics}>
+      <Metric icon={UsersRound} value={node.direct_reports} label="Direct reports" />
+      <Metric icon={UserRound} value={node.total_reports} label="Total team" />
+      <Metric icon={Building2} value={node.department ?? "—"} label="Department" />
+      <Metric icon={MapPin} value={node.country_code ?? "—"} label="Country" />
+    </div>
+  </section>;
+}
+
+function Metric({ icon: Icon, value, label }: { icon: typeof UsersRound; value: string | number; label: string }) {
+  return <div className={styles.metric}><Icon /><div className="min-w-0"><p className="truncate font-semibold text-violet-600">{value}</p><p className="text-xs text-muted-foreground">{label}</p></div></div>;
 }
 
 function unique(values: (string | null)[]) { return [...new Set(values.filter((value): value is string => Boolean(value)))].sort(); }
