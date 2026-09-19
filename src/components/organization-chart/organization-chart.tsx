@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { Building2, ChevronDown, ChevronRight, CircleAlert, Expand, MapPin, Search, Shrink, UserRound, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,9 @@ export function OrganizationChart({ nodes, roots, unresolvedManagers, currentEmp
   const [country, setCountry] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(currentEmployeeId ?? roots[0] ?? null);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(nodes.filter((node) => node.total_reports > 18).map((node) => node.employee_id)));
+  const [chartSize, setChartSize] = useState({ scale: 1, height: 520 });
+  const canvasRef = useRef<HTMLElement>(null);
+  const treeRef = useRef<HTMLDivElement>(null);
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.employee_id, node])), [nodes]);
   const childrenById = useMemo(() => {
     const map = new Map<string, string[]>();
@@ -48,6 +51,24 @@ export function OrganizationChart({ nodes, roots, unresolvedManagers, currentEmp
   }, [country, department, nodeById, nodes, query]);
   const selected = selectedId ? nodeById.get(selectedId) ?? null : null;
 
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    const tree = treeRef.current;
+    if (!canvas || !tree) return;
+    const fit = () => {
+      const naturalWidth = tree.scrollWidth;
+      const naturalHeight = tree.scrollHeight;
+      const availableWidth = Math.max(0, canvas.clientWidth - 24);
+      const scale = naturalWidth > 0 ? Math.min(1, availableWidth / naturalWidth) : 1;
+      setChartSize({ scale, height: Math.max(360, Math.ceil(naturalHeight * scale)) });
+    };
+    const observer = new ResizeObserver(fit);
+    observer.observe(canvas);
+    observer.observe(tree);
+    fit();
+    return () => observer.disconnect();
+  }, [collapsed, country, department, query]);
+
   function toggle(id: string) {
     setCollapsed((current) => {
       const next = new Set(current);
@@ -57,22 +78,23 @@ export function OrganizationChart({ nodes, roots, unresolvedManagers, currentEmp
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-2xl border bg-card p-3 shadow-sm lg:flex-row lg:items-center">
-        <div className="relative min-w-0 flex-1"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input className="border-0 bg-muted/45 pl-9 shadow-none" placeholder="Search name, employee ID, title, or department…" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
-        <select aria-label="Department" className="h-9 rounded-lg border bg-background px-3 text-sm" value={department} onChange={(event) => setDepartment(event.target.value)}><option value="">All departments</option>{departments.map((value) => <option key={value}>{value}</option>)}</select>
-        <select aria-label="Country" className="h-9 rounded-lg border bg-background px-3 text-sm" value={country} onChange={(event) => setCountry(event.target.value)}><option value="">All countries</option>{countries.map((value) => <option key={value}>{value}</option>)}</select>
+    <div className="min-w-0 max-w-full space-y-4 overflow-hidden">
+      <div className="flex min-w-0 flex-col gap-3 rounded-2xl border bg-card p-3 shadow-sm lg:flex-row lg:flex-wrap lg:items-center">
+        <div className="relative min-w-0 flex-1 lg:basis-[360px]"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" /><Input className="border-0 bg-muted/45 pl-9 shadow-none" placeholder="Search name, employee ID, title, or department…" value={query} onChange={(event) => setQuery(event.target.value)} /></div>
+        <select aria-label="Department" className="h-9 min-w-0 max-w-full rounded-lg border bg-background px-3 text-sm" value={department} onChange={(event) => setDepartment(event.target.value)}><option value="">All departments</option>{departments.map((value) => <option key={value}>{value}</option>)}</select>
+        <select aria-label="Country" className="h-9 min-w-0 max-w-full rounded-lg border bg-background px-3 text-sm" value={country} onChange={(event) => setCountry(event.target.value)}><option value="">All countries</option>{countries.map((value) => <option key={value}>{value}</option>)}</select>
         <Button size="sm" variant="outline" onClick={() => setCollapsed(new Set())}><Expand /> Expand</Button>
         <Button size="sm" variant="outline" onClick={() => setCollapsed(new Set(nodes.filter((node) => node.direct_reports > 0).map((node) => node.employee_id)))}><Shrink /> Collapse</Button>
       </div>
 
       {unresolvedManagers > 0 && <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0" /><p>{unresolvedManagers} manager {unresolvedManagers === 1 ? "record is" : "records are"} missing from the active employee directory. Their reporting lines remain visible as dashed cards.</p></div>}
 
-      <section className={styles.canvas} aria-label="Company organization chart">
-        <div className={styles.canvasInner}>
+      <section ref={canvasRef} className={styles.canvas} aria-label="Company organization chart">
+        <div className={styles.canvasStage} style={{ height: `${chartSize.height}px` }}>
+        <div ref={treeRef} className={styles.canvasInner} style={{ transform: `translateX(-50%) scale(${chartSize.scale})` }}>
           {roots.filter((id) => !visible || visible.has(id)).map((id) => <OrgBranch key={id} id={id} nodeById={nodeById} childrenById={childrenById} collapsed={collapsed} visible={visible} selectedId={selectedId} currentEmployeeId={currentEmployeeId} onToggle={toggle} onSelect={setSelectedId} />)}
           {visible && visible.size === 0 && <div className="py-24 text-center text-sm text-muted-foreground">No positions match the current filters.</div>}
-        </div>
+        </div></div>
       </section>
 
       {selected && <EmployeeDetails node={selected} current={selected.employee_id === currentEmployeeId} />}
