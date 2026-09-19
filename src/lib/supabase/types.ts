@@ -841,6 +841,29 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["complaint_updates"]["Insert"]>;
         Relationships: [];
       };
+      complaint_attachments: {
+        Row: {
+          id: string;
+          complaint_id: string;
+          uploaded_by: string;
+          file_name: string;
+          storage_path: string;
+          mime_type: string;
+          size_bytes: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          complaint_id: string;
+          uploaded_by: string;
+          file_name: string;
+          storage_path: string;
+          mime_type: string;
+          size_bytes: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["complaint_attachments"]["Insert"]>;
+        Relationships: [];
+      };
       training_requests: {
         Row: {
           id: string;

@@ -10,6 +10,19 @@ import { createClient } from "@/lib/supabase/server";
 const CATEGORIES = new Set(["workplace", "management", "conduct", "harassment", "discrimination", "safety", "ethics", "other"]);
 const STATUSES = new Set(["under_review", "resolved", "closed"]);
 const PRIORITIES = new Set(["low", "normal", "high", "urgent"]);
+const EVIDENCE_BUCKET = "complaint-evidence";
+const MAX_EVIDENCE_FILES = 3;
+const MAX_EVIDENCE_SIZE = 10 * 1024 * 1024;
+const EVIDENCE_TYPES: Record<string, string> = {
+  pdf: "application/pdf",
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  doc: "application/msword",
+  docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  xls: "application/vnd.ms-excel",
+  xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+};
 type ComplaintCategory = "workplace" | "management" | "conduct" | "harassment" | "discrimination" | "safety" | "ethics" | "other";
 type ComplaintStatus = "under_review" | "resolved" | "closed";
 type ComplaintPriority = "low" | "normal" | "high" | "urgent";
@@ -222,11 +235,11 @@ export async function updateComplaint(input: {
   return { success: true };
 }
 
-export async function escalateComplaintToFaleh(complaintId: string) {
+export async function escalateComplaint(complaintId: string) {
   const profile = await currentProfile();
   if (!profile || profile.role !== "admin") return { error: "HR access required." };
   const supabase = await createClient();
-  const { data: faleh } = await supabase
+  const { data: executive } = await supabase
     .from("profiles")
     .select("id, full_name")
     .eq("is_active", true)
@@ -240,8 +253,8 @@ export async function escalateComplaintToFaleh(complaintId: string) {
       status: "escalated",
       priority: "urgent",
       hr_owner_id: profile.id,
-      escalated_to: faleh?.id ?? null,
-      escalated_to_name: faleh?.full_name ?? "Faleh",
+      escalated_to: executive?.id ?? null,
+      escalated_to_name: executive?.full_name ?? "Executive reviewer",
       escalated_at: new Date().toISOString(),
     })
     .eq("id", complaintId)
@@ -265,9 +278,9 @@ export async function escalateComplaintToFaleh(complaintId: string) {
     link: `/complaints/${complaint.id}`,
     metadata: { complaint_id: complaint.id },
   });
-  if (faleh) {
+  if (executive) {
     await createNotification({
-      user_id: faleh.id,
+      user_id: executive.id,
       type: NOTIFICATION_TYPES.COMPLAINT_ESCALATED,
       title: `Confidential escalation: CMP-${String(complaint.case_number).padStart(6, "0")}`,
       body: "HR escalated a confidential complaint for your review.",
@@ -276,5 +289,107 @@ export async function escalateComplaintToFaleh(complaintId: string) {
     });
   }
   refreshComplaints(complaint.id);
-  return { success: true, warning: faleh ? null : "Escalation was recorded, but Faleh does not yet have an active portal account. HR must follow up outside the portal." };
+  return { success: true, warning: executive ? null : "Escalation was recorded, but the executive reviewer does not yet have an active portal account. HR must follow up outside the portal." };
+}
+
+async function ensureEvidenceBucket() {
+  const admin = createAdminClient();
+  if (!admin) return { error: "Evidence storage is not configured." as const, admin: null };
+  const { data } = await admin.storage.getBucket(EVIDENCE_BUCKET);
+  if (!data) {
+    const { error } = await admin.storage.createBucket(EVIDENCE_BUCKET, {
+      public: false,
+      fileSizeLimit: MAX_EVIDENCE_SIZE,
+      allowedMimeTypes: [...new Set(Object.values(EVIDENCE_TYPES))],
+    });
+    if (error && !error.message.toLowerCase().includes("already exists")) return { error: error.message, admin: null };
+  }
+  return { error: null, admin };
+}
+
+export async function uploadComplaintEvidence(complaintId: string, formData: FormData) {
+  const profile = await currentProfile();
+  if (!profile) return { error: "Not authenticated." };
+  const supabase = await createClient();
+  const { data: complaint } = await supabase
+    .from("complaints")
+    .select("id, reporter_id, case_number, status")
+    .eq("id", complaintId)
+    .maybeSingle();
+  if (!complaint) return { error: "Complaint not found or access denied." };
+  if (complaint.status === "closed") return { error: "Evidence cannot be added to a closed case." };
+
+  const files = formData.getAll("evidence").filter((value): value is File => value instanceof File && value.size > 0);
+  if (!files.length) return { error: "Choose at least one evidence file." };
+  if (files.length > MAX_EVIDENCE_FILES) return { error: `Upload no more than ${MAX_EVIDENCE_FILES} files at a time.` };
+
+  const checked = files.map((file) => {
+    const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
+    const mimeType = EVIDENCE_TYPES[extension];
+    if (!mimeType) return { error: `${file.name}: unsupported file type.` as string, file, mimeType: "" };
+    if (file.size > MAX_EVIDENCE_SIZE) return { error: `${file.name}: file exceeds 10 MB.` as string, file, mimeType };
+    return { error: null, file, mimeType };
+  });
+  const invalid = checked.find((item) => item.error);
+  if (invalid?.error) return { error: invalid.error };
+
+  const storage = await ensureEvidenceBucket();
+  if (storage.error || !storage.admin) return { error: storage.error ?? "Evidence storage is unavailable." };
+  const { count } = await storage.admin
+    .from("complaint_attachments")
+    .select("id", { count: "exact", head: true })
+    .eq("complaint_id", complaint.id);
+  if ((count ?? 0) + files.length > 10) return { error: "A complaint can contain no more than 10 evidence files." };
+
+  const uploaded: string[] = [];
+  for (const item of checked) {
+    const safeName = item.file.name.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(-120);
+    const path = `${complaint.id}/${crypto.randomUUID()}-${safeName}`;
+    const { error: uploadError } = await storage.admin.storage
+      .from(EVIDENCE_BUCKET)
+      .upload(path, Buffer.from(await item.file.arrayBuffer()), { contentType: item.mimeType, upsert: false });
+    if (uploadError) return { error: `${item.file.name}: ${uploadError.message}` };
+
+    const { error: metadataError } = await storage.admin.from("complaint_attachments").insert({
+      complaint_id: complaint.id,
+      uploaded_by: profile.id,
+      file_name: item.file.name.slice(0, 255),
+      storage_path: path,
+      mime_type: item.mimeType,
+      size_bytes: item.file.size,
+    });
+    if (metadataError) {
+      await storage.admin.storage.from(EVIDENCE_BUCKET).remove([path]);
+      return { error: `${item.file.name}: ${metadataError.message}` };
+    }
+    uploaded.push(item.file.name);
+  }
+
+  if (complaint.reporter_id === profile.id) {
+    await notifyHr(
+      `Evidence added to CMP-${String(complaint.case_number).padStart(6, "0")}`,
+      `${profile.full_name ?? "The reporter"} added ${uploaded.length} evidence file${uploaded.length === 1 ? "" : "s"}.`,
+      `/complaints/${complaint.id}`,
+      { complaint_id: complaint.id }
+    );
+  }
+  refreshComplaints(complaint.id);
+  return { success: true, uploaded };
+}
+
+export async function getComplaintEvidenceUrl(attachmentId: string) {
+  const profile = await currentProfile();
+  if (!profile) return { error: "Not authenticated." };
+  const supabase = await createClient();
+  const { data: attachment } = await supabase
+    .from("complaint_attachments")
+    .select("storage_path")
+    .eq("id", attachmentId)
+    .maybeSingle();
+  if (!attachment) return { error: "Evidence file not found or access denied." };
+  const admin = createAdminClient();
+  if (!admin) return { error: "Evidence storage is not configured." };
+  const { data, error } = await admin.storage.from(EVIDENCE_BUCKET).createSignedUrl(attachment.storage_path, 60);
+  if (error || !data?.signedUrl) return { error: error?.message ?? "Could not open evidence file." };
+  return { success: true, url: data.signedUrl };
 }

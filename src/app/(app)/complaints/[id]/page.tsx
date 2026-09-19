@@ -4,6 +4,7 @@ import { ArrowLeft, LockKeyhole } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ComplaintDetailActions } from "@/components/complaints/complaint-detail-actions";
+import { ComplaintAttachments } from "@/components/complaints/complaint-attachments";
 import { createClient } from "@/lib/supabase/server";
 import { cn } from "@/lib/utils";
 
@@ -26,11 +27,10 @@ export default async function ComplaintDetailPage(props: PageProps<"/complaints/
     supabase.from("complaints").select("*").eq("id", id).maybeSingle(),
   ]);
   if (!profile || !complaint) notFound();
-  const { data: updates } = await supabase
-    .from("complaint_updates")
-    .select("id, author_name, kind, visibility, body, created_at")
-    .eq("complaint_id", complaint.id)
-    .order("created_at");
+  const [{ data: updates }, { data: attachments }] = await Promise.all([
+    supabase.from("complaint_updates").select("id, author_name, kind, visibility, body, created_at").eq("complaint_id", complaint.id).order("created_at"),
+    supabase.from("complaint_attachments").select("id, file_name, mime_type, size_bytes, created_at").eq("complaint_id", complaint.id).order("created_at"),
+  ]);
 
   const reference = `CMP-${String(complaint.case_number).padStart(6, "0")}`;
   const isReporter = complaint.reporter_id === profile.id;
@@ -62,10 +62,12 @@ export default async function ComplaintDetailPage(props: PageProps<"/complaints/
           </dl>
           <div><h2 className="text-sm font-medium">Description</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{complaint.description}</p></div>
           {complaint.requested_outcome && <div><h2 className="text-sm font-medium">Requested outcome</h2><p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{complaint.requested_outcome}</p></div>}
-          {complaint.escalated_at && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">Escalated to {complaint.escalated_to_name ?? "Faleh"} on {new Date(complaint.escalated_at).toLocaleString()}.</div>}
+          {complaint.escalated_at && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-900">Escalated for executive review on {new Date(complaint.escalated_at).toLocaleString()}.</div>}
           {complaint.resolution_summary && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3"><h2 className="text-sm font-medium text-emerald-900">Resolution</h2><p className="mt-1 whitespace-pre-wrap text-sm text-emerald-800">{complaint.resolution_summary}</p></div>}
         </CardContent>
       </Card>
+
+      <ComplaintAttachments complaintId={complaint.id} attachments={attachments ?? []} canUpload={complaint.status !== "closed"} />
 
       <Card>
         <CardHeader><CardTitle className="text-base">Case timeline</CardTitle></CardHeader>

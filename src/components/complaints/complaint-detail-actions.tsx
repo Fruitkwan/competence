@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { addComplaintUpdate, escalateComplaintToFaleh, updateComplaint } from "@/lib/actions/complaints";
+import { addComplaintUpdate, escalateComplaint, updateComplaint } from "@/lib/actions/complaints";
 
 export function ComplaintDetailActions({
   complaint,
@@ -54,13 +54,13 @@ export function ComplaintDetailActions({
   }
 
   async function escalate() {
-    if (!confirm("Escalate this confidential case to Faleh for executive review?")) return;
+    if (!confirm("Escalate this confidential case for executive review?")) return;
     setBusy("escalate");
-    const result = await escalateComplaintToFaleh(complaint.id);
+    const result = await escalateComplaint(complaint.id);
     setBusy(null);
     if (result.error) return toast.error(result.error);
     if (result.warning) toast.warning(result.warning);
-    else toast.success("Case escalated to Faleh.");
+    else toast.success("Case escalated for executive review.");
     router.refresh();
   }
 
@@ -103,7 +103,7 @@ export function ComplaintDetailActions({
             <div className="flex flex-wrap justify-between gap-3">
               <Button variant="destructive" onClick={escalate} disabled={busy !== null || complaint.status === "escalated"}>
                 {busy === "escalate" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldAlert className="h-4 w-4" />}
-                Escalate to Faleh
+                Escalate for executive review
               </Button>
               <Button onClick={saveReview} disabled={busy !== null}>
                 {busy === "review" && <Loader2 className="h-4 w-4 animate-spin" />} Save case update

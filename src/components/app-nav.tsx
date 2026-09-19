@@ -211,7 +211,7 @@ const NAV: NavItem[] = [
   // ── Notifications ───────────────────────────────────────────────────────────
   {
     href: "/complaints",
-    label: "Raise a Complaint",
+    label: "Raise Performance Concern",
     icon: MessageSquareWarning,
     iconColor: "#dc2626",
     divider: true,
@@ -220,7 +220,7 @@ const NAV: NavItem[] = [
   },
   {
     href: "/complaints",
-    label: "Complaint Cases",
+    label: "Raise Performance Concern",
     icon: MessageSquareWarning,
     iconColor: "#dc2626",
     divider: true,

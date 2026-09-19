@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { AlertTriangle, ArrowRight, Loader2, LockKeyhole, Plus } from "lucide-react";
+import { AlertTriangle, ArrowRight, Loader2, LockKeyhole, Paperclip, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { submitComplaint } from "@/lib/actions/complaints";
+import { submitComplaint, uploadComplaintEvidence } from "@/lib/actions/complaints";
 import { cn } from "@/lib/utils";
 
 export type ComplaintListRow = {
@@ -63,6 +63,8 @@ export function ComplaintsClient({
   const [description, setDescription] = useState("");
   const [outcome, setOutcome] = useState("");
   const [acknowledged, setAcknowledged] = useState(false);
+  const [evidence, setEvidence] = useState<File[]>([]);
+  const [fileInputKey, setFileInputKey] = useState(0);
   const [saving, setSaving] = useState(false);
 
   async function submit() {
@@ -77,13 +79,23 @@ export function ComplaintsClient({
     });
     setSaving(false);
     if (result.error) return toast.error(result.error);
+    let evidenceWarning: string | null = null;
+    if (evidence.length && result.id) {
+      const formData = new FormData();
+      evidence.forEach((file) => formData.append("evidence", file));
+      const upload = await uploadComplaintEvidence(result.id, formData);
+      evidenceWarning = upload.error ?? null;
+    }
     toast.success(`${result.reference} was submitted confidentially to HR.`);
+    if (evidenceWarning) toast.warning(`The concern was submitted, but evidence upload failed: ${evidenceWarning}`);
     setShowForm(false);
     setSubjectId("");
     setTitle("");
     setDescription("");
     setOutcome("");
     setAcknowledged(false);
+    setEvidence([]);
+    setFileInputKey((value) => value + 1);
     router.refresh();
   }
 
@@ -96,7 +108,7 @@ export function ComplaintsClient({
             <div>
               <p className="font-medium">Confidential case channel</p>
               <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-                Complaints go directly to HR. The person named in the complaint and their manager cannot see the case. HR may escalate it to Faleh when executive review is required.
+                Concerns go directly to HR. The person named in the concern and their manager cannot see the case. HR may escalate it when executive review is required.
               </p>
             </div>
           </div>
@@ -156,6 +168,26 @@ export function ComplaintsClient({
             <div className="grid gap-2">
               <Label htmlFor="complaint-outcome">Requested outcome (optional)</Label>
               <Textarea id="complaint-outcome" rows={3} maxLength={2000} value={outcome} onChange={(event) => setOutcome(event.target.value)} placeholder="What support or resolution would you like HR to consider?" />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="complaint-evidence">Evidence (optional)</Label>
+              <div className="rounded-lg border border-dashed p-4">
+                <div className="flex items-start gap-3">
+                  <Paperclip className="mt-0.5 h-4 w-4 text-muted-foreground" />
+                  <div className="flex-1">
+                    <Input
+                      key={fileInputKey}
+                      id="complaint-evidence"
+                      type="file"
+                      multiple
+                      accept=".pdf,.png,.jpg,.jpeg,.doc,.docx,.xls,.xlsx"
+                      onChange={(event) => setEvidence(Array.from(event.target.files ?? []).slice(0, 3))}
+                    />
+                    <p className="mt-2 text-xs text-muted-foreground">Up to 3 files per upload and 10 MB per file. PDF, images, Word, and Excel files are accepted.</p>
+                    {evidence.length > 0 && <p className="mt-2 text-xs font-medium">{evidence.length} file{evidence.length === 1 ? "" : "s"} selected</p>}
+                  </div>
+                </div>
+              </div>
             </div>
             <label className="flex items-start gap-2 rounded-lg border bg-muted/20 p-3 text-sm">
               <input type="checkbox" className="mt-0.5" checked={acknowledged} onChange={(event) => setAcknowledged(event.target.checked)} />
