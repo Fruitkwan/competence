@@ -22,6 +22,7 @@ import {
   Compass,
   Library,
   MessageSquareWarning,
+  Network,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -151,12 +152,18 @@ const NAV: NavItem[] = [
 
   // ── People ──────────────────────────────────────────────────────────────────
   {
+    href: "/org-chart",
+    label: "Organization Chart",
+    icon: Network,
+    iconColor: "#0f766e",
+    divider: true,
+    dividerLabel: "People",
+  },
+  {
     href: "/employees",
     label: "Employee Directory",
     icon: Users,
     iconColor: "#ec4899",
-    divider: true,
-    dividerLabel: "People",
     roles: ["manager", "executive"],
   },
   {
@@ -164,8 +171,6 @@ const NAV: NavItem[] = [
     label: "Employee Directory",
     icon: Users,
     iconColor: "#ec4899",
-    divider: true,
-    dividerLabel: "People",
     roles: ["admin"],
   },
   {
