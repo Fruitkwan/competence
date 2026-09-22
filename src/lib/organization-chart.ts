@@ -1,3 +1,12 @@
+export type OrgAssessment = {
+  id: string;
+  name: string;
+  wave: string | null;
+  score: number | null;
+  provisional: boolean;
+  raters: string[] | null;
+};
+
 export type OrgEmployee = {
   employee_id: string;
   full_name: string;
@@ -5,6 +14,7 @@ export type OrgEmployee = {
   department: string | null;
   country_code: string | null;
   manager_name: string | null;
+  assessments?: OrgAssessment[];
 };
 
 export type OrgNode = OrgEmployee & {

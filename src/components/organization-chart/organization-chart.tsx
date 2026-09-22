@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useMemo, useState } from "react";
 import { Building2, ChevronDown, ChevronRight, CircleAlert, Expand, MapPin, Search, Shrink, UserRound, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,10 +16,7 @@ export function OrganizationChart({ nodes, roots, unresolvedManagers, currentEmp
   const [department, setDepartment] = useState("");
   const [country, setCountry] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(currentEmployeeId ?? roots[0] ?? null);
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(nodes.filter((node) => node.total_reports > 18).map((node) => node.employee_id)));
-  const [chartSize, setChartSize] = useState({ scale: 1, height: 520 });
-  const canvasRef = useRef<HTMLElement>(null);
-  const treeRef = useRef<HTMLDivElement>(null);
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set(nodes.filter((node) => node.parent_id !== null && node.direct_reports > 0).map((node) => node.employee_id)));
   const nodeById = useMemo(() => new Map(nodes.map((node) => [node.employee_id, node])), [nodes]);
   const childrenById = useMemo(() => {
     const map = new Map<string, string[]>();
@@ -51,24 +48,6 @@ export function OrganizationChart({ nodes, roots, unresolvedManagers, currentEmp
   }, [country, department, nodeById, nodes, query]);
   const selected = selectedId ? nodeById.get(selectedId) ?? null : null;
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const tree = treeRef.current;
-    if (!canvas || !tree) return;
-    const fit = () => {
-      const naturalWidth = tree.scrollWidth;
-      const naturalHeight = tree.scrollHeight;
-      const availableWidth = Math.max(0, canvas.clientWidth - 24);
-      const scale = naturalWidth > 0 ? Math.min(1, availableWidth / naturalWidth) : 1;
-      setChartSize({ scale, height: Math.max(360, Math.ceil(naturalHeight * scale)) });
-    };
-    const observer = new ResizeObserver(fit);
-    observer.observe(canvas);
-    observer.observe(tree);
-    fit();
-    return () => observer.disconnect();
-  }, [collapsed, country, department, query]);
-
   function toggle(id: string) {
     setCollapsed((current) => {
       const next = new Set(current);
@@ -89,12 +68,11 @@ export function OrganizationChart({ nodes, roots, unresolvedManagers, currentEmp
 
       {unresolvedManagers > 0 && <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"><CircleAlert className="mt-0.5 h-4 w-4 shrink-0" /><p>{unresolvedManagers} manager {unresolvedManagers === 1 ? "record is" : "records are"} missing from the active employee directory. Their reporting lines remain visible as dashed cards.</p></div>}
 
-      <section ref={canvasRef} className={styles.canvas} aria-label="Company organization chart">
-        <div className={styles.canvasStage} style={{ height: `${chartSize.height}px` }}>
-        <div ref={treeRef} className={styles.canvasInner} style={{ transform: `translateX(-50%) scale(${chartSize.scale})` }}>
+      <section className={styles.canvas} aria-label="Company organization chart">
+        <div className={styles.canvasInner}>
           {roots.filter((id) => !visible || visible.has(id)).map((id) => <OrgBranch key={id} id={id} nodeById={nodeById} childrenById={childrenById} collapsed={collapsed} visible={visible} selectedId={selectedId} currentEmployeeId={currentEmployeeId} onToggle={toggle} onSelect={setSelectedId} />)}
           {visible && visible.size === 0 && <div className="py-24 text-center text-sm text-muted-foreground">No positions match the current filters.</div>}
-        </div></div>
+        </div>
       </section>
 
       {selected && <EmployeeDetails node={selected} current={selected.employee_id === currentEmployeeId} />}
@@ -109,7 +87,7 @@ function OrgBranch({ id, nodeById, childrenById, collapsed, visible, selectedId,
   const closed = !visible && collapsed.has(id);
   return <div className={styles.branch}>
     <EmployeeCard node={node} selected={selectedId === id} current={currentEmployeeId === id} closed={closed} hasChildren={children.length > 0} onSelect={() => onSelect(id)} onToggle={() => onToggle(id)} />
-    {!closed && children.length > 0 && <div className={styles.children} style={{ "--children": children.length } as CSSProperties}>{children.map((childId) => <OrgBranch key={childId} id={childId} nodeById={nodeById} childrenById={childrenById} collapsed={collapsed} visible={visible} selectedId={selectedId} currentEmployeeId={currentEmployeeId} onToggle={onToggle} onSelect={onSelect} />)}</div>}
+    {!closed && children.length > 0 && <div className={styles.children}>{children.map((childId) => <OrgBranch key={childId} id={childId} nodeById={nodeById} childrenById={childrenById} collapsed={collapsed} visible={visible} selectedId={selectedId} currentEmployeeId={currentEmployeeId} onToggle={onToggle} onSelect={onSelect} />)}</div>}
   </div>;
 }
 
@@ -120,7 +98,15 @@ function EmployeeCard({ node, selected, current, closed, hasChildren, onSelect, 
       <span className={styles.personText}><span className={styles.personName}>{node.full_name}</span><span className={styles.personTitle}>{node.job_title}</span></span>
       {current && <span className={styles.you}>You</span>}
     </button>
-    {hasChildren && <button type="button" className={styles.toggle} onClick={onToggle} aria-label={`${closed ? "Expand" : "Collapse"} ${node.full_name}`}>{closed ? <ChevronRight /> : <ChevronDown />}</button>}
+    {!node.placeholder && <div className={styles.assessments}>
+      {node.assessments === undefined ? <p className={styles.assessmentEmpty}>Assessment details are private</p> : node.assessments.length === 0 ? <p className={styles.assessmentEmpty}>No completed assessments</p> : node.assessments.map((assessment) => <div key={assessment.id} className={styles.assessment}>
+        <div className={styles.scoreRow}><Link href={`/assessments/${assessment.id}/report`}>{assessment.name}</Link><strong>{assessment.score == null ? "Pending" : `${assessment.score}%`}</strong></div>
+        {assessment.wave && <p className={styles.assessmentEmpty}>{assessment.wave}</p>}
+        {assessment.provisional && assessment.score != null && <span className={styles.provisional}>Provisional</span>}
+        {assessment.raters !== null && <p className={styles.raters}><span>Raters:</span> {assessment.raters.length ? assessment.raters.join(", ") : "None assigned"}</p>}
+      </div>)}
+    </div>}
+    {hasChildren && <button type="button" className={styles.toggle} onClick={onToggle} aria-expanded={!closed} aria-label={`${closed ? "Expand" : "Collapse"} ${node.full_name}`}>{closed ? <ChevronRight /> : <ChevronDown />}</button>}
   </div>;
 }
 
