@@ -17,9 +17,27 @@ export default async function AppLayout({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("email, full_name, role")
+    .select("email, full_name, role, is_active")
     .eq("id", user.id)
     .single();
+
+  if (profile && profile.is_active === false) {
+    return (
+      <div className="flex min-h-screen items-center justify-center p-6">
+        <div className="max-w-sm space-y-3 text-center">
+          <h1 className="text-lg font-semibold">Account deactivated</h1>
+          <p className="text-sm text-muted-foreground">
+            Your account has been deactivated. Contact HR if you believe this is a mistake.
+          </p>
+          <form action="/auth/signout" method="post">
+            <button type="submit" className="text-sm font-medium text-primary underline">
+              Sign out
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   const role = profile?.role ?? "employee";
 
