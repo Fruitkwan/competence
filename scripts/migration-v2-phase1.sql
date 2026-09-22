@@ -261,7 +261,36 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ===================== 9. AUDIT TRIGGER FOR NEW TABLES =====================
--- Reuse existing audit pattern for new tables
+-- audit_trigger_func: generic row-change logger into public.audit_log.
+CREATE OR REPLACE FUNCTION public.audit_trigger_func()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_pk text;
+BEGIN
+  v_pk := COALESCE(
+    CASE WHEN TG_OP <> 'DELETE' THEN to_jsonb(NEW)->>'id' END,
+    CASE WHEN TG_OP <> 'INSERT' THEN to_jsonb(OLD)->>'id' END,
+    CASE WHEN TG_OP <> 'DELETE' THEN to_jsonb(NEW)->>'item_id' END,
+    CASE WHEN TG_OP <> 'INSERT' THEN to_jsonb(OLD)->>'item_id' END
+  );
+  INSERT INTO public.audit_log (actor, actor_email, table_name, row_pk, action, before, after)
+  VALUES (
+    auth.uid(),
+    (SELECT email FROM auth.users WHERE id = auth.uid()),
+    TG_TABLE_NAME,
+    v_pk,
+    TG_OP,
+    CASE WHEN TG_OP <> 'INSERT' THEN to_jsonb(OLD) END,
+    CASE WHEN TG_OP <> 'DELETE' THEN to_jsonb(NEW) END
+  );
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
 DO $$
 DECLARE
   t TEXT;
