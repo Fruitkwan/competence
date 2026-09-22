@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/router.dart';
 import 'core/theme.dart';
+import 'features/notifications/push_service.dart';
 
 class PerformanceHubApp extends ConsumerWidget {
   const PerformanceHubApp({super.key});
@@ -10,6 +11,8 @@ class PerformanceHubApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    PushService.onOpenLink = router.go;
+    PushService.flushPendingLink();
     return MaterialApp.router(
       title: 'Performance Hub',
       debugShowCheckedModeBanner: false,

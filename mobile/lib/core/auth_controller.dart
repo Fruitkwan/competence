@@ -45,6 +45,18 @@ class AuthController {
     );
   }
 
+  /// Password sign-in for allowlisted super-user accounts (see
+  /// Env.superuserEmails). Uses real Supabase credentials — no OTP involved.
+  Future<AuthResponse> signInWithPassword({
+    required String email,
+    required String password,
+  }) {
+    return _supabase.auth.signInWithPassword(
+      email: email,
+      password: password,
+    );
+  }
+
   Future<void> signOut() => _supabase.auth.signOut();
 
   /// Debug-only password sign-in to skip the OTP flow during local development.

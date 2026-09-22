@@ -8,6 +8,8 @@ import '../features/appraisals/appraisals_list_page.dart';
 import '../features/appraisals/hr_finalize_page.dart';
 import '../features/appraisals/manager_review_page.dart';
 import '../features/appraisals/self_assessment_page.dart';
+import '../features/assessments/assessment_report_page.dart';
+import '../features/assessments/assessments_page.dart';
 import '../features/auth/login_page.dart';
 import '../features/auth/splash_page.dart';
 import '../features/calibration/calibration_page.dart';
@@ -89,6 +91,18 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: ':id/finalize',
                 builder: (_, state) =>
                     HrFinalizePage(appraisalId: state.pathParameters['id']!),
+              ),
+            ],
+          ),
+          GoRoute(
+            path: '/assessments',
+            builder: (_, __) => const AssessmentsPage(),
+            routes: [
+              GoRoute(
+                path: ':id/report',
+                builder: (_, state) => AssessmentReportPage(
+                  assignmentId: state.pathParameters['id']!,
+                ),
               ),
             ],
           ),

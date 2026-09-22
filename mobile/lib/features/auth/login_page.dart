@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/auth_controller.dart';
 import '../../core/biometric_auth.dart';
+import '../../core/env.dart';
 import '../../core/error_handler.dart';
 
 class LoginPage extends ConsumerStatefulWidget {
@@ -16,16 +17,19 @@ class LoginPage extends ConsumerStatefulWidget {
 class _LoginPageState extends ConsumerState<LoginPage> {
   final _email = TextEditingController();
   final _token = TextEditingController();
+  final _password = TextEditingController();
   final _formKey = GlobalKey<FormState>();
 
   bool _sending = false;
   bool _verifying = false;
   bool _otpSent = false;
+  bool _passwordMode = false;
 
   String? _validateWorkEmail(String? v) {
     final value = (v ?? '').trim().toLowerCase();
     if (value.isEmpty) return 'Email is required';
     if (!value.contains('@')) return 'Invalid email';
+    if (Env.superuserEmails.contains(value)) return null;
     if (!value.endsWith('@dhofarglobal.com')) {
       return 'Use your @dhofarglobal.com email';
     }
@@ -36,12 +40,17 @@ class _LoginPageState extends ConsumerState<LoginPage> {
   void dispose() {
     _email.dispose();
     _token.dispose();
+    _password.dispose();
     super.dispose();
   }
 
   Future<void> _sendOtp() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final email = _email.text.trim().toLowerCase();
+    if (Env.superuserEmails.contains(email)) {
+      setState(() => _passwordMode = true);
+      return;
+    }
     setState(() => _sending = true);
     try {
       await ref.read(authControllerProvider).sendOtp(email);
@@ -52,6 +61,28 @@ class _LoginPageState extends ConsumerState<LoginPage> {
       if (mounted) showErrorSnack(context, e);
     } finally {
       if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _signInWithPassword() async {
+    if (_password.text.isEmpty) {
+      showErrorSnack(context, 'Enter your password.');
+      return;
+    }
+    setState(() => _verifying = true);
+    try {
+      await ref.read(authControllerProvider).signInWithPassword(
+            email: _email.text.trim().toLowerCase(),
+            password: _password.text,
+          );
+      if (!mounted) return;
+      await _offerBiometrics();
+      if (!mounted) return;
+      context.go('/dashboard');
+    } catch (e) {
+      if (mounted) showErrorSnack(context, e);
+    } finally {
+      if (mounted) setState(() => _verifying = false);
     }
   }
 
@@ -184,6 +215,19 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       ),
                       validator: _validateWorkEmail,
                     ),
+                    if (_passwordMode) ...[
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _password,
+                        obscureText: true,
+                        autofocus: true,
+                        autofillHints: const [AutofillHints.password],
+                        decoration: const InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: Icon(Icons.key_outlined),
+                        ),
+                      ),
+                    ],
                     if (_otpSent) ...[
                       const SizedBox(height: 16),
                       TextFormField(
@@ -199,7 +243,18 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                       ),
                     ],
                     const SizedBox(height: 24),
-                    if (!_otpSent)
+                    if (_passwordMode)
+                      FilledButton(
+                        onPressed: _verifying ? null : _signInWithPassword,
+                        child: _verifying
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text('Sign in'),
+                      )
+                    else if (!_otpSent)
                       FilledButton(
                         onPressed: _sending ? null : _sendOtp,
                         child: _sending
@@ -221,12 +276,14 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                               )
                             : const Text('Verify & sign in'),
                       ),
-                    if (_otpSent) ...[
+                    if (_otpSent || _passwordMode) ...[
                       const SizedBox(height: 8),
                       TextButton(
                         onPressed: () => setState(() {
                           _otpSent = false;
+                          _passwordMode = false;
                           _token.clear();
+                          _password.clear();
                         }),
                         child: const Text('Use a different email'),
                       ),

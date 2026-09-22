@@ -34,4 +34,17 @@ class Env {
 
   static String get devAutoLoginPassword =>
       dotenv.maybeGet('DEV_AUTO_LOGIN_PASSWORD') ?? '';
+
+  /// Emails allowed to sign in with a password instead of OTP
+  /// (comma-separated SUPERUSER_EMAILS in .env). The account must exist in
+  /// Supabase Auth with a password — this is not an auth bypass.
+  static Set<String> get superuserEmails => {
+        for (final e in (dotenv.maybeGet('SUPERUSER_EMAILS') ?? '').split(','))
+          if (e.trim().isNotEmpty) e.trim().toLowerCase(),
+      };
+
+  /// Base URL of the deployed web app; serves the /api/mobile/* endpoints.
+  static String get webApiBaseUrl => (dotenv.maybeGet('WEB_API_BASE_URL') ?? '')
+      .trim()
+      .replaceAll(RegExp(r'/$'), '');
 }
