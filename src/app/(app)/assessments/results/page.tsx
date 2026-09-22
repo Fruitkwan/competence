@@ -2,6 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getViewer, loadAssignmentResult } from "@/lib/assessments/results";
+import { loadAssessmentTracker } from "@/lib/assessments/tracker";
+import { AssessmentTracker } from "@/components/assessments/results-tracker";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -55,19 +58,9 @@ export default async function AssessmentResultsPage() {
     })
   );
 
-  return (
-    <>
-      <PageHeader
-        title="Assessment Results"
-        description="Scored from self, line manager, cross-departmental / peer and scenario inputs. Open a report for the full profile."
-        actions={
-          viewer.role !== "executive" ? (
-            <Link href="/assessments/assign" className={buttonVariants()}>
-              Assign
-            </Link>
-          ) : null
-        }
-      />
+  const tracker = viewer.role === "admin" ? await loadAssessmentTracker() : null;
+
+  const resultsCard = (
       <Card>
         <Table>
           <TableHeader>
@@ -141,6 +134,35 @@ export default async function AssessmentResultsPage() {
           </TableBody>
         </Table>
       </Card>
+  );
+
+  return (
+    <>
+      <PageHeader
+        title="Assessment Results"
+        description="Scored from self, line manager, cross-departmental / peer and scenario inputs. Open a report for the full profile."
+        actions={
+          viewer.role !== "executive" ? (
+            <Link href="/assessments/assign" className={buttonVariants()}>
+              Assign
+            </Link>
+          ) : null
+        }
+      />
+      {tracker ? (
+        <Tabs defaultValue="results">
+          <TabsList variant="line" className="mb-4">
+            <TabsTrigger value="results">Results</TabsTrigger>
+            <TabsTrigger value="tracker">Tracker</TabsTrigger>
+          </TabsList>
+          <TabsContent value="results">{resultsCard}</TabsContent>
+          <TabsContent value="tracker">
+            <AssessmentTracker data={tracker} />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        resultsCard
+      )}
     </>
   );
 }
