@@ -930,7 +930,7 @@ export type Database = {
       assessment_templates: {
         Row: {
           id: string;
-          kind: "skill" | "behaviour";
+          kind: "skill" | "behaviour" | "placement";
           name: string;
           role_family: string | null;
           department: string | null;
@@ -948,7 +948,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          kind: "skill" | "behaviour";
+          kind: "skill" | "behaviour" | "placement";
           name: string;
           role_family?: string | null;
           department?: string | null;
@@ -993,6 +993,7 @@ export type Database = {
         Row: {
           item_id: string;
           answer_key: "A" | "B" | "C" | "D" | null;
+          option_points: Record<string, number> | null;
           rationale: string | null;
           diagnostic: string | null;
           updated_at: string;
@@ -1000,6 +1001,7 @@ export type Database = {
         Insert: {
           item_id: string;
           answer_key?: "A" | "B" | "C" | "D" | null;
+          option_points?: Record<string, number> | null;
           rationale?: string | null;
           diagnostic?: string | null;
         };
@@ -1021,6 +1023,7 @@ export type Database = {
           started_at: string | null;
           submitted_at: string | null;
           report_signatures: Record<string, unknown>;
+          record_scores: Record<string, unknown>;
           created_at: string;
           updated_at: string;
         };
@@ -1038,6 +1041,7 @@ export type Database = {
           started_at?: string | null;
           submitted_at?: string | null;
           report_signatures?: Record<string, unknown>;
+          record_scores?: Record<string, unknown>;
         };
         Update: Partial<Database["public"]["Tables"]["assessment_assignments"]["Insert"]>;
         Relationships: [];

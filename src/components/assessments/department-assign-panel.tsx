@@ -14,7 +14,7 @@ import { matchSkillTemplate } from "@/lib/assessments/match";
 import { cn } from "@/lib/utils";
 
 type Employee = { employee_id: string; full_name: string; job_title: string; manager_name: string | null; department: string | null };
-type Template = { id: string; kind: "skill" | "behaviour"; name: string; role_family: string | null; job_titles: string[] };
+type Template = { id: string; kind: "skill" | "behaviour" | "placement"; name: string; role_family: string | null; department?: string | null; job_titles: string[] };
 type UserOption = { id: string; label: string; meta: string; employee_id: string | null };
 
 export function DepartmentAssignPanel({
@@ -38,6 +38,7 @@ export function DepartmentAssignPanel({
   const [dueDate, setDueDate] = useState("");
   const [includeSkill, setIncludeSkill] = useState(true);
   const [includeBehaviour, setIncludeBehaviour] = useState(true);
+  const [includePlacement, setIncludePlacement] = useState(true);
   const [includeManager, setIncludeManager] = useState(true);
   const [autoPeers, setAutoPeers] = useState(true);
   const [crossDept, setCrossDept] = useState<string[]>([]);
@@ -45,6 +46,9 @@ export function DepartmentAssignPanel({
   const [saving, setSaving] = useState(false);
 
   const hasBehaviourTemplate = templates.some((t) => t.kind === "behaviour");
+  const placementTemplate = templates.find(
+    (t) => t.kind === "placement" && (t.department ?? "").trim().toLowerCase() === department.trim().toLowerCase()
+  );
   const members = useMemo(() => employees.filter((e) => e.department === department), [employees, department]);
   const accountByEmployee = useMemo(() => new Set(users.map((u) => u.employee_id).filter(Boolean)), [users]);
 
@@ -55,7 +59,9 @@ export function DepartmentAssignPanel({
   }));
   const matched = preview.filter((p) => p.skill).length;
   const withAccount = preview.filter((p) => p.hasAccount).length;
-  const willAssign = preview.filter((p) => (includeSkill && p.skill) || (includeBehaviour && hasBehaviourTemplate)).length;
+  const willAssign = preview.filter(
+    (p) => (includeSkill && p.skill) || (includeBehaviour && hasBehaviourTemplate) || (includePlacement && placementTemplate)
+  ).length;
 
   const q = query.trim().toLowerCase();
   const memberIds = new Set(members.map((m) => m.employee_id));
@@ -73,6 +79,7 @@ export function DepartmentAssignPanel({
       due_date: dueDate || null,
       include_skill: includeSkill,
       include_behaviour: includeBehaviour,
+      include_placement: includePlacement,
       include_line_manager: includeManager,
       auto_peers: autoPeers,
       cross_dept_user_ids: crossDept,
@@ -121,6 +128,16 @@ export function DepartmentAssignPanel({
             />
             Behaviour, Desire and Attitude assessment (company-wide)
             {!hasBehaviourTemplate && <span className="text-xs text-muted-foreground">not published</span>}
+          </label>
+          <label className={cn("flex items-center gap-2 text-sm", !placementTemplate && "opacity-50")}>
+            <input
+              type="checkbox"
+              checked={includePlacement && !!placementTemplate}
+              disabled={!placementTemplate}
+              onChange={(e) => setIncludePlacement(e.target.checked)}
+            />
+            Role placement assessment (this department)
+            {!placementTemplate && <span className="text-xs text-muted-foreground">not published for this department</span>}
           </label>
         </div>
 

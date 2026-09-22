@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 
 export type TemplateRow = {
   id: string;
-  kind: "skill" | "behaviour";
+  kind: "skill" | "behaviour" | "placement";
   name: string;
   role_family: string | null;
   department: string | null;

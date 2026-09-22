@@ -16,7 +16,7 @@ export type ParsedItem = {
 };
 
 export type ParsedTemplate = {
-  kind: "skill" | "behaviour";
+  kind: "skill" | "behaviour" | "placement";
   name: string;
   role_family: string | null;
   department: string | null;
@@ -27,15 +27,21 @@ export type ParsedTemplate = {
 };
 
 export type ParsedKey = {
-  kind: "skill" | "behaviour";
+  kind: "skill" | "behaviour" | "placement";
   role_family: string | null;
   item_name: string;
   answer_key: "A" | "B" | "C" | "D";
   rationale: string | null;
   diagnostic: string | null;
+  /** Placement keys match by question number instead of name. */
+  sort_order?: number;
+  /** Placement option point values, e.g. {A:4,B:0,C:2,D:1}. */
+  option_points?: Record<"A" | "B" | "C" | "D", number>;
+  /** Placement templates are matched by department when set. */
+  department?: string | null;
 };
 
-type Token =
+export type Token =
   | { type: "h1" | "h2" | "h3" | "p" | "li"; text: string }
   | { type: "table"; rows: string[][] };
 

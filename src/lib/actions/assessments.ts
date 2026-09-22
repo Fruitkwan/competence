@@ -5,11 +5,17 @@ import { NOTIFICATION_TYPES } from "@/lib/constants/notification-types";
 import { createNotification } from "@/lib/notifications/create-notification";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
-import { parseAnnexeDocx, parseInstrumentDocx, type ParsedKey } from "@/lib/assessments/parse-docx";
+import { docxToTokens, parseAnnexeDocx, parseInstrumentDocx, type ParsedKey } from "@/lib/assessments/parse-docx";
+import {
+  isPlacementAnnexeTokens,
+  isPlacementInstrumentTokens,
+  parsePlacementAnnexeDocx,
+  parsePlacementInstrumentDocx,
+} from "@/lib/assessments/parse-placement-docx";
 import { matchSkillTemplate, normalizeName } from "@/lib/assessments/match";
 import { defaultJobTitlesFor } from "@/lib/assessments/role-mapping";
 import { DEFAULT_SCORING } from "@/lib/assessments/scoring";
-import { isExpired, peerTiming } from "@/lib/assessments/time-limit";
+import { isExpired, peerTiming, PLACEMENT_TIME_LIMIT_MINUTES } from "@/lib/assessments/time-limit";
 
 type Letter = "A" | "B" | "C" | "D";
 type RaterType = "self" | "line_manager" | "cross_dept" | "peer";
@@ -74,7 +80,10 @@ export async function uploadAssessmentDocx(formData: FormData) {
 
   try {
     if (hasInstrument) {
-      const parsed = await parseInstrumentDocx(Buffer.from(await instrument.arrayBuffer()));
+      const instrumentBuffer = Buffer.from(await instrument.arrayBuffer());
+      const parsed = isPlacementInstrumentTokens(await docxToTokens(instrumentBuffer))
+        ? [await parsePlacementInstrumentDocx(instrumentBuffer)]
+        : await parseInstrumentDocx(instrumentBuffer);
       for (const tpl of parsed) {
         const { data: row, error } = await supabase
           .from("assessment_templates")
@@ -86,7 +95,7 @@ export async function uploadAssessmentDocx(formData: FormData) {
             job_titles: defaultJobTitlesFor(tpl.role_family),
             version: tpl.version,
             status: "draft",
-            scoring: DEFAULT_SCORING[tpl.kind],
+            scoring: tpl.kind === "placement" ? {} : DEFAULT_SCORING[tpl.kind],
             aspiration_questions: tpl.aspiration_questions,
             privacy_notice: tpl.privacy_notice,
             source_file_name: instrument.name,
@@ -105,7 +114,10 @@ export async function uploadAssessmentDocx(formData: FormData) {
     }
 
     if (hasAnnexe) {
-      const keys = await parseAnnexeDocx(Buffer.from(await annexe.arrayBuffer()));
+      const annexeBuffer = Buffer.from(await annexe.arrayBuffer());
+      const keys = isPlacementAnnexeTokens(await docxToTokens(annexeBuffer))
+        ? await parsePlacementAnnexeDocx(annexeBuffer)
+        : await parseAnnexeDocx(annexeBuffer);
       const result = await applyAnswerKeys(keys);
       if (result.error) return { error: result.error };
       keysApplied.push(...result.applied);
@@ -122,25 +134,37 @@ async function applyAnswerKeys(keys: ParsedKey[]) {
   const supabase = await createClient();
   const { data: templates, error } = await supabase
     .from("assessment_templates")
-    .select("id, kind, role_family, status")
+    .select("id, kind, role_family, department, status")
     .neq("status", "archived");
   if (error) return { error: dbError(error), applied: [] };
 
   const templateIds = (templates ?? []).map((t) => t.id);
   const { data: items } = templateIds.length
-    ? await supabase.from("assessment_items").select("id, template_id, name").in("template_id", templateIds)
+    ? await supabase.from("assessment_items").select("id, template_id, name, sort_order").in("template_id", templateIds)
     : { data: [] };
 
-  const rows: { item_id: string; answer_key: Letter; rationale: string | null; diagnostic: string | null }[] = [];
+  const rows: {
+    item_id: string;
+    answer_key: Letter;
+    rationale: string | null;
+    diagnostic: string | null;
+    option_points?: Record<string, number> | null;
+  }[] = [];
   const applied: string[] = [];
   for (const key of keys) {
     const matchingTemplates = (templates ?? []).filter(
-      (t) => t.kind === key.kind && (key.kind === "behaviour" || normalizeName(t.role_family ?? "") === normalizeName(key.role_family ?? ""))
+      (t) =>
+        t.kind === key.kind &&
+        (key.kind === "placement"
+          ? !key.department || normalizeName(t.department ?? "") === normalizeName(key.department)
+          : key.kind !== "skill" || normalizeName(t.role_family ?? "") === normalizeName(key.role_family ?? ""))
     );
     for (const tpl of matchingTemplates) {
-      const item = (items ?? []).find((i) => i.template_id === tpl.id && normalizeName(i.name) === normalizeName(key.item_name));
+      const item = key.sort_order != null
+        ? (items ?? []).find((i) => i.template_id === tpl.id && i.sort_order === key.sort_order)
+        : (items ?? []).find((i) => i.template_id === tpl.id && normalizeName(i.name) === normalizeName(key.item_name));
       if (!item) continue;
-      rows.push({ item_id: item.id, answer_key: key.answer_key, rationale: key.rationale, diagnostic: key.diagnostic });
+      rows.push({ item_id: item.id, answer_key: key.answer_key, rationale: key.rationale, diagnostic: key.diagnostic, option_points: key.option_points ?? null });
       applied.push(item.id);
     }
   }
@@ -167,10 +191,14 @@ export async function setTemplateStatus(templateId: string, status: "draft" | "p
     const { data: items } = await supabase.from("assessment_items").select("id").eq("template_id", templateId);
     const ids = (items ?? []).map((i) => i.id);
     const { data: keys } = ids.length
-      ? await supabase.from("assessment_item_keys").select("item_id").in("item_id", ids).not("answer_key", "is", null)
+      ? await supabase.from("assessment_item_keys").select("item_id, option_points").in("item_id", ids).not("answer_key", "is", null)
       : { data: [] };
     const missing = ids.length - (keys?.length ?? 0);
     if (missing > 0) return { error: `${missing} item(s) have no answer key. Upload the scoring annexe or set the keys before publishing.` };
+    if (tpl.kind === "placement") {
+      const missingPoints = ids.length - (keys ?? []).filter((k) => k.option_points != null).length;
+      if (missingPoints > 0) return { error: `${missingPoints} item(s) have no option point values. Upload the placement scoring annexe before publishing.` };
+    }
 
     // Only one published template per kind + role family.
     let q = supabase
@@ -242,7 +270,7 @@ export type AssignInput = {
 };
 
 type EmployeeRow = { employee_id: string; full_name: string; job_title: string; manager_name: string | null; user_id: string | null };
-type TemplateRow = { id: string; kind: "skill" | "behaviour"; name: string; role_family: string | null; job_titles: string[] };
+type TemplateRow = { id: string; kind: "skill" | "behaviour" | "placement"; name: string; role_family: string | null; job_titles: string[] };
 type ProfileRow = { id: string; employee_id: string | null; full_name: string | null; manager_id: string | null };
 
 function resolveEmployeeUsers(employee: EmployeeRow, profiles: ProfileRow[]) {
@@ -294,8 +322,8 @@ async function createAssignmentsForEmployee(opts: {
     if (opts.include_line_manager && managerUserId && managerUserId !== employeeUserId) {
       raters.push({ rater_user_id: managerUserId, rater_type: "line_manager" });
     }
-    const others = tpl.kind === "skill" ? opts.cross_dept_user_ids : opts.peer_user_ids;
-    const otherType: RaterType = tpl.kind === "skill" ? "cross_dept" : "peer";
+    const others = tpl.kind === "behaviour" ? opts.peer_user_ids : opts.cross_dept_user_ids;
+    const otherType: RaterType = tpl.kind === "behaviour" ? "peer" : "cross_dept";
     for (const uid of new Set(others)) {
       if (uid && uid !== employeeUserId && uid !== managerUserId) raters.push({ rater_user_id: uid, rater_type: otherType });
     }
@@ -311,7 +339,7 @@ async function createAssignmentsForEmployee(opts: {
           user_id: employeeUserId,
           type: NOTIFICATION_TYPES.ASSESSMENT_ASSIGNED,
           title: `New assessment: ${tpl.name}`,
-          body: `You have been asked to complete the ${tpl.kind === "skill" ? "skill" : "behaviour"} assessment.${due}`,
+          body: `You have been asked to complete the ${tpl.kind === "skill" ? "skill" : tpl.kind === "placement" ? "role placement" : "behaviour"} assessment.${due}`,
           link: "/assessments",
           metadata: { assignment_id: assignment.id, template_id: tpl.id, employee_id: employee.employee_id },
         })
@@ -387,6 +415,7 @@ export type DepartmentAssignInput = {
   due_date: string | null;
   include_skill: boolean;
   include_behaviour: boolean;
+  include_placement: boolean;
   include_line_manager: boolean;
   /** Nominate up to 3 peers per person from the same department (behaviour assessment). */
   auto_peers: boolean;
@@ -400,7 +429,7 @@ export async function assignAssessmentsToDepartment(input: DepartmentAssignInput
   const { error: authError, profile } = await requireAdmin();
   if (authError) return { error: authError };
   if (!input.department) return { error: "Select a department." };
-  if (!input.include_skill && !input.include_behaviour) return { error: "Include at least one assessment type." };
+  if (!input.include_skill && !input.include_behaviour && !input.include_placement) return { error: "Include at least one assessment type." };
 
   const supabase = await createClient();
   const [{ data: employees, error: empError }, { data: templates }, { data: profiles }] = await Promise.all([
@@ -410,7 +439,7 @@ export async function assignAssessmentsToDepartment(input: DepartmentAssignInput
       .eq("active", true)
       .eq("department", input.department)
       .order("full_name"),
-    supabase.from("assessment_templates").select("id, kind, name, role_family, job_titles").eq("status", "published"),
+    supabase.from("assessment_templates").select("id, kind, name, role_family, department, job_titles").eq("status", "published"),
     supabase.from("profiles").select("id, employee_id, full_name, manager_id"),
   ]);
   if (empError) return { error: dbError(empError) };
@@ -419,6 +448,10 @@ export async function assignAssessmentsToDepartment(input: DepartmentAssignInput
   const published = templates ?? [];
   const behaviour = published.find((t) => t.kind === "behaviour") ?? null;
   if (input.include_behaviour && !behaviour) return { error: "No published behaviour assessment. Publish it in the library first." };
+  const placement =
+    published.find((t) => t.kind === "placement" && normalizeName(t.department ?? "") === normalizeName(input.department)) ?? null;
+  if (input.include_placement && !placement)
+    return { error: `No published placement assessment for ${input.department}. Upload and publish it in the library first.` };
 
   const resolved = employees.map((e) => ({ employee: e, ...resolveEmployeeUsers(e, profiles ?? []) }));
   const peerPool = resolved.map((r) => r.employeeUserId);
@@ -437,6 +470,7 @@ export async function assignAssessmentsToDepartment(input: DepartmentAssignInput
       else unmatched.push(`${employee.full_name} (${employee.job_title})`);
     }
     if (input.include_behaviour && behaviour) tpls.push(behaviour);
+    if (input.include_placement && placement) tpls.push(placement);
     if (!tpls.length) continue;
     if (!employeeUserId) noAccount.push(employee.full_name);
 
@@ -563,7 +597,7 @@ export async function updateAssignmentRaters(input: UpdateAssignmentRatersInput)
   const managerUserId = employee.manager_name
     ? activeProfiles.find((p) => p.full_name === employee.manager_name)?.id ?? null
     : null;
-  const otherType: RaterType = template.kind === "skill" ? "cross_dept" : "peer";
+  const otherType: RaterType = template.kind === "behaviour" ? "peer" : "cross_dept";
   const desired = new Map<string, RaterType>();
   if (input.include_line_manager && managerUserId && managerUserId !== assignment.employee_user_id) {
     desired.set(managerUserId, "line_manager");
@@ -695,12 +729,26 @@ export async function saveSelfAssessment(
   }
   if (rater.status === "submitted") return { error: "Already submitted." };
 
+  const { data: tpl } = await supabase
+    .from("assessment_templates")
+    .select("kind")
+    .eq("id", assignment.template_id)
+    .single();
+  const placement = tpl?.kind === "placement";
+
   // Once the time limit has passed, any save finalises whatever has been answered.
-  const timedOut = isExpired(assignment.started_at);
+  const timedOut = isExpired(assignment.started_at, Date.now(), placement ? PLACEMENT_TIME_LIMIT_MINUTES : undefined);
   const finalise = submit || timedOut;
   if (submit && !timedOut) {
-    const incomplete = answers.filter((a) => a.rating == null || a.scenario_answer == null);
-    if (incomplete.length) return { error: `Answer every rating and scenario before submitting (${incomplete.length} remaining).` };
+    const incomplete = placement
+      ? answers.filter((a) => a.scenario_answer == null)
+      : answers.filter((a) => a.rating == null || a.scenario_answer == null);
+    if (incomplete.length)
+      return {
+        error: placement
+          ? `Answer every question before submitting (${incomplete.length} remaining).`
+          : `Answer every rating and scenario before submitting (${incomplete.length} remaining).`,
+      };
   }
 
   if (answers.length) {
@@ -783,8 +831,11 @@ export async function saveRaterAssessment(raterId: string, answers: RaterAnswer[
   if (rater.status === "submitted") return { error: "Already submitted." };
   if (rater.rater_type === "self") return { error: "Use the self-assessment form." };
   const { data: assignment } = await supabase.from("assessment_assignments")
-    .select("status").eq("id", rater.assignment_id).maybeSingle();
+    .select("status, template_id").eq("id", rater.assignment_id).maybeSingle();
   if (!assignment || assignment.status === "closed") return { error: "Assessment is closed." };
+  const { data: tpl } = await supabase.from("assessment_templates")
+    .select("kind").eq("id", assignment.template_id).maybeSingle();
+  const placement = tpl?.kind === "placement";
   const peer = rater.rater_type === "peer";
   if (peer && !rater.started_at) return { error: "Press Start to begin the peer assessment." };
   const { timedOut, acceptAnswers } = peer && rater.started_at
@@ -795,6 +846,14 @@ export async function saveRaterAssessment(raterId: string, answers: RaterAnswer[
   if (submit && !timedOut) {
     const incomplete = answers.filter((a) => a.rating == null && !a.not_observed);
     if (incomplete.length) return { error: `Rate every item or mark it "Not observed" (${incomplete.length} remaining).` };
+    // The placement instrument requires a written example for extreme ratings.
+    if (placement) {
+      const missingEvidence = answers.filter(
+        (a) => !a.not_observed && (a.rating === 1 || a.rating === 2 || a.rating === 5) && !a.evidence?.trim()
+      );
+      if (missingEvidence.length)
+        return { error: `A written example is required for every rating of 1, 2 or 5 (${missingEvidence.length} missing).` };
+    }
   }
 
   // After the delivery grace period, finalise the saved draft without accepting late edits.
@@ -828,15 +887,58 @@ export async function saveRaterAssessment(raterId: string, answers: RaterAnswer[
 export async function suggestTemplatesForEmployee(employeeId: string) {
   const supabase = await createClient();
   const [{ data: employee }, { data: templates }] = await Promise.all([
-    supabase.from("employees").select("job_title").eq("employee_id", employeeId).single(),
-    supabase.from("assessment_templates").select("id, kind, role_family, job_titles").eq("status", "published"),
+    supabase.from("employees").select("job_title, department").eq("employee_id", employeeId).single(),
+    supabase.from("assessment_templates").select("id, kind, role_family, department, job_titles").eq("status", "published"),
   ]);
   const skill = matchSkillTemplate(employee?.job_title, templates ?? []);
-  return (templates ?? []).filter((t) => t.kind === "behaviour" || t.id === skill?.id).map((t) => t.id);
+  const dept = normalizeName(employee?.department ?? "");
+  return (templates ?? [])
+    .filter(
+      (t) =>
+        t.kind === "behaviour" ||
+        t.id === skill?.id ||
+        (t.kind === "placement" && !!dept && normalizeName(t.department ?? "") === dept)
+    )
+    .map((t) => t.id);
 }
 
 export async function isAdminClientConfigured() {
   return createAdminClient() != null;
+}
+
+/** Saves the verified 12-month performance record for a placement assignment (HR/staff). */
+export async function saveRecordScores(
+  assignmentId: string,
+  scores: { commercial: number | null; account: number | null; leadership: number | null }
+) {
+  const { error: authError } = await requireStaff();
+  if (authError) return { error: authError };
+
+  const clean = (v: number | null) => (v == null ? null : Math.min(100, Math.max(0, Math.round(v))));
+  const record_scores = {
+    commercial: clean(scores.commercial),
+    account: clean(scores.account),
+    leadership: clean(scores.leadership),
+  };
+
+  const supabase = await createClient();
+  const { data: assignment } = await supabase
+    .from("assessment_assignments")
+    .select("id, template_id")
+    .eq("id", assignmentId)
+    .maybeSingle();
+  if (!assignment) return { error: "Assignment not found." };
+  const { data: tpl } = await supabase
+    .from("assessment_templates")
+    .select("kind")
+    .eq("id", assignment.template_id)
+    .maybeSingle();
+  if (tpl?.kind !== "placement") return { error: "Record scores only apply to role placement assessments." };
+
+  const { error } = await supabase.from("assessment_assignments").update({ record_scores }).eq("id", assignmentId);
+  if (error) return { error: error.message };
+  revalidatePath(`/assessments/${assignmentId}/report`);
+  return { success: true };
 }
 
 /** Records a report acknowledgement signature for the given role slot. */

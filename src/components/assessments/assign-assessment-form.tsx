@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
 import { DepartmentAssignPanel } from "./department-assign-panel";
 
 type Employee = { employee_id: string; full_name: string; job_title: string; manager_name: string | null; department: string | null };
-type Template = { id: string; kind: "skill" | "behaviour"; name: string; role_family: string | null; job_titles: string[] };
+type Template = { id: string; kind: "skill" | "behaviour" | "placement"; name: string; role_family: string | null; department?: string | null; job_titles: string[] };
 type UserOption = { id: string; label: string; meta: string; employee_id: string | null };
 
 export type AssignmentRow = {
@@ -27,7 +27,7 @@ export type AssignmentRow = {
   employee_id: string;
   employee_name: string;
   template_name: string;
-  kind: "skill" | "behaviour";
+  kind: "skill" | "behaviour" | "placement";
   wave: string | null;
   due_date: string | null;
   status: "assigned" | "in_progress" | "submitted" | "closed";
@@ -92,6 +92,7 @@ export function AssignAssessmentForm({
 
   const hasSkill = [...selected].some((id) => templates.find((t) => t.id === id)?.kind === "skill");
   const hasBehaviour = [...selected].some((id) => templates.find((t) => t.id === id)?.kind === "behaviour");
+  const hasPlacement = [...selected].some((id) => templates.find((t) => t.id === id)?.kind === "placement");
 
   async function submit() {
     if (!employeeId) return toast.error("Select an employee.");
@@ -266,12 +267,16 @@ export function AssignAssessmentForm({
 
             <UserMultiPicker
               label="Cross-departmental rater(s)"
-              hint={hasSkill ? "Skill assessment. Someone outside the direct reporting line." : "Only used by the skill assessment."}
+              hint={
+                hasSkill || hasPlacement
+                  ? `${hasSkill && hasPlacement ? "Skill and placement assessments" : hasSkill ? "Skill assessment" : "Placement assessment"}. Someone outside the direct reporting line.`
+                  : "Only used by the skill and placement assessments."
+              }
               users={users}
               exclude={[employeeUser?.id, managerUser?.id]}
               value={crossDept}
               onChange={setCrossDept}
-              disabled={!hasSkill}
+              disabled={!hasSkill && !hasPlacement}
             />
             <UserMultiPicker
               label="Peer raters (minimum 3)"
@@ -465,7 +470,7 @@ function ManageRatersDialog({
             </label>
           </div>
           <UserMultiPicker
-            label={assignment?.kind === "skill" ? "Cross-departmental raters" : "Peer raters"}
+            label={assignment?.kind === "behaviour" ? "Peer raters" : "Cross-departmental raters"}
             hint="Submitted responses are preserved and cannot be removed."
             users={users}
             exclude={[subjectUserId, assignment?.manager_user_id]}
