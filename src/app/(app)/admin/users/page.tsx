@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ROLE_LABELS } from "@/lib/constants/roles";
 import type { AppRole } from "@/lib/constants/roles";
+import { UserActions } from "./user-actions";
 
 const EM_DASH = "\u2014";
 
@@ -66,6 +67,7 @@ export default async function AdminUsersPage() {
                   <th className="px-4 py-3 text-left font-medium">Country</th>
                   <th className="px-4 py-3 text-left font-medium">Manager</th>
                   <th className="px-4 py-3 text-left font-medium">Status</th>
+                  <th className="px-4 py-3 text-right font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -106,6 +108,14 @@ export default async function AdminUsersPage() {
                       ) : (
                         <span className="text-muted-foreground">Inactive</span>
                       )}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <UserActions
+                        user={u}
+                        departments={(departments ?? []).map((d) => ({ id: d.id, name: d.name }))}
+                        managers={(users ?? []).filter((m) => m.id !== u.id).map((m) => ({ id: m.id, name: m.full_name ?? m.email }))}
+                        isSelf={u.id === user!.id}
+                      />
                     </td>
                   </tr>
                   );

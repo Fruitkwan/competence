@@ -339,7 +339,7 @@ async function createAssignmentsForEmployee(opts: {
           user_id: employeeUserId,
           type: NOTIFICATION_TYPES.ASSESSMENT_ASSIGNED,
           title: `New assessment: ${tpl.name}`,
-          body: `You have been asked to complete the ${tpl.kind === "skill" ? "skill" : tpl.kind === "placement" ? "role placement" : "behaviour"} assessment.${due}`,
+          body: `You have been asked to complete the ${tpl.kind === "behaviour" ? "behaviour" : "skill"} assessment.${due}`,
           link: "/assessments",
           metadata: { assignment_id: assignment.id, template_id: tpl.id, employee_id: employee.employee_id },
         })

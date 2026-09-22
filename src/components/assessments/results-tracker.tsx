@@ -76,7 +76,7 @@ export function AssessmentTracker({ data }: { data: TrackerData }) {
                   </TableCell>
                   <TableCell>
                     {row.assessment}
-                    <span className="ml-1 text-xs capitalize text-muted-foreground">({row.kind})</span>
+                    <span className="ml-1 text-xs capitalize text-muted-foreground">({row.kind === "placement" ? "skill" : row.kind})</span>
                   </TableCell>
                   <TableCell><Tick done={row.selfDone} /></TableCell>
                   <TableCell><Tick done={row.managerDone} /></TableCell>

@@ -119,7 +119,7 @@ export default async function MyAssessmentsPage() {
                   <div>
                     <div className="font-medium">{tpl?.role_family ?? tpl?.name ?? "Assessment"}</div>
                     <div className="text-xs text-muted-foreground">
-                      <span className="capitalize">{tpl?.kind}</span>
+                      <span className="capitalize">{tpl?.kind === "placement" ? "skill" : tpl?.kind}</span>
                       {a.wave ? ` · ${a.wave}` : ""}
                       {a.due_date ? ` · due ${formatDate(a.due_date)}` : ""}
                     </div>

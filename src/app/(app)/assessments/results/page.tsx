@@ -98,7 +98,7 @@ export default async function AssessmentResultsPage() {
                   </TableCell>
                   <TableCell>
                     {tpl?.role_family ?? tpl?.name}
-                    <span className="ml-1 text-xs capitalize text-muted-foreground">({tpl?.kind})</span>
+                    <span className="ml-1 text-xs capitalize text-muted-foreground">({tpl?.kind === "placement" ? "skill" : tpl?.kind})</span>
                   </TableCell>
                   <TableCell>
                     {a.wave ?? "—"}
