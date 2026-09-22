@@ -41,7 +41,7 @@ function RecordScoresCard({ report }: { report: PlacementReport }) {
           <ClipboardList className="size-4" /> Verified performance record
         </CardTitle>
         <CardDescription>
-          12-month record, entered by HR. A missing commercial record leaves the placement pending; missing sections count as unmet.
+          12-month record, entered by HR. A missing commercial record leaves the result pending; missing sections count as unmet.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -109,7 +109,7 @@ export function PlacementReportView({ report }: { report: PlacementReport }) {
         <div className="flex items-start justify-between gap-6">
           <div>
             <div className="text-xs font-semibold uppercase tracking-[0.2em] text-teal-700 dark:text-teal-300">Dhofar Global</div>
-            <h1 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">Role placement report</h1>
+            <h1 className="mt-2 text-2xl font-semibold text-slate-900 dark:text-slate-100">Skill assessment report</h1>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">{template.name}</p>
           </div>
           <div className="rounded-full border border-teal-300 bg-white/70 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-teal-800 dark:border-teal-700 dark:bg-teal-950/40 dark:text-teal-200">

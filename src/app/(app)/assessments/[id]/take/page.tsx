@@ -50,7 +50,7 @@ export default async function TakeAssessmentPage(props: PageProps<"/assessments/
     <>
       <PageHeader
         title={template.role_family ?? template.name}
-        description={`${template.kind === "skill" ? "Skill assessment" : template.kind === "placement" ? "Role placement assessment" : "Behaviour, Desire and Attitude assessment"}${template.kind === "placement" ? "" : " · self-rating"}${assignment.wave ? ` · ${assignment.wave}` : ""}${assignment.due_date ? ` · due ${formatDate(assignment.due_date)}` : ""}`}
+        description={`${template.kind === "behaviour" ? "Behaviour, Desire and Attitude assessment" : "Skill assessment"}${template.kind === "placement" ? "" : " · self-rating"}${assignment.wave ? ` · ${assignment.wave}` : ""}${assignment.due_date ? ` · due ${formatDate(assignment.due_date)}` : ""}`}
       />
       <AssessmentForm
         title={template.name}

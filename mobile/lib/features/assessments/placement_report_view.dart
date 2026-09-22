@@ -60,7 +60,7 @@ class PlacementReportView extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Placement outcome',
+                'Assessment outcome',
                 style: theme.textTheme.labelLarge
                     ?.copyWith(color: scheme.onSurfaceVariant),
               ),

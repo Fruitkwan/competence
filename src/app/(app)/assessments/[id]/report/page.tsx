@@ -34,8 +34,8 @@ export default async function AssessmentReportPage(props: PageProps<"/assessment
     return (
       <>
         <PageHeader
-          title="Role placement report"
-          description="Placement decided by the published threshold ladder: paper scores, conduct gate and the verified performance record."
+          title="Skill assessment report"
+          description="Outcome decided by the published scoring thresholds, the conduct gate and the verified performance record."
           actions={
             <Link href={viewer.role === "employee" ? "/assessments" : "/assessments/results"} className={buttonVariants({ variant: "outline" })}>
               Back
