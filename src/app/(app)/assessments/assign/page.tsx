@@ -17,7 +17,7 @@ export default async function AssignAssessmentsPage() {
     supabase.from("employees").select("employee_id, full_name, job_title, manager_name, department").eq("active", true).order("full_name"),
     supabase
       .from("assessment_templates")
-      .select("id, kind, name, role_family, job_titles")
+      .select("id, kind, name, role_family, department, job_titles")
       .eq("status", "published")
       .order("kind")
       .order("role_family"),

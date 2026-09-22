@@ -1,0 +1,51 @@
+.canvas { width: 100%; min-width: 0; border: 1px solid #e5def5; border-radius: 18px; background-color: #fcfbff; background-image: radial-gradient(circle, #ddd2f5 1px, transparent 1.2px); background-size: 16px 16px; container-type: inline-size; }
+.canvasInner { display: flex; flex-direction: column; gap: 48px; padding: 32px 20px; }
+.branch { position: relative; display: flex; flex-direction: column; align-items: center; min-width: 0; width: 100%; }
+.children { position: relative; display: grid; width: 100%; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); align-items: start; gap: 32px 24px; padding-top: 34px; }
+.children > .branch::before { content: ""; position: absolute; height: 34px; top: -34px; left: 50%; border-left: 1px dashed #9b79f1; }
+/* Within a team column, stack reports vertically like the supplied reference. */
+.children .children { display: flex; flex-direction: column; gap: 26px; padding: 26px 0 0 14px; }
+.children .children::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; border-left: 1px dashed #9b79f1; }
+.children .children > .branch::before { top: 24px; left: -14px; width: 14px; height: 0; border-left: 0; border-top: 1px dashed #9b79f1; }
+.children .children .children { padding-left: 0; }
+.children .children .children::before { display: none; }
+.children .children .children > .branch::before { left: 50%; top: -26px; width: 0; height: 26px; border-top: 0; border-left: 1px dashed #9b79f1; }
+.personCard { position: relative; z-index: 1; width: 100%; max-width: 340px; border: 1px solid #bda8fb; border-radius: 11px; background: rgba(255,255,255,.96); box-shadow: 0 5px 14px rgba(70,45,120,.10); transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
+.personCard:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(70,45,120,.15); }
+.selected { border-color: #7c3aed; box-shadow: 0 0 0 2px rgba(124,58,237,.16), 0 8px 20px rgba(70,45,120,.16); }
+.placeholder { border-style: dashed; background: #fffbeb; }
+.personMain { display: flex; width: 100%; align-items: center; gap: 10px; padding: 10px 12px; text-align: left; }
+.avatar { display: flex; width: 42px; height: 42px; flex: 0 0 42px; align-items: center; justify-content: center; border-radius: 999px; background: #ede9fe; color: #6d28d9; font-size: 12px; font-weight: 700; }
+.personText { min-width: 0; flex: 1; }
+.personName { display: block; overflow: hidden; color: #514963; font-size: 14px; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
+.personTitle { display: block; overflow: hidden; margin-top: 4px; color: #24202b; font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.you { border-radius: 999px; background: #ede9fe; padding: 2px 6px; color: #6d28d9; font-size: 9px; font-weight: 700; }
+.toggle { position: absolute; bottom: -13px; left: 50%; display: grid; width: 26px; height: 26px; transform: translateX(-50%); place-items: center; border: 1px solid #c4b5fd; border-radius: 999px; background: white; color: #7c3aed; }
+.toggle svg { width: 14px; height: 14px; }
+.detailPanel { display: grid; gap: 22px; border: 1px solid #bda8fb; border-radius: 14px; background: #fff; padding: 22px; box-shadow: 0 7px 18px rgba(70,45,120,.11); }
+.detailIdentity { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 4px 14px; }
+.detailIdentity > :last-child { grid-column: 1 / -1; }
+.detailAvatar { position: relative; display: grid; width: 72px; height: 72px; grid-row: span 2; place-items: center; border-radius: 999px; background: #ede9fe; color: #6d28d9; font-size: 20px; font-weight: 700; }
+.verified { position: absolute; right: -1px; bottom: 2px; display: grid; width: 20px; height: 20px; place-items: center; border: 2px solid white; border-radius: 999px; background: #8b5cf6; color: white; font-size: 10px; }
+.metrics { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.metric { display: flex; min-width: 0; align-items: center; gap: 10px; border: 1px solid #ddd6fe; border-radius: 8px; background: #fcfbff; padding: 10px 12px; }
+.metric > svg { width: 18px; height: 18px; flex: none; color: #8b5cf6; }
+@media (min-width: 768px) { .detailPanel { grid-template-columns: minmax(240px, .8fr) minmax(360px, 1.3fr); align-items: center; } .detailIdentity > :last-child { grid-column: 2; width: fit-content; } }
+@media (max-width: 720px) { .canvasInner { padding: 24px 12px; } .detailPanel { padding: 14px; } }
+.assessments { padding: 0 14px 20px; font-size: 13px; }
+.assessment { border-top: 1px solid #ede9fe; padding-top: 10px; margin-top: 6px; }
+.scoreRow { display: flex; align-items: start; justify-content: space-between; gap: 10px; }
+.scoreRow a { color: #55466d; font-weight: 500; overflow-wrap: anywhere; }
+.scoreRow a:hover { text-decoration: underline; }
+.scoreRow strong { font-size: 19px; color: #6d28d9; white-space: nowrap; }
+.assessmentEmpty { font-size: 12px; color: #6b6478; }
+.raters { margin-top: 6px; color: #514963; line-height: 1.5; overflow-wrap: anywhere; }
+.raters span { font-weight: 600; }
+.provisional { font-size: 12px; color: #92400e; }
+.personMain:focus-visible, .toggle:focus-visible { outline: 2px solid #7c3aed; outline-offset: 3px; }
+@media (prefers-reduced-motion: reduce) { .personCard { transition: none; } }
+
+.canvasInner > .branch > .children::before { content: ""; position: absolute; top: 16px; left: 0; right: 0; border-top: 1px dashed #9b79f1; }
+.canvasInner > .branch > .children::after { content: ""; position: absolute; top: 0; left: 50%; height: 16px; border-left: 1px dashed #9b79f1; }
+.canvasInner > .branch > .children > .branch::before { top: -18px; height: 18px; }
+@container (max-width: 620px) { .canvasInner > .branch > .children::before { display: none; } }

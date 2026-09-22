@@ -48,9 +48,15 @@ Then edit `.env`:
 SUPABASE_URL=https://YOUR-PROJECT-REF.supabase.co
 SUPABASE_ANON_KEY=YOUR_ANON_KEY      # the *anon* key, never the service-role key
 ENABLE_PUSH=false                    # flip to true once Firebase is wired (step 5)
+WEB_API_BASE_URL=https://your-web-app.vercel.app   # serves /api/mobile/* (scores + reports)
+SUPERUSER_EMAILS=admin@example.com   # comma-separated; password login instead of OTP
 ```
 
 `mobile/.env` is git-ignored and bundled as a Flutter asset.
+
+### Super-user login (no OTP)
+
+Emails listed in `SUPERUSER_EMAILS` see a **password field** on the login screen instead of the OTP flow. The account must exist in Supabase Auth with a password (create it via the web app's register flow or the Supabase dashboard). This is a real authenticated account — not an auth bypass — so give it the intended role (e.g. `admin`) in `profiles`.
 
 ## 5. (Optional) Wire up Firebase Cloud Messaging
 
@@ -152,6 +158,7 @@ mobile/
 │   │   ├── employees/         # directory with filters/pagination
 │   │   ├── idp/               # courses + certificate upload
 │   │   ├── notifications/     # in-app feed + FCM push service
+│   │   ├── assessments/       # assigned assessments + score/report viewer
 │   │   └── hr_dashboard/
 │   └── shared/widgets/        # AsyncValueView, StatusChip, EmptyState
 └── README.md (this file)

@@ -332,7 +332,7 @@ export function AssessmentReport({ report }: { report: EmployeeReport }) {
 
 /* ---------------- blocks ---------------- */
 
-function SignatureField({
+export function SignatureField({
   role,
   name,
   signature,

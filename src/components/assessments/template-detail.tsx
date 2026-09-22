@@ -68,7 +68,7 @@ export function TemplateDetail({
           <div ref={content} tabIndex={-1} className="min-w-0 scroll-mt-6 space-y-4 outline-none">
             {active ? <>
               <div className="flex items-center justify-between gap-3"><p className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Competency {activeIndex + 1} of {items.length}</p><Badge variant="outline">Admin preview</Badge></div>
-              <ItemCard key={active.id} item={active} itemKey={keyByItem.get(active.id) ?? null} />
+              <ItemCard key={active.id} item={active} itemKey={keyByItem.get(active.id) ?? null} placement={template.kind === "placement"} />
               <div className="flex justify-between gap-3 rounded-xl border bg-background p-3"><Button variant="outline" disabled={activeIndex <= 0} onClick={() => selectItem(items[activeIndex - 1].id)}><ArrowLeft className="size-4" /> Previous</Button><Button disabled={activeIndex >= items.length - 1} onClick={() => selectItem(items[activeIndex + 1].id)}>Next competency <ArrowRight className="size-4" /></Button></div>
             </> : <Card><CardHeader><CardTitle>No competencies yet</CardTitle><CardDescription>This template does not contain any assessment items.</CardDescription></CardHeader></Card>}
           </div>
@@ -118,6 +118,25 @@ export function TemplateDetail({
 }
 
 function ScoringSummary({ scoring, kind }: { scoring: Record<string, unknown>; kind: Template["kind"] }) {
+  if (kind === "placement") {
+    return (
+      <dl className="grid grid-cols-[1fr_auto] gap-x-6 gap-y-3">
+        {[
+          ["Part 1 — Foundation", "Gate: ≥ 12/20, no 0-point answer"],
+          ["Part 2 — Account Leadership", "≥ 14/20 senior threshold"],
+          ["Part 3 — Team Leadership", "≥ 15/20 manager threshold"],
+          ["Part 4 — Conduct", "Gate: any 0 caps at Sales Executive"],
+          ["Option scoring", "4 / 2 / 1 / 0 per option"],
+          ["Time limit", "120 minutes"],
+        ].map(([k, v]) => (
+          <div key={k} className="contents">
+            <dt className="text-muted-foreground">{k}</dt>
+            <dd className="text-right font-medium">{v}</dd>
+          </div>
+        ))}
+      </dl>
+    );
+  }
   const s = resolveScoring(kind, scoring);
   const w = s.weights ?? {};
   const t = s.thresholds ?? {};
@@ -148,10 +167,11 @@ function pct(v: number | undefined) {
   return v == null ? "—" : `${Math.round(v * 100)}%`;
 }
 
-function ItemCard({ item, itemKey }: { item: Item; itemKey: Key | null }) {
+function ItemCard({ item, itemKey, placement }: { item: Item; itemKey: Key | null; placement: boolean }) {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [key, setKey] = useState<Letter | null>(itemKey?.answer_key ?? null);
+  const optionPoints = itemKey?.option_points as Record<string, number> | null;
 
   async function setAnswer(letter: Letter) {
     setSaving(true);
@@ -180,6 +200,7 @@ function ItemCard({ item, itemKey }: { item: Item; itemKey: Key | null }) {
         <CardDescription className="leading-relaxed">{item.indicator}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6 px-6 pb-8 text-sm sm:px-8">
+        {(item.anchor_2 || item.anchor_3 || item.anchor_4) && (
         <details className="rounded-xl border bg-muted/20 p-4">
           <summary className="cursor-pointer font-medium">Rating guide · Levels 2–4</summary>
           <div className="mt-4 grid gap-4 leading-relaxed">
@@ -197,29 +218,40 @@ function ItemCard({ item, itemKey }: { item: Item; itemKey: Key | null }) {
           ))}
           </div>
         </details>
+        )}
 
         {item.scenario && (
           <div className="space-y-4">
-            <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Scenario check</div>
+            <div className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">{placement ? "Question" : "Scenario check"}</div>
             <p className="rounded-xl bg-muted/40 p-5 leading-7">{item.scenario}</p>
-            <p className="text-xs text-muted-foreground">The highlighted option is the correct answer. Selecting another option updates the answer key immediately.</p>
+            <p className="text-xs text-muted-foreground">
+              {placement
+                ? "Each option carries its point value; the key marks the 4-point (best judgement) answer."
+                : "The highlighted option is the correct answer. Selecting another option updates the answer key immediately."}
+            </p>
             <div className="grid gap-3">
               {options.map(([letter, text]) => (
                 <button
                   key={letter}
                   type="button"
-                  disabled={saving}
+                  disabled={saving || placement}
                   aria-pressed={key === letter}
                   onClick={() => setAnswer(letter)}
                   className={cn(
                     "flex items-start gap-3 rounded-xl border p-4 text-left leading-relaxed transition-colors hover:bg-accent",
-                    key === letter && "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40"
+                    key === letter && "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40",
+                    placement && "cursor-default"
                   )}
                 >
                   <span className={cn("mt-0.5 font-mono text-xs", key === letter ? "text-emerald-600" : "text-muted-foreground")}>
                     {letter}
                   </span>
                   <span className="flex-1">{text}</span>
+                  {optionPoints && (
+                    <span className="mt-0.5 shrink-0 rounded border px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-muted-foreground">
+                      {optionPoints[letter] ?? 0}pt
+                    </span>
+                  )}
                   {key === letter && <Check className="mt-0.5 h-4 w-4 text-emerald-600" />}
                 </button>
               ))}
@@ -228,9 +260,9 @@ function ItemCard({ item, itemKey }: { item: Item; itemKey: Key | null }) {
               {saving ? (
                 <Loader2 className="h-3 w-3 animate-spin" />
               ) : key ? (
-                <Badge variant="outline" className="border-emerald-300 text-emerald-700">Answer: {key}</Badge>
+                <Badge variant="outline" className="border-emerald-300 text-emerald-700">{placement ? `Key: ${key} (4pt)` : `Answer: ${key}`}</Badge>
               ) : (
-                <Badge variant="outline" className="border-amber-300 text-amber-700">No answer key — click the correct option</Badge>
+                <Badge variant="outline" className="border-amber-300 text-amber-700">{placement ? "No scoring key — upload the annexe" : "No answer key — click the correct option"}</Badge>
               )}
             </div>
             {itemKey?.rationale && (

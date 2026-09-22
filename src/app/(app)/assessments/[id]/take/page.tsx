@@ -50,7 +50,7 @@ export default async function TakeAssessmentPage(props: PageProps<"/assessments/
     <>
       <PageHeader
         title={template.role_family ?? template.name}
-        description={`${template.kind === "skill" ? "Skill assessment" : "Behaviour, Desire and Attitude assessment"} · self-rating${assignment.wave ? ` · ${assignment.wave}` : ""}${assignment.due_date ? ` · due ${formatDate(assignment.due_date)}` : ""}`}
+        description={`${template.kind === "skill" ? "Skill assessment" : template.kind === "placement" ? "Role placement assessment" : "Behaviour, Desire and Attitude assessment"}${template.kind === "placement" ? "" : " · self-rating"}${assignment.wave ? ` · ${assignment.wave}` : ""}${assignment.due_date ? ` · due ${formatDate(assignment.due_date)}` : ""}`}
       />
       <AssessmentForm
         title={template.name}
@@ -60,6 +60,7 @@ export default async function TakeAssessmentPage(props: PageProps<"/assessments/
         mode={{
           kind: "self",
           assignmentId: assignment.id,
+          placement: template.kind === "placement",
           aspirationQuestions: template.aspiration_questions as string[],
           aspiration: (assignment.aspiration as Record<string, string> | null) ?? {},
           startedAt: assignment.started_at,

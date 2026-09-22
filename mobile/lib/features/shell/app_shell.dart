@@ -20,6 +20,8 @@ const _tabs = <_NavTab>[
   _NavTab('/objectives', Icons.flag_outlined, Icons.flag_rounded, 'Objectives'),
   _NavTab('/appraisals', Icons.assessment_outlined, Icons.assessment_rounded,
       'Appraisals'),
+  _NavTab('/assessments', Icons.fact_check_outlined, Icons.fact_check_rounded,
+      'Assessments',),
   _NavTab('/idp', Icons.school_outlined, Icons.school_rounded, 'IDP'),
 ];
 

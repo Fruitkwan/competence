@@ -1,5 +1,6 @@
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
@@ -52,8 +53,10 @@ export type EmployeeReport = {
   canSign: Record<SignSlot, boolean>;
 };
 
-export async function getViewer(): Promise<Viewer | null> {
-  const supabase = await createClient();
+type DbClient = SupabaseClient<Database>;
+
+export async function getViewer(client?: DbClient): Promise<Viewer | null> {
+  const supabase = client ?? (await createClient());
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -72,8 +75,8 @@ function dataClient() {
 }
 
 /** Loads one assignment and scores it. Returns null when not found or not permitted. */
-export async function loadAssignmentResult(assignmentId: string, viewer: Viewer): Promise<AssignmentResult | null> {
-  const user = await createClient();
+export async function loadAssignmentResult(assignmentId: string, viewer: Viewer, client?: DbClient): Promise<AssignmentResult | null> {
+  const user = client ?? (await createClient());
   const { data: assignment } = await user
     .from("assessment_assignments")
     .select("*")
@@ -85,17 +88,20 @@ export async function loadAssignmentResult(assignmentId: string, viewer: Viewer)
   const isStaff = viewer.role !== "employee";
   if (!isStaff && !(isSelf && assignment.results_released)) return null;
 
-  return scoreAssignment(assignment);
+  return scoreAssignment(assignment, user);
 }
 
-async function scoreAssignment(assignment: Assignment): Promise<AssignmentResult | null> {
-  const admin = dataClient() ?? (await createClient());
+async function scoreAssignment(assignment: Assignment, client?: DbClient): Promise<AssignmentResult | null> {
+  const admin = dataClient() ?? client ?? (await createClient());
   const [{ data: template }, { data: items }, { data: raters }] = await Promise.all([
     admin.from("assessment_templates").select("*").eq("id", assignment.template_id).single(),
     admin.from("assessment_items").select("*").eq("template_id", assignment.template_id).order("sort_order"),
     admin.from("assessment_raters").select("*").eq("assignment_id", assignment.id),
   ]);
   if (!template || !items) return null;
+  // Placement instruments use the option-points ladder in placement.ts, not the
+  // skill/behaviour person scoring — the results list calls this for every row.
+  if (template.kind === "placement") return null;
 
   const raterIds = (raters ?? []).map((r) => r.id);
   const [{ data: responses }, { data: keys }] = await Promise.all([
@@ -156,11 +162,11 @@ async function scoreAssignment(assignment: Assignment): Promise<AssignmentResult
  * Builds the combined report for an employee: latest skill + latest behaviour
  * assignment (same wave preferred), placed on the skill/will grid.
  */
-export async function loadEmployeeReport(assignmentId: string, viewer: Viewer): Promise<EmployeeReport | null> {
-  const primary = await loadAssignmentResult(assignmentId, viewer);
+export async function loadEmployeeReport(assignmentId: string, viewer: Viewer, client?: DbClient): Promise<EmployeeReport | null> {
+  const primary = await loadAssignmentResult(assignmentId, viewer, client);
   if (!primary) return null;
 
-  const user = await createClient();
+  const user = client ?? (await createClient());
   const { data: employee } = await user
     .from("employees")
     .select("employee_id, full_name, job_title, department, country_code, manager_name")
@@ -183,7 +189,7 @@ export async function loadEmployeeReport(assignmentId: string, viewer: Viewer): 
 
   const sameWave = (candidates ?? []).find((c) => c.wave && c.wave === primary.assignment.wave);
   const companionRow = sameWave ?? (candidates ?? [])[0] ?? null;
-  const companion = companionRow ? await loadAssignmentResult(companionRow.id, viewer) : null;
+  const companion = companionRow ? await loadAssignmentResult(companionRow.id, viewer, client) : null;
 
   const skill = primary.template.kind === "skill" ? primary : companion;
   const behaviour = primary.template.kind === "behaviour" ? primary : companion;

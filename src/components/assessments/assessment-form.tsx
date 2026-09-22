@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { saveRaterAssessment, saveSelfAssessment, startSelfAssessment, startPeerAssessment, type RaterAnswer, type SelfAnswer } from "@/lib/actions/assessments";
-import { ASSESSMENT_TIME_LIMIT_MINUTES, PEER_TIME_LIMIT_MINUTES, deadlineFor } from "@/lib/assessments/time-limit";
+import { ASSESSMENT_TIME_LIMIT_MINUTES, PEER_TIME_LIMIT_MINUTES, PLACEMENT_TIME_LIMIT_MINUTES, deadlineFor } from "@/lib/assessments/time-limit";
 import { cn } from "@/lib/utils";
 
 type Letter = "A" | "B" | "C" | "D";
@@ -50,6 +50,8 @@ type Mode =
   | {
       kind: "self";
       assignmentId: string;
+      /** Placement instruments are MCQ-only with a two-hour sitting. */
+      placement?: boolean;
       aspirationQuestions: string[];
       aspiration: Record<string, string>;
       /** Null until the employee presses Start. */
@@ -131,7 +133,7 @@ function CountdownTimer({ remainingMs, onExpire, minutes }: { remainingMs: numbe
   );
 }
 
-function StartGate({ title, intro, itemCount, hasAspiration, onStart, minutes, peer }: { title: string; intro: string | null; itemCount: number; hasAspiration: boolean; onStart: () => Promise<void>; minutes: number; peer: boolean }) {
+function StartGate({ title, intro, itemCount, hasAspiration, onStart, minutes, peer, placement }: { title: string; intro: string | null; itemCount: number; hasAspiration: boolean; onStart: () => Promise<void>; minutes: number; peer: boolean; placement: boolean }) {
   const [starting, setStarting] = useState(false);
   return (
     <div className="mx-auto max-w-2xl space-y-6 pb-4">
@@ -145,14 +147,14 @@ function StartGate({ title, intro, itemCount, hasAspiration, onStart, minutes, p
             </div>
           </div>
           <CardDescription className="text-sm leading-relaxed">
-            You have <span className="font-semibold text-foreground">{minutes} minutes</span> to complete {itemCount} skill{itemCount === 1 ? "" : "s"}
+            You have <span className="font-semibold text-foreground">{minutes} minutes</span> to complete {itemCount} {placement ? "question" : "skill"}{itemCount === 1 ? "" : "s"}
             {hasAspiration ? " and a short aspiration section" : ""}. The clock starts when you press Start and keeps running even if you leave the page.
             When time runs out, whatever you have answered is submitted automatically.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <ul className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2">
-            <li className="rounded-xl border bg-muted/20 p-3"><span className="font-medium text-foreground">Rate each skill</span> {peer ? "on the 1–5 scale, or choose Not observed if you have not seen enough to rate it." : "on the 1–5 scale, then answer its scenario check. Each scenario has one best answer."}</li>
+            <li className="rounded-xl border bg-muted/20 p-3"><span className="font-medium text-foreground">{placement ? "Answer each question" : "Rate each skill"}</span> {peer ? "on the 1–5 scale, or choose Not observed if you have not seen enough to rate it." : placement ? "by choosing the option that best reflects your judgement. Every option carries points; there is no single right answer." : "on the 1–5 scale, then answer its scenario check. Each scenario has one best answer."}</li>
             <li className="rounded-xl border bg-muted/20 p-3"><span className="font-medium text-foreground">Save as you go.</span> Drafts are kept, but the timer does not pause.</li>
           </ul>
           {intro && (
@@ -199,7 +201,8 @@ export function AssessmentForm({
   const [step, setStep] = useState(0);
   const heading = useRef<HTMLDivElement>(null);
   const isTimed = mode.kind === "self" || mode.timed;
-  const minutes = mode.kind === "rater" ? PEER_TIME_LIMIT_MINUTES : ASSESSMENT_TIME_LIMIT_MINUTES;
+  const placement = mode.kind === "self" && mode.placement === true;
+  const minutes = mode.kind === "rater" ? PEER_TIME_LIMIT_MINUTES : placement ? PLACEMENT_TIME_LIMIT_MINUTES : ASSESSMENT_TIME_LIMIT_MINUTES;
   const hasAspiration = mode.kind === "self" && mode.aspirationQuestions.length > 0;
   // Start time paired with the server clock that observed it, so remaining time never depends on the client clock.
   const [session, setSession] = useState<{ startedAt: string; serverNow: number } | null>(
@@ -213,6 +216,7 @@ export function AssessmentForm({
   };
   const complete = (item: FormItem) => {
     const d = drafts[item.id];
+    if (placement) return d.scenario_answer != null;
     return mode.kind === "self" ? d.rating != null && (!item.scenario || d.scenario_answer != null) : d.rating != null || d.not_observed;
   };
   const [drafts, setDrafts] = useState<Record<string, Draft>>(() => {
@@ -294,7 +298,7 @@ export function AssessmentForm({
   }
 
   if (isTimed && !session) {
-    return <StartGate title={title} intro={intro} itemCount={items.length} hasAspiration={hasAspiration} onStart={start} minutes={minutes} peer={mode.kind === "rater"} />;
+    return <StartGate title={title} intro={intro} itemCount={items.length} hasAspiration={hasAspiration} onStart={start} minutes={minutes} peer={mode.kind === "rater"} placement={placement} />;
   }
 
   const remainingMs = session ? deadlineFor(session.startedAt, minutes) - session.serverNow : null;
@@ -309,10 +313,10 @@ export function AssessmentForm({
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-widest text-teal-700 dark:text-teal-300">Your development starts here</p>
             <h2 className="mt-1 text-lg font-semibold">{title}</h2>
-            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">{mode.kind === "self" ? `Take one skill at a time. Reflect on your experience, choose a rating, then work through the scenario. You have ${ASSESSMENT_TIME_LIMIT_MINUTES} minutes in total.` : `Share your observations of ${mode.subjectName}, one skill at a time.`}</p>
+            <p className="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">{mode.kind === "self" ? (placement ? `Answer every question, one at a time. Choose the option that best reflects your judgement — there is no single right answer. You have ${PLACEMENT_TIME_LIMIT_MINUTES} minutes in total.` : `Take one skill at a time. Reflect on your experience, choose a rating, then work through the scenario. You have ${ASSESSMENT_TIME_LIMIT_MINUTES} minutes in total.`) : `Share your observations of ${mode.subjectName}, one skill at a time.`}</p>
             <details className="mt-3 text-sm text-muted-foreground">
               <summary className="cursor-pointer font-medium text-foreground">How to complete this assessment{intro ? " & privacy" : ""}</summary>
-              <p className="mt-3 max-w-2xl leading-relaxed">Use the full rating scale and choose the level that best reflects consistent performance. Each scenario has one best answer. You can revisit any section before submitting. Save a draft before leaving to continue later.{mode.kind === "rater" && ' Choose “Not observed” if you have not had enough visibility; it is excluded from the score.'}</p>
+              <p className="mt-3 max-w-2xl leading-relaxed">{placement ? "Every option carries judgement points. Answer all questions in one sitting; you can revisit any question before submitting. Save a draft before leaving to continue later." : "Use the full rating scale and choose the level that best reflects consistent performance. Each scenario has one best answer. You can revisit any section before submitting. Save a draft before leaving to continue later."}{mode.kind === "rater" && ' Choose “Not observed” if you have not had enough visibility; it is excluded from the score.'}</p>
               {intro && <p className="mt-3 max-w-2xl whitespace-pre-line leading-relaxed">{intro}</p>}
             </details>
           </div>
@@ -340,13 +344,14 @@ export function AssessmentForm({
               return (
                 <Card key={item.id} className="overflow-hidden rounded-2xl py-0 shadow-sm">
                   <CardHeader className="gap-3 border-b bg-muted/20 px-6 py-6 sm:px-8">
-                    <p className="text-xs font-semibold uppercase tracking-widest text-teal-700 dark:text-teal-300">Skill {step + 1} of {items.length}{item.group_name ? ` · ${item.group_name}` : ""}</p>
+                    <p className="text-xs font-semibold uppercase tracking-widest text-teal-700 dark:text-teal-300">{placement ? "Question" : "Skill"} {step + 1} of {items.length}{item.group_name ? ` · ${item.group_name}` : ""}</p>
                     <CardTitle className="text-2xl tracking-tight">
                       {item.name}
                     </CardTitle>
                     <CardDescription className="text-sm leading-relaxed">{item.indicator}</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-8 px-6 pb-8 sm:px-8">
+                    {!placement && (item.anchor_2 || item.anchor_3 || item.anchor_4) && (
                     <details className="rounded-xl border bg-muted/20 p-4 text-sm">
                       <summary className="cursor-pointer font-medium">What does each level look like?</summary>
                       <div className="mt-4 space-y-4 leading-relaxed">
@@ -364,7 +369,9 @@ export function AssessmentForm({
                       ))}
                       </div>
                     </details>
+                    )}
 
+                    {!placement && (
                     <fieldset className="space-y-4">
                       <legend className="text-sm font-medium">{ratePrompt}</legend>
                       <div className="grid gap-2 sm:grid-cols-5">
@@ -404,10 +411,11 @@ export function AssessmentForm({
                         </label>
                       )}
                     </fieldset>
+                    )}
 
                     {mode.kind === "self" && item.scenario && (
                       <fieldset className="space-y-4">
-                        <legend className="text-sm font-medium">Scenario check</legend>
+                        <legend className="text-sm font-medium">{placement ? "Choose the best response" : "Scenario check"}</legend>
                         <p className="rounded-xl bg-muted/40 p-5 text-sm leading-7">{item.scenario}</p>
                         <div className="grid gap-3">
                           {(
@@ -491,7 +499,7 @@ export function AssessmentForm({
             <Card className="rounded-2xl">
               <CardHeader><CardTitle className="text-xl">Review your assessment</CardTitle><CardDescription>{progress.done === progress.total ? "All skills are complete. Take a moment to review before submitting." : "A few answers still need your attention. Choose a skill below to finish it."}</CardDescription></CardHeader>
               <CardContent className="space-y-3">
-                {items.map((item, index) => <button key={item.id} onClick={() => goTo(index)} className="flex w-full items-center justify-between gap-4 rounded-xl border p-4 text-left text-sm hover:bg-muted/40"><span className="font-medium">{item.name}</span><span className={cn("text-right text-xs", complete(item) ? "text-teal-700 dark:text-teal-300" : "text-amber-700 dark:text-amber-300")}>{drafts[item.id].not_observed ? "Not observed" : drafts[item.id].rating ? `${drafts[item.id].rating} · ${SCALE.find(s => s.value === drafts[item.id].rating)?.label}` : "Rating needed"}{mode.kind === "self" && item.scenario && (drafts[item.id].scenario_answer ? ` · Scenario ${drafts[item.id].scenario_answer}` : " · Scenario needed")}</span></button>)}
+                {items.map((item, index) => <button key={item.id} onClick={() => goTo(index)} className="flex w-full items-center justify-between gap-4 rounded-xl border p-4 text-left text-sm hover:bg-muted/40"><span className="font-medium">{item.name}</span><span className={cn("text-right text-xs", complete(item) ? "text-teal-700 dark:text-teal-300" : "text-amber-700 dark:text-amber-300")}>{placement ? (drafts[item.id].scenario_answer ? `Answer ${drafts[item.id].scenario_answer}` : "Answer needed") : <>{drafts[item.id].not_observed ? "Not observed" : drafts[item.id].rating ? `${drafts[item.id].rating} · ${SCALE.find(s => s.value === drafts[item.id].rating)?.label}` : "Rating needed"}{mode.kind === "self" && item.scenario && (drafts[item.id].scenario_answer ? ` · Scenario ${drafts[item.id].scenario_answer}` : " · Scenario needed")}</>}</span></button>)}
                 {hasAspiration && <Button variant="outline" onClick={() => goTo(items.length)}>Review your aspirations</Button>}
                 <p className="pt-3 text-xs leading-relaxed text-muted-foreground">Once submitted, your answers cannot be changed.</p>
               </CardContent>

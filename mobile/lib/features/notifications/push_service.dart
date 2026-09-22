@@ -20,6 +20,28 @@ class PushService {
   static final _local = FlutterLocalNotificationsPlugin();
   static bool _initialized = false;
 
+  /// Set by the app (app.dart) once the router exists so notification taps
+  /// can deep-link into the app (e.g. /assessments/<id>/report).
+  static void Function(String link)? onOpenLink;
+  static String? _pendingLink;
+
+  static void _openLink(String? link) {
+    if (link == null || link.isEmpty || link.startsWith('http')) return;
+    final handler = onOpenLink;
+    if (handler == null) {
+      _pendingLink = link; // cold start: router not built yet
+      return;
+    }
+    handler(link);
+  }
+
+  /// Replays a notification tap that arrived before the router was ready.
+  static void flushPendingLink() {
+    final link = _pendingLink;
+    _pendingLink = null;
+    if (link != null) onOpenLink?.call(link);
+  }
+
   /// Best-effort initializer. Silently no-ops if Firebase config is missing.
   static Future<void> tryInit() async {
     if (_initialized) return;
@@ -41,6 +63,7 @@ class PushService {
     );
     await _local.initialize(
       const InitializationSettings(android: android, iOS: darwin),
+      onDidReceiveNotificationResponse: (resp) => _openLink(resp.payload),
     );
 
     final messaging = FirebaseMessaging.instance;
@@ -62,8 +85,20 @@ class PushService {
           ),
           iOS: DarwinNotificationDetails(),
         ),
+        payload: msg.data['link'] as String?,
       );
     });
+
+    // Tapped while the app was in the background.
+    FirebaseMessaging.onMessageOpenedApp
+        .listen((msg) => _openLink(msg.data['link'] as String?));
+
+    // Tapped from a cold start (app was terminated).
+    unawaited(
+      messaging.getInitialMessage().then((msg) {
+        if (msg != null) _openLink(msg.data['link'] as String?);
+      }),
+    );
 
     _initialized = true;
   }
