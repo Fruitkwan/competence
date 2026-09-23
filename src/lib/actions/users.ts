@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import type { AppRole } from "@/lib/constants/roles";
 import { ROLES } from "@/lib/constants/roles";
 
@@ -17,13 +18,22 @@ async function requireAdmin() {
 }
 
 export async function setUserActive(userId: string, active: boolean) {
-  const { error: authError, supabase, userId: me } = await requireAdmin();
+  const { error: authError, userId: me } = await requireAdmin();
   if (authError) return { error: authError };
   if (userId === me) return { error: "You cannot deactivate your own account." };
 
-  const { error } = await supabase.from("profiles").update({ is_active: active }).eq("id", userId);
+  const admin = createAdminClient();
+  if (!admin) return { error: "Server administration is not configured." };
+  const { data, error } = await admin
+    .from("profiles")
+    .update({ is_active: active })
+    .eq("id", userId)
+    .select("id, is_active")
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!data || data.is_active !== active) return { error: "The account status was not changed. Please try again." };
   revalidatePath("/admin/users");
+  revalidatePath("/", "layout");
   return { error: null };
 }
 
@@ -38,13 +48,15 @@ export type UserUpdate = {
 };
 
 export async function updateUser(userId: string, fields: UserUpdate) {
-  const { error: authError, supabase, userId: me } = await requireAdmin();
+  const { error: authError, userId: me } = await requireAdmin();
   if (authError) return { error: authError };
   if (!Object.values(ROLES).includes(fields.role)) return { error: "Invalid role." };
   if (userId === me && fields.role !== "admin") return { error: "You cannot remove your own admin role." };
-  if (userId === me && fields.manager_id === me) return { error: "A user cannot be their own manager." };
+  if (fields.manager_id === userId) return { error: "A user cannot be their own manager." };
 
-  const { error } = await supabase
+  const admin = createAdminClient();
+  if (!admin) return { error: "Server administration is not configured." };
+  const { data, error } = await admin
     .from("profiles")
     .update({
       full_name: fields.full_name.trim() || null,
@@ -55,8 +67,11 @@ export async function updateUser(userId: string, fields: UserUpdate) {
       manager_id: fields.manager_id || null,
       employee_id: fields.employee_id?.trim() || null,
     })
-    .eq("id", userId);
+    .eq("id", userId)
+    .select("id")
+    .maybeSingle();
   if (error) return { error: error.message };
+  if (!data) return { error: "The user profile was not updated." };
   revalidatePath("/admin/users");
   return { error: null };
 }

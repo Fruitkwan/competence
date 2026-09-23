@@ -46,7 +46,9 @@ export default async function RecycleBinPage() {
           <div className="rounded-full bg-muted p-3"><Trash2 className="size-6 text-muted-foreground" /></div>
           <div>
             <div className="font-medium">Recycle Bin is empty</div>
-            <div className="mt-1 text-sm text-muted-foreground">Removed records will appear here and can be restored.</div>
+            <div className="mt-1 max-w-lg text-sm text-muted-foreground">
+              Removed records will appear here and can be restored. Login accounts are deactivated and reactivated from User Management, so they do not appear in the Recycle Bin.
+            </div>
           </div>
         </Card>
       ) : (

@@ -81,13 +81,13 @@ export function TemplateLibrary({ templates, loadError }: { templates: TemplateR
   }
 
   async function remove(id: string, name: string) {
-    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+    if (!confirm(`Move "${name}" to the Recycle Bin?`)) return;
     setBusyId(id);
     const result = await deleteTemplate(id);
     setBusyId(null);
     if (result.error) toast.error(result.error);
     else {
-      toast.success("Deleted.");
+      toast.success("Moved to the Recycle Bin.");
       router.refresh();
     }
   }

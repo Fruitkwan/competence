@@ -208,3 +208,6 @@ GRANT EXECUTE ON FUNCTION public.move_to_recycle_bin(text, text) TO authenticate
 GRANT EXECUTE ON FUNCTION public.restore_deleted_item(text, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.permanently_delete_item(text, text) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.list_recycle_bin() TO authenticated;
+
+-- Make the newly added RPCs available to PostgREST immediately after deployment.
+NOTIFY pgrst, 'reload schema';

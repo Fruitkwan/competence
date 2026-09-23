@@ -130,13 +130,13 @@ export function AssignAssessmentForm({
   }
 
   async function remove(row: AssignmentRow) {
-    if (!confirm(`Delete ${row.template_name} for ${row.employee_name}? All responses will be lost.`)) return;
+    if (!confirm(`Move ${row.template_name} for ${row.employee_name} to the Recycle Bin? Responses will be kept for recovery.`)) return;
     setBusyId(row.id);
     const result = await deleteAssignment(row.id);
     setBusyId(null);
     if (result.error) toast.error(result.error);
     else {
-      toast.success("Deleted.");
+      toast.success("Moved to the Recycle Bin.");
       router.refresh();
     }
   }

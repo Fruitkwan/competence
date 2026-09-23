@@ -91,7 +91,10 @@ export function UserActions({
           </DropdownMenuItem>
           {!isSelf && (
             <DropdownMenuItem
-              onClick={() => run(() => setUserActive(user.id, !user.is_active), user.is_active ? "User deactivated." : "User activated.")}
+              onClick={() => run(
+                () => setUserActive(user.id, !user.is_active),
+                user.is_active ? "User deactivated. Use Activate to restore access." : "User activated."
+              )}
             >
               {user.is_active ? (
                 <><UserX className="mr-2 size-4" /> Deactivate</>
