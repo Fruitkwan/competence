@@ -1,6 +1,12 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import Link from "next/link";
+import { Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatDate } from "@/lib/format";
 import type { TrackerData, TrackerRow } from "@/lib/assessments/tracker";
@@ -17,14 +23,57 @@ function pct(n: number, d: number) {
   return d === 0 ? "—" : `${Math.round((n / d) * 100)}%`;
 }
 
+const STATUS_FILTERS = [
+  ["all", "All"],
+  ["incomplete", "Has pending"],
+  ["complete", "Fully complete"],
+  ["self", "Self pending"],
+  ["manager", "Manager pending"],
+  ["peers", "Peers pending"],
+] as const;
+
+function matches(row: TrackerRow, status: string) {
+  switch (status) {
+    case "incomplete": return !(row.selfDone && row.managerDone && row.peerDone >= row.peerTotal);
+    case "complete": return row.selfDone && row.managerDone && row.peerDone >= row.peerTotal;
+    case "self": return !row.selfDone;
+    case "manager": return !row.managerDone;
+    case "peers": return row.peerDone < row.peerTotal;
+    default: return true;
+  }
+}
+
 export function AssessmentTracker({ data }: { data: TrackerData }) {
+  const [query, setQuery] = useState("");
+  const [dept, setDept] = useState("all");
+  const [status, setStatus] = useState("all");
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return data.departments
+      .filter((d) => dept === "all" || d.name === dept)
+      .map((d) => ({
+        ...d,
+        rows: d.rows.filter(
+          (r) =>
+            matches(r, status) &&
+            (!q || r.employeeName.toLowerCase().includes(q) || (r.jobTitle ?? "").toLowerCase().includes(q))
+        ),
+      }))
+      .filter((d) => d.rows.length > 0);
+  }, [data, query, dept, status]);
+
+  const shown = filtered.reduce((n, d) => n + d.rows.length, 0);
   const total = data.departments.reduce((n, d) => n + d.rows.length, 0);
   const selfIn = data.departments.reduce((n, d) => n + d.selfIn, 0);
   const managerIn = data.departments.reduce((n, d) => n + d.managerIn, 0);
   const peerIn = data.departments.reduce((n, d) => n + d.peerIn, 0);
   const peerTotal = data.departments.reduce((n, d) => n + d.peerTotal, 0);
   const complete = data.departments.reduce((n, d) => n + d.complete, 0);
-  const outstanding = data.raters.filter((r) => r.outstandingFor.length > 0);
+  const outstanding = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return data.raters.filter((r) => r.outstandingFor.length > 0 && (!q || r.name.toLowerCase().includes(q)));
+  }, [data, query]);
 
   const stats: [string, string][] = [
     ["In scope", String(total)],
@@ -46,12 +95,64 @@ export function AssessmentTracker({ data }: { data: TrackerData }) {
         ))}
       </div>
 
-      {data.departments.map((dept) => (
-        <Card key={dept.name} className="overflow-hidden">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative min-w-56 flex-1 sm:max-w-72">
+          <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search employee or job title…"
+            className="pl-8"
+          />
+        </div>
+        <Select value={dept} onValueChange={(v) => setDept(String(v ?? "all"))}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Department" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All departments</SelectItem>
+            {data.departments.map((d) => (
+              <SelectItem key={d.name} value={d.name}>{d.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={status} onValueChange={(v) => setStatus(String(v ?? "all"))}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_FILTERS.map(([v, label]) => (
+              <SelectItem key={v} value={v}>{label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {(query || dept !== "all" || status !== "all") && (
+          <button
+            className="text-xs font-medium text-primary hover:underline"
+            onClick={() => { setQuery(""); setDept("all"); setStatus("all"); }}
+          >
+            Clear filters
+          </button>
+        )}
+        <span className="ml-auto text-xs text-muted-foreground">
+          Showing {shown} of {total}
+        </span>
+      </div>
+
+      {filtered.length === 0 && (
+        <Card className="py-10 text-center text-sm text-muted-foreground">
+          No assignments match the current filters.
+        </Card>
+      )}
+
+      {filtered.map((deptCard) => (
+        <Card key={deptCard.name} className="overflow-hidden">
           <div className="flex items-center justify-between border-b px-4 py-3">
-            <div className="font-semibold">{dept.name}</div>
+            <div className="font-semibold">{deptCard.name}</div>
             <div className="text-xs text-muted-foreground">
-              {dept.complete}/{dept.rows.length} complete · peers {dept.peerIn}/{dept.peerTotal}
+              {deptCard.rows.filter((r) => r.selfDone && r.managerDone && r.peerDone >= r.peerTotal).length}/{deptCard.rows.length} complete
+              {" · peers "}
+              {deptCard.rows.reduce((n, r) => n + r.peerDone, 0)}/{deptCard.rows.reduce((n, r) => n + r.peerTotal, 0)}
             </div>
           </div>
           <Table>
@@ -68,7 +169,7 @@ export function AssessmentTracker({ data }: { data: TrackerData }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {dept.rows.map((row: TrackerRow) => (
+              {deptCard.rows.map((row: TrackerRow) => (
                 <TableRow key={row.assignmentId}>
                   <TableCell>
                     <div className="font-medium">{row.employeeName}</div>
