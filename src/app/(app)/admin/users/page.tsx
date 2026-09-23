@@ -1,13 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { ROLE_LABELS } from "@/lib/constants/roles";
-import type { AppRole } from "@/lib/constants/roles";
-import { UserActions } from "./user-actions";
-
-const EM_DASH = "\u2014";
+import { UsersTable, type UserManagementRow } from "./users-table";
 
 export default async function AdminUsersPage() {
   const supabase = await createClient();
@@ -39,12 +33,17 @@ export default async function AdminUsersPage() {
   const nameMap = new Map(users?.map((u) => [u.id, u.full_name]) ?? []);
   const employeeMap = new Map(employees?.map((e) => [e.employee_id, e]) ?? []);
 
-  const roleBadgeColor: Record<string, string> = {
-    admin: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
-    manager: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-    employee: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
-    executive: "bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300",
-  };
+  const userRows: UserManagementRow[] = (users ?? []).map((profileRow) => {
+    const employee = profileRow.employee_id ? employeeMap.get(profileRow.employee_id) : null;
+    const managerName = profileRow.manager_id ? nameMap.get(profileRow.manager_id) : employee?.manager_name;
+    return {
+      ...profileRow,
+      display_job_title: profileRow.job_title ?? employee?.job_title ?? null,
+      display_department: profileRow.department_id ? deptMap.get(profileRow.department_id) ?? null : employee?.department ?? null,
+      display_country: profileRow.country_code ?? employee?.country_code ?? null,
+      display_manager: managerName && !samePerson(managerName, profileRow.full_name) ? managerName : null,
+    };
+  });
 
   return (
     <>
@@ -53,78 +52,12 @@ export default async function AdminUsersPage() {
         description={`${users?.length ?? 0} users in the system.`}
       />
 
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th className="px-4 py-3 text-left font-medium">Name</th>
-                  <th className="px-4 py-3 text-left font-medium">Email</th>
-                  <th className="px-4 py-3 text-left font-medium">Role</th>
-                  <th className="px-4 py-3 text-left font-medium">Job title</th>
-                  <th className="px-4 py-3 text-left font-medium">Department</th>
-                  <th className="px-4 py-3 text-left font-medium">Country</th>
-                  <th className="px-4 py-3 text-left font-medium">Manager</th>
-                  <th className="px-4 py-3 text-left font-medium">Status</th>
-                  <th className="px-4 py-3 text-right font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users?.map((u) => {
-                  const employee = u.employee_id ? employeeMap.get(u.employee_id) : null;
-                  const managerName = u.manager_id ? nameMap.get(u.manager_id) : employee?.manager_name;
-                  const visibleManager = managerName && !samePerson(managerName, u.full_name) ? managerName : null;
-                  return (
-                  <tr key={u.id} className="border-b transition-colors hover:bg-muted/30">
-                    <td className="px-4 py-3 font-medium">
-                      {u.full_name ?? EM_DASH}
-                      {u.employee_id && (
-                        <span className="ml-1.5 text-xs text-muted-foreground">
-                          #{u.employee_id}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{u.email}</td>
-                    <td className="px-4 py-3">
-                      <Badge
-                        variant="outline"
-                        className={`border-0 ${roleBadgeColor[u.role] ?? ""}`}
-                      >
-                        {ROLE_LABELS[u.role as AppRole] ?? u.role}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{u.job_title ?? employee?.job_title ?? EM_DASH}</td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {u.department_id ? deptMap.get(u.department_id) ?? EM_DASH : employee?.department ?? EM_DASH}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{u.country_code ?? employee?.country_code ?? EM_DASH}</td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {visibleManager ?? EM_DASH}
-                    </td>
-                    <td className="px-4 py-3">
-                      {u.is_active !== false ? (
-                        <span className="text-emerald-600">Active</span>
-                      ) : (
-                        <span className="text-muted-foreground">Inactive</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      <UserActions
-                        user={u}
-                        departments={(departments ?? []).map((d) => ({ id: d.id, name: d.name }))}
-                        managers={(users ?? []).filter((m) => m.id !== u.id).map((m) => ({ id: m.id, name: m.full_name ?? m.email }))}
-                        isSelf={u.id === user!.id}
-                      />
-                    </td>
-                  </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
+      <UsersTable
+        users={userRows}
+        departments={(departments ?? []).map((department) => ({ id: department.id, name: department.name }))}
+        managers={(users ?? []).map((manager) => ({ id: manager.id, name: manager.full_name ?? manager.email }))}
+        currentUserId={user!.id}
+      />
     </>
   );
 }
