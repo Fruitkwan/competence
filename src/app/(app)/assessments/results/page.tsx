@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getViewer, loadAssignmentResult } from "@/lib/assessments/results";
 import { loadAssessmentTracker } from "@/lib/assessments/tracker";
 import { AssessmentTracker } from "@/components/assessments/results-tracker";
+import { ResultsAnalytics, type AnalyticsRow } from "@/components/assessments/results-analytics";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -42,7 +43,7 @@ export default async function AssessmentResultsPage() {
   const rows = assignments ?? [];
   const [{ data: employees }, { data: templates }] = await Promise.all([
     rows.length
-      ? supabase.from("employees").select("employee_id, full_name, job_title").in("employee_id", [...new Set(rows.map((r) => r.employee_id))])
+      ? supabase.from("employees").select("employee_id, full_name, job_title, department").in("employee_id", [...new Set(rows.map((r) => r.employee_id))])
       : { data: [] },
     rows.length
       ? supabase.from("assessment_templates").select("id, kind, name, role_family").in("id", [...new Set(rows.map((r) => r.template_id))])
@@ -60,7 +61,31 @@ export default async function AssessmentResultsPage() {
 
   const tracker = viewer.role === "admin" ? await loadAssessmentTracker() : null;
 
+  const analyticsRows: AnalyticsRow[] = scored.map(({ a, result }) => {
+    const emp = empById.get(a.employee_id);
+    const tpl = tplById.get(a.template_id);
+    const nonSelf = result?.raters.filter((r) => r.type !== "self") ?? [];
+    return {
+      employeeName: emp?.full_name ?? a.employee_id,
+      department: emp?.department ?? "Unknown",
+      assessment: tpl?.role_family ?? tpl?.name ?? "",
+      kind: tpl?.kind ?? "",
+      wave: a.wave,
+      status: a.status,
+      index: result?.score.index ?? null,
+      ratersIn: nonSelf.filter((r) => r.status === "submitted").length,
+      ratersTotal: nonSelf.length,
+      flags: (result?.score.warnings ?? []).filter((w) => w.code !== "provisional").length,
+    };
+  });
+
   const resultsCard = (
+    <div className="space-y-3">
+      <div className="flex justify-end">
+        <a href="/api/export/assessment-results" className={buttonVariants({ variant: "outline", size: "sm" })}>
+          Export Excel
+        </a>
+      </div>
       <Card>
         <Table>
           <TableHeader>
@@ -134,6 +159,7 @@ export default async function AssessmentResultsPage() {
           </TableBody>
         </Table>
       </Card>
+    </div>
   );
 
   return (
@@ -154,10 +180,14 @@ export default async function AssessmentResultsPage() {
           <TabsList variant="line" className="mb-4">
             <TabsTrigger value="results">Results</TabsTrigger>
             <TabsTrigger value="tracker">Tracker</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
           </TabsList>
           <TabsContent value="results">{resultsCard}</TabsContent>
           <TabsContent value="tracker">
             <AssessmentTracker data={tracker} />
+          </TabsContent>
+          <TabsContent value="analytics">
+            <ResultsAnalytics rows={analyticsRows} />
           </TabsContent>
         </Tabs>
       ) : (

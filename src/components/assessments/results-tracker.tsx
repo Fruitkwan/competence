@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Download, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -45,6 +45,7 @@ function matches(row: TrackerRow, status: string) {
 
 export function AssessmentTracker({ data }: { data: TrackerData }) {
   const [query, setQuery] = useState("");
+  const [exporting, setExporting] = useState(false);
   const [dept, setDept] = useState("all");
   const [status, setStatus] = useState("all");
 
@@ -57,7 +58,10 @@ export function AssessmentTracker({ data }: { data: TrackerData }) {
         rows: d.rows.filter(
           (r) =>
             matches(r, status) &&
-            (!q || r.employeeName.toLowerCase().includes(q) || (r.jobTitle ?? "").toLowerCase().includes(q))
+            (!q ||
+              r.employeeName.toLowerCase().includes(q) ||
+              (r.jobTitle ?? "").toLowerCase().includes(q) ||
+              r.waitingOn.some((w) => w.toLowerCase().includes(q)))
         ),
       }))
       .filter((d) => d.rows.length > 0);
@@ -65,23 +69,26 @@ export function AssessmentTracker({ data }: { data: TrackerData }) {
 
   const shown = filtered.reduce((n, d) => n + d.rows.length, 0);
   const total = data.departments.reduce((n, d) => n + d.rows.length, 0);
-  const selfIn = data.departments.reduce((n, d) => n + d.selfIn, 0);
-  const managerIn = data.departments.reduce((n, d) => n + d.managerIn, 0);
-  const peerIn = data.departments.reduce((n, d) => n + d.peerIn, 0);
-  const peerTotal = data.departments.reduce((n, d) => n + d.peerTotal, 0);
-  const complete = data.departments.reduce((n, d) => n + d.complete, 0);
+  const selfIn = filtered.reduce((n, d) => n + d.rows.filter((r) => r.selfDone).length, 0);
+  const managerIn = filtered.reduce((n, d) => n + d.rows.filter((r) => r.managerDone).length, 0);
+  const peerIn = filtered.reduce((n, d) => n + d.rows.reduce((m, r) => m + r.peerDone, 0), 0);
+  const peerTotal = filtered.reduce((n, d) => n + d.rows.reduce((m, r) => m + r.peerTotal, 0), 0);
+  const complete = filtered.reduce(
+    (n, d) => n + d.rows.filter((r) => r.selfDone && r.managerDone && r.peerDone >= r.peerTotal).length,
+    0
+  );
   const outstanding = useMemo(() => {
     const q = query.trim().toLowerCase();
     return data.raters.filter((r) => r.outstandingFor.length > 0 && (!q || r.name.toLowerCase().includes(q)));
   }, [data, query]);
 
   const stats: [string, string][] = [
-    ["In scope", String(total)],
-    ["Self assessments in", `${selfIn}/${total}`],
-    ["Manager ratings in", `${managerIn}/${total}`],
+    ["In scope", String(shown)],
+    ["Self assessments in", `${selfIn}/${shown}`],
+    ["Manager ratings in", `${managerIn}/${shown}`],
     ["Peer ratings in", `${peerIn}/${peerTotal}`],
-    ["Fully complete", `${complete}/${total}`],
-    ["Overall progress", pct(selfIn + managerIn + peerIn, total * 2 + peerTotal)],
+    ["Fully complete", `${complete}/${shown}`],
+    ["Overall progress", pct(selfIn + managerIn + peerIn, shown * 2 + peerTotal)],
   ];
 
   return (
@@ -101,7 +108,7 @@ export function AssessmentTracker({ data }: { data: TrackerData }) {
           <Input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search employee or job title…"
+            placeholder="Search employee, job title or rater…"
             className="pl-8"
           />
         </div>
@@ -134,6 +141,50 @@ export function AssessmentTracker({ data }: { data: TrackerData }) {
             Clear filters
           </button>
         )}
+        <button
+          className="inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
+          disabled={exporting || shown === 0}
+          onClick={async () => {
+            setExporting(true);
+            try {
+              const XLSX = await import("xlsx");
+              const progress = filtered.flatMap((d) =>
+                d.rows.map((r) => ({
+                  Department: d.name,
+                  "Employee ID": r.employeeId,
+                  "Employee Name": r.employeeName,
+                  "Job Title": r.jobTitle ?? "",
+                  "Line Manager": r.managerName ?? "",
+                  Assessment: r.assessment,
+                  Kind: r.kind === "placement" ? "skill" : r.kind,
+                  Wave: r.wave ?? "",
+                  "Due Date": r.dueDate ?? "",
+                  "Self done?": r.selfDone ? "Y" : "N",
+                  "Manager done?": r.managerDone ? "Y" : "N",
+                  "Peers in": r.peerDone,
+                  "Peers total": r.peerTotal,
+                  "STILL WAITING FOR": r.waitingOn.join("; "),
+                  Status: r.status.replace("_", " "),
+                }))
+              );
+              const chase = outstanding.map((r) => ({
+                Rater: r.name,
+                "Assigned to rate": r.assigned,
+                Done: r.done,
+                Outstanding: r.outstandingFor.length,
+                "Waiting for": r.outstandingFor.join("; "),
+              }));
+              const wb = XLSX.utils.book_new();
+              XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(progress), "Person_Progress");
+              XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(chase), "Peer_Chase");
+              XLSX.writeFile(wb, `assessment-tracker-${new Date().toISOString().slice(0, 10)}.xlsx`);
+            } finally {
+              setExporting(false);
+            }
+          }}
+        >
+          <Download className="size-3.5" /> {exporting ? "Exporting…" : "Export Excel"}
+        </button>
         <span className="ml-auto text-xs text-muted-foreground">
           Showing {shown} of {total}
         </span>
