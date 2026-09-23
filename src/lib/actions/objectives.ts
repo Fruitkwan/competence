@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { NOTIFICATION_TYPES } from "@/lib/constants/notification-types";
 import { createNotification } from "@/lib/notifications/create-notification";
+import { moveToRecycleBin } from "@/lib/actions/recycle-bin";
 
 export async function createObjective(formData: FormData) {
   const supabase = await createClient();
@@ -269,15 +270,5 @@ export async function rejectObjective(objectiveId: string, comment: string) {
 }
 
 export async function deleteObjective(objectiveId: string) {
-  const supabase = await createClient();
-
-  const { error } = await supabase
-    .from("cycle_objectives")
-    .delete()
-    .eq("id", objectiveId);
-
-  if (error) return { error: error.message };
-
-  revalidatePath("/objectives");
-  return { success: true };
+  return moveToRecycleBin("cycle_objectives", objectiveId);
 }

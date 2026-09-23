@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { MoreHorizontal, Pencil, Trash2, UserCheck, UserX } from "lucide-react";
+import { MoreHorizontal, Pencil, UserCheck, UserX } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,24 +16,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { deleteUser, setUserActive, updateUser } from "@/lib/actions/users";
+import { setUserActive, updateUser } from "@/lib/actions/users";
 import { ROLE_LABELS, ROLES, type AppRole } from "@/lib/constants/roles";
 
 export type UserRow = {
@@ -66,7 +55,6 @@ export function UserActions({
 }) {
   const router = useRouter();
   const [editOpen, setEditOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [form, setForm] = useState({
     full_name: user.full_name ?? "",
@@ -111,14 +99,6 @@ export function UserActions({
                 <><UserCheck className="mr-2 size-4" /> Activate</>
               )}
             </DropdownMenuItem>
-          )}
-          {!isSelf && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-red-600" onClick={() => setDeleteOpen(true)}>
-                <Trash2 className="mr-2 size-4" /> Delete
-              </DropdownMenuItem>
-            </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
@@ -217,25 +197,6 @@ export function UserActions({
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete {user.full_name ?? user.email}?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This removes the login and profile permanently. Assessment history stays but the user loses all access.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-red-600 hover:bg-red-700"
-              onClick={() => run(() => deleteUser(user.id), "User deleted.")}
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

@@ -5,6 +5,7 @@ import { NOTIFICATION_TYPES } from "@/lib/constants/notification-types";
 import { createNotification } from "@/lib/notifications/create-notification";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { moveToRecycleBin } from "@/lib/actions/recycle-bin";
 import { docxToTokens, parseAnnexeDocx, parseInstrumentDocx, type ParsedKey } from "@/lib/assessments/parse-docx";
 import {
   isPlacementAnnexeTokens,
@@ -246,13 +247,7 @@ export async function updateItemAnswerKey(itemId: string, answerKey: Letter) {
 export async function deleteTemplate(templateId: string) {
   const { error: authError } = await requireAdmin();
   if (authError) return { error: authError };
-  const supabase = await createClient();
-  const { error } = await supabase.from("assessment_templates").delete().eq("id", templateId);
-  if (error) {
-    return { error: error.code === "23503" ? "This template has assignments. Archive it instead." : error.message };
-  }
-  revalidateAll();
-  return { success: true };
+  return moveToRecycleBin("assessment_templates", templateId);
 }
 
 // ---------------------------------------------------------------------------
@@ -552,11 +547,7 @@ export async function closeAssignment(assignmentId: string) {
 export async function deleteAssignment(assignmentId: string) {
   const { error: authError } = await requireAdmin();
   if (authError) return { error: authError };
-  const supabase = await createClient();
-  const { error } = await supabase.from("assessment_assignments").delete().eq("id", assignmentId);
-  if (error) return { error: error.message };
-  revalidateAll();
-  return { success: true };
+  return moveToRecycleBin("assessment_assignments", assignmentId);
 }
 
 export type UpdateAssignmentRatersInput = {

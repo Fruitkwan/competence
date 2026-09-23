@@ -154,9 +154,9 @@ export function DepartmentCard({ department }: { department: DepartmentRow }) {
       <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete department?</AlertDialogTitle>
+            <AlertDialogTitle>Move department to Recycle Bin?</AlertDialogTitle>
             <AlertDialogDescription>
-              Permanently remove <strong>{department.name}</strong>.
+              Remove <strong>{department.name}</strong> from active lists.
               {department.memberCount > 0 ? (
                 <>
                   {" "}
@@ -164,7 +164,7 @@ export function DepartmentCard({ department }: { department: DepartmentRow }) {
                   before deleting.
                 </>
               ) : (
-                " This action cannot be undone."
+                " You can restore it later from the Recycle Bin."
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -175,7 +175,7 @@ export function DepartmentCard({ department }: { department: DepartmentRow }) {
               disabled={isPending || department.memberCount > 0}
               className="bg-destructive text-white hover:bg-destructive/90"
             >
-              {isPending ? "Deleting…" : "Delete"}
+              {isPending ? "Moving…" : "Move to Recycle Bin"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -831,15 +831,15 @@ export function RemoveKpiButton({
       <AlertDialog open={open} onOpenChange={setOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete KPI template?</AlertDialogTitle>
+            <AlertDialogTitle>Move KPI template to Recycle Bin?</AlertDialogTitle>
             <AlertDialogDescription>
-              Permanently remove &ldquo;{title}&rdquo; from this role.
+              Remove &ldquo;{title}&rdquo; from this role. It can be restored later.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirm} disabled={isPending}>
-              {isPending ? "Deleting…" : "Delete"}
+              {isPending ? "Moving…" : "Move to Recycle Bin"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
