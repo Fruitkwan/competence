@@ -1140,7 +1140,31 @@ export type Database = {
         Relationships: [];
       };
     };
-    Functions: Record<string, never>;
+    Functions: {
+      move_to_recycle_bin: {
+        Args: { p_table: string; p_record_id: string };
+        Returns: boolean;
+      };
+      restore_deleted_item: {
+        Args: { p_table: string; p_record_id: string };
+        Returns: boolean;
+      };
+      permanently_delete_item: {
+        Args: { p_table: string; p_record_id: string };
+        Returns: boolean;
+      };
+      list_recycle_bin: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          table_name: string;
+          record_id: string;
+          label: string;
+          detail: string;
+          deleted_at: string;
+          deleted_by_email: string | null;
+        }[];
+      };
+    };
     Enums: {
       app_role: "admin" | "manager" | "employee" | "executive";
     };

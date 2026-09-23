@@ -23,6 +23,7 @@ import {
   Library,
   MessageSquareWarning,
   Network,
+  Trash2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -271,6 +272,13 @@ const NAV: NavItem[] = [
     label: "Assessment Library",
     icon: Library,
     iconColor: "#0ea5e9",
+    roles: ["admin"],
+  },
+  {
+    href: "/admin/recycle-bin",
+    label: "Recycle Bin",
+    icon: Trash2,
+    iconColor: "#f97316",
     roles: ["admin"],
   },
   {

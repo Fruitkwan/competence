@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { moveToRecycleBin } from "@/lib/actions/recycle-bin";
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -195,16 +196,7 @@ export async function removeRoleCompetency(roleTitle: string, competencyId: stri
   const auth = await requireAdmin();
   if (auth.error) return { error: auth.error };
 
-  const { error } = await auth.supabase!
-    .from("role_competencies")
-    .delete()
-    .eq("role_title", roleTitle)
-    .eq("competency_id", competencyId);
-
-  if (error) return { error: error.message };
-
-  revalidateRolePaths(roleTitle);
-  return { success: true };
+  return moveToRecycleBin("role_competencies", JSON.stringify({ role_title: roleTitle, competency_id: competencyId }));
 }
 
 export type RoleKpiInput = {
@@ -263,10 +255,5 @@ export async function deleteRoleKpi(id: string, roleTitle: string) {
   const auth = await requireAdmin();
   if (auth.error) return { error: auth.error };
 
-  const { error } = await auth.supabase!.from("role_kpi_templates").delete().eq("id", id);
-
-  if (error) return { error: error.message };
-
-  revalidateRolePaths(roleTitle);
-  return { success: true };
+  return moveToRecycleBin("role_kpi_templates", id);
 }

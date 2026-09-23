@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { createAdminClient } from "@/lib/supabase/admin";
 import type { AppRole } from "@/lib/constants/roles";
 import { ROLES } from "@/lib/constants/roles";
 
@@ -57,24 +56,6 @@ export async function updateUser(userId: string, fields: UserUpdate) {
       employee_id: fields.employee_id?.trim() || null,
     })
     .eq("id", userId);
-  if (error) return { error: error.message };
-  revalidatePath("/admin/users");
-  return { error: null };
-}
-
-export async function deleteUser(userId: string) {
-  const { error: authError, supabase, userId: me } = await requireAdmin();
-  if (authError) return { error: authError };
-  if (userId === me) return { error: "You cannot delete your own account." };
-
-  const admin = createAdminClient();
-  if (!admin) return { error: "Service role key not configured — cannot delete auth accounts." };
-
-  // Remove the auth account first (profiles row cascades if the FK allows it).
-  const { error: authDelete } = await admin.auth.admin.deleteUser(userId);
-  if (authDelete) return { error: authDelete.message };
-
-  const { error } = await supabase.from("profiles").delete().eq("id", userId);
   if (error) return { error: error.message };
   revalidatePath("/admin/users");
   return { error: null };

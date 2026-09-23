@@ -9,9 +9,9 @@ import {
 } from "@/components/ui/table";
 import { Check, Loader2, Plus, Search, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
 import { formatCourseDevelops } from "@/lib/course-format";
 import { assignCourseToEmployee, updateEmployeeCourseStatus } from "@/lib/actions/training";
+import { moveToRecycleBin } from "@/lib/actions/recycle-bin";
 import { toast } from "sonner";
 
 type Employee = { employee_id: string; full_name: string; job_title: string };
@@ -122,14 +122,14 @@ export function AssignCourseForm({
   }
 
   async function handleDelete(id: string) {
+    if (!confirm("Move this course assignment to the Recycle Bin?")) return;
     setDeletingId(id);
-    const supabase = createClient();
-    const { error } = await supabase.from("employee_courses").delete().eq("id", id);
-    if (error) {
-      toast.error(error.message);
+    const result = await moveToRecycleBin("employee_courses", id);
+    if (result.error) {
+      toast.error(result.error);
     } else {
       setAssignments((prev) => prev.filter((a) => a.id !== id));
-      toast.success("Assignment removed.");
+      toast.success("Course assignment moved to the Recycle Bin.");
     }
     setDeletingId(null);
   }

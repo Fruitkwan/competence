@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { moveToRecycleBin } from "@/lib/actions/recycle-bin";
 
 async function requireAdmin() {
   const supabase = await createClient();
@@ -87,15 +88,5 @@ export async function deleteDepartment(id: string) {
     };
   }
 
-  const { error } = await auth.supabase!.from("departments").delete().eq("id", id);
-
-  if (error) {
-    if (error.code === "23503") {
-      return { error: "Cannot delete: this department is referenced by KPIs or other records." };
-    }
-    return { error: error.message };
-  }
-
-  revalidatePath("/admin/departments");
-  return { success: true };
+  return moveToRecycleBin("departments", id);
 }

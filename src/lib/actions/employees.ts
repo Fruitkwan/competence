@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { moveToRecycleBin } from "@/lib/actions/recycle-bin";
 
 export type EmployeeInput = {
   employee_id: string;
@@ -76,40 +77,7 @@ export async function upsertEmployee(data: EmployeeInput, isEdit: boolean) {
 }
 
 export async function deleteEmployee(employee_id: string) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: "Not authenticated" };
-  }
-
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", user.id)
-    .single();
-
-  if (profile?.role !== "admin") {
-    return { error: "Unauthorized. HR Access required." };
-  }
-
-  try {
-    const { error } = await supabase
-      .from("employees")
-      .delete()
-      .eq("employee_id", employee_id);
-
-    if (error) {
-      return { error: error.message };
-    }
-
-    revalidatePath("/admin/employees");
-    return { success: true };
-  } catch (err: unknown) {
-    return { error: err instanceof Error ? err.message : "Failed to delete employee" };
-  }
+  return moveToRecycleBin("employees", employee_id);
 }
 
 export async function resetEmployeeData() {

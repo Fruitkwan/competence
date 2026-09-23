@@ -10,11 +10,11 @@ export function DeleteObjectiveButton({ objectiveId }: { objectiveId: string }) 
   const [isPending, startTransition] = useTransition();
 
   function handleDelete() {
-    if (!confirm("Delete this objective?")) return;
+    if (!confirm("Move this objective to the Recycle Bin?")) return;
     startTransition(async () => {
       const res = await deleteObjective(objectiveId);
       if (res?.error) toast.error(res.error);
-      else toast.success("Objective deleted");
+      else toast.success("Objective moved to the Recycle Bin.");
     });
   }
 
