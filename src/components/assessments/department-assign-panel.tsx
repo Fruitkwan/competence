@@ -73,24 +73,29 @@ export function DepartmentAssignPanel({
     if (!department) return toast.error("Select a department.");
     if (!confirm(`Assign assessments to ${willAssign} employee(s) in ${department}? Everyone involved will be notified.`)) return;
     setSaving(true);
-    const result = await assignAssessmentsToDepartment({
-      department,
-      wave: wave.trim() || null,
-      due_date: dueDate || null,
-      include_skill: includeSkill,
-      include_behaviour: includeBehaviour,
-      include_placement: includePlacement,
-      include_line_manager: includeManager,
-      auto_peers: autoPeers,
-      cross_dept_user_ids: crossDept,
-    });
-    setSaving(false);
-    if (result.error) return toast.error(result.error);
-    toast.success(`Created ${result.created} assignment(s) for ${result.total} employee(s) in ${department}.`);
-    if (result.skipped?.length) toast.warning(`Skipped ${result.skipped.length}: ${result.skipped.slice(0, 3).join("; ")}${result.skipped.length > 3 ? "…" : ""}`);
-    if (result.unmatched?.length) toast.warning(`No skill template for: ${result.unmatched.slice(0, 3).join("; ")}${result.unmatched.length > 3 ? ` (+${result.unmatched.length - 3})` : ""}. Map their job titles in the library.`);
-    if (result.noAccount?.length) toast.info(`${result.noAccount.length} employee(s) have no user account yet; they will see it once linked.`);
-    router.refresh();
+    try {
+      const result = await assignAssessmentsToDepartment({
+        department,
+        wave: wave.trim() || null,
+        due_date: dueDate || null,
+        include_skill: includeSkill,
+        include_behaviour: includeBehaviour,
+        include_placement: includePlacement,
+        include_line_manager: includeManager,
+        auto_peers: autoPeers,
+        cross_dept_user_ids: crossDept,
+      });
+      if (result.error) return toast.error(result.error);
+      toast.success(`Created ${result.created} assignment(s) for ${result.total} employee(s) in ${department}.`);
+      if (result.skipped?.length) toast.warning(`Skipped ${result.skipped.length}: ${result.skipped.slice(0, 3).join("; ")}${result.skipped.length > 3 ? "…" : ""}`);
+      if (result.unmatched?.length) toast.warning(`No skill template for: ${result.unmatched.slice(0, 3).join("; ")}${result.unmatched.length > 3 ? ` (+${result.unmatched.length - 3})` : ""}. Map their job titles in the library.`);
+      if (result.noAccount?.length) toast.info(`${result.noAccount.length} employee(s) have no user account yet; they will see it once linked.`);
+      router.refresh();
+    } catch {
+      toast.error("The department assignments could not be created. Refresh the page and try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
