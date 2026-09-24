@@ -1,5 +1,10 @@
-import { CheckCircle2, Clock3, ShieldCheck, UserRound, UsersRound } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { CheckCircle2, Clock3, Download, Loader2, ShieldCheck, UserRound, UsersRound } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { AdminAnswer, AdminResponseSection } from "@/lib/assessments/admin-responses";
 
@@ -19,6 +24,30 @@ const RATING_LABEL: Record<number, string> = {
 };
 
 export function AdminAssessmentResponses({ sections }: { sections: AdminResponseSection[] }) {
+  const [exporting, setExporting] = useState(false);
+
+  async function downloadPdf() {
+    setExporting(true);
+    try {
+      const [{ pdf }, { AdminAssessmentResponsesPdf }] = await Promise.all([
+        import("@react-pdf/renderer"),
+        import("./admin-assessment-responses-pdf"),
+      ]);
+      const blob = await pdf(<AdminAssessmentResponsesPdf sections={sections} />).toBlob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      const employee = sections[0]?.employeeName ?? "employee";
+      link.href = url;
+      link.download = `Assessment_responses_${employee.replace(/[^a-z0-9]+/gi, "_")}.pdf`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "PDF export failed.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   if (sections.length === 0) {
     return (
       <Card>
@@ -32,6 +61,12 @@ export function AdminAssessmentResponses({ sections }: { sections: AdminResponse
 
   return (
     <div className="space-y-5">
+      <div className="flex justify-end">
+        <Button variant="outline" onClick={downloadPdf} disabled={exporting}>
+          {exporting ? <Loader2 className="size-4 animate-spin" /> : <Download className="size-4" />}
+          Export responses PDF
+        </Button>
+      </div>
       <div className="flex gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-100">
         <ShieldCheck className="mt-0.5 size-5 shrink-0" />
         <div>
