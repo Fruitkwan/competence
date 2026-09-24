@@ -20,6 +20,7 @@ import { isExpired, peerTiming, PLACEMENT_TIME_LIMIT_MINUTES } from "@/lib/asses
 
 type Letter = "A" | "B" | "C" | "D";
 type RaterType = "self" | "line_manager" | "cross_dept" | "peer";
+type AdminClient = NonNullable<ReturnType<typeof createAdminClient>>;
 
 const MISSING_TABLE_HINT = "Assessment tables are missing. Run scripts/migration-assessments.sql in Supabase.";
 
@@ -287,8 +288,7 @@ async function createAssignmentsForEmployee(opts: {
   cross_dept_user_ids: string[];
   peer_user_ids: string[];
   assignedBy: string;
-}) {
-  const supabase = await createClient();
+}, supabase: AdminClient) {
   const { employee, employeeUserId, managerUserId } = opts;
   const created: string[] = [];
   const skipped: string[] = [];
@@ -310,8 +310,6 @@ async function createAssignmentsForEmployee(opts: {
       skipped.push(error?.code === "23505" ? `${tpl.name} (already assigned)` : `${tpl.name} (${dbError(error ?? { message: "failed" })})`);
       continue;
     }
-    created.push(tpl.name);
-
     const raters: { rater_user_id: string; rater_type: RaterType }[] = [];
     if (employeeUserId) raters.push({ rater_user_id: employeeUserId, rater_type: "self" });
     if (opts.include_line_manager && managerUserId && managerUserId !== employeeUserId) {
@@ -323,8 +321,16 @@ async function createAssignmentsForEmployee(opts: {
       if (uid && uid !== employeeUserId && uid !== managerUserId) raters.push({ rater_user_id: uid, rater_type: otherType });
     }
     if (raters.length) {
-      await supabase.from("assessment_raters").insert(raters.map((r) => ({ ...r, assignment_id: assignment.id })));
+      const { error: ratersError } = await supabase
+        .from("assessment_raters")
+        .insert(raters.map((r) => ({ ...r, assignment_id: assignment.id })));
+      if (ratersError) {
+        await supabase.from("assessment_assignments").delete().eq("id", assignment.id);
+        skipped.push(`${tpl.name} (${dbError(ratersError)})`);
+        continue;
+      }
     }
+    created.push(tpl.name);
 
     const due = opts.due_date ? ` Due ${opts.due_date}.` : "";
     const notifications: Promise<unknown>[] = [];
@@ -364,22 +370,33 @@ export async function assignAssessments(input: AssignInput) {
   if (!input.employee_id) return { error: "Select an employee." };
   if (!input.template_ids.length) return { error: "Select at least one assessment." };
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
+  if (!supabase) return { error: "Server administration is not configured." };
   const [{ data: employee }, { data: templates }, { data: profiles }] = await Promise.all([
     supabase
       .from("employees")
       .select("employee_id, full_name, job_title, manager_name, user_id")
       .eq("employee_id", input.employee_id)
+      .is("deleted_at", null)
       .single(),
     supabase
       .from("assessment_templates")
       .select("id, kind, name, role_family, job_titles")
       .in("id", input.template_ids)
+      .is("deleted_at", null)
       .eq("status", "published"),
     supabase.from("profiles").select("id, employee_id, full_name, manager_id"),
   ]);
   if (!employee) return { error: "Employee not found." };
   if (!templates?.length) return { error: "No published assessments selected." };
+
+  const employeeProfile = (profiles ?? []).find((candidate) => candidate.employee_id === employee.employee_id) ?? null;
+  const managesEmployee =
+    employeeProfile?.manager_id === profile.id ||
+    Boolean(employee.manager_name && profile.full_name && normalizeName(employee.manager_name) === normalizeName(profile.full_name));
+  if (profile.role !== "admin" && !managesEmployee) {
+    return { error: "Managers can assign assessments only to their direct reports." };
+  }
 
   const { employeeUserId, managerUserId } = resolveEmployeeUsers(employee, profiles ?? []);
   const { created, skipped } = await createAssignmentsForEmployee({
@@ -393,7 +410,7 @@ export async function assignAssessments(input: AssignInput) {
     cross_dept_user_ids: input.cross_dept_user_ids,
     peer_user_ids: input.peer_user_ids,
     assignedBy: profile.id,
-  });
+  }, supabase);
 
   revalidateAll();
   return {
@@ -426,15 +443,17 @@ export async function assignAssessmentsToDepartment(input: DepartmentAssignInput
   if (!input.department) return { error: "Select a department." };
   if (!input.include_skill && !input.include_behaviour && !input.include_placement) return { error: "Include at least one assessment type." };
 
-  const supabase = await createClient();
+  const supabase = createAdminClient();
+  if (!supabase) return { error: "Server administration is not configured." };
   const [{ data: employees, error: empError }, { data: templates }, { data: profiles }] = await Promise.all([
     supabase
       .from("employees")
       .select("employee_id, full_name, job_title, manager_name, user_id")
       .eq("active", true)
+      .is("deleted_at", null)
       .eq("department", input.department)
       .order("full_name"),
-    supabase.from("assessment_templates").select("id, kind, name, role_family, department, job_titles").eq("status", "published"),
+    supabase.from("assessment_templates").select("id, kind, name, role_family, department, job_titles").is("deleted_at", null).eq("status", "published"),
     supabase.from("profiles").select("id, employee_id, full_name, manager_id"),
   ]);
   if (empError) return { error: dbError(empError) };
@@ -491,7 +510,7 @@ export async function assignAssessmentsToDepartment(input: DepartmentAssignInput
       cross_dept_user_ids: input.cross_dept_user_ids,
       peer_user_ids: peers,
       assignedBy: profile.id,
-    });
+    }, supabase);
     created += result.created.length;
     skipped.push(...result.skipped.map((s) => `${employee.full_name}: ${s}`));
   }
@@ -661,11 +680,13 @@ export type RaterAnswer = { item_id: string; rating: number | null; not_observed
 async function ownSelfAssignment(assignmentId: string) {
   const profile = await currentProfile();
   if (!profile) return { error: "Not authenticated" as const };
-  const supabase = await createClient();
+  const supabase = createAdminClient();
+  if (!supabase) return { error: "Server administration is not configured." as const };
   const { data: assignment } = await supabase
     .from("assessment_assignments")
     .select("id, employee_id, employee_user_id, status, assigned_by, template_id, started_at")
     .eq("id", assignmentId)
+    .is("deleted_at", null)
     .maybeSingle();
   if (!assignment) return { error: "Assessment not found." as const };
   const isMine = assignment.employee_user_id === profile.id || (profile.employee_id != null && assignment.employee_id === profile.employee_id);
@@ -682,13 +703,16 @@ export async function startSelfAssessment(assignmentId: string) {
   if (assignment.started_at) return { success: true, started_at: assignment.started_at, server_now: Date.now() };
 
   const started_at = new Date().toISOString();
-  const { error } = await supabase
+  const { data: started, error } = await supabase
     .from("assessment_assignments")
     .update({ started_at, status: "in_progress", employee_user_id: assignment.employee_user_id ?? profile.id })
-    .eq("id", assignmentId);
-  if (error) return { error: error.message };
+    .eq("id", assignmentId)
+    .is("deleted_at", null)
+    .select("started_at")
+    .single();
+  if (error || !started) return { error: error?.message ?? "Could not start the assessment." };
   revalidateAll();
-  return { success: true, started_at, server_now: Date.now() };
+  return { success: true, started_at: started.started_at, server_now: Date.now() };
 }
 
 export async function saveSelfAssessment(

@@ -4,9 +4,12 @@ import { ASSESSMENT_PURPOSE } from "@/lib/assessments/copy";
 import { getViewer, loadEmployeeReport } from "@/lib/assessments/results";
 import { loadPlacementReport } from "@/lib/assessments/placement";
 import { AssessmentReport } from "@/components/assessments/assessment-report";
+import { AdminAssessmentResponses } from "@/components/assessments/admin-assessment-responses";
 import { PlacementReportView } from "@/components/assessments/placement-report";
 import { buttonVariants } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PageHeader } from "@/components/page-header";
+import { loadAdminAssessmentResponses } from "@/lib/assessments/admin-responses";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function AssessmentReportPage(props: PageProps<"/assessments/[id]/report">) {
@@ -31,6 +34,7 @@ export default async function AssessmentReportPage(props: PageProps<"/assessment
   if (template?.kind === "placement") {
     const placement = await loadPlacementReport(id, viewer);
     if (!placement) notFound();
+    const responses = viewer.role === "admin" ? await loadAdminAssessmentResponses([id], viewer) : [];
     return (
       <>
         <PageHeader
@@ -42,13 +46,24 @@ export default async function AssessmentReportPage(props: PageProps<"/assessment
             </Link>
           }
         />
-        <PlacementReportView report={placement} />
+        {viewer.role === "admin" ? (
+          <Tabs defaultValue="report">
+            <TabsList variant="line" className="mb-4">
+              <TabsTrigger value="report">Report</TabsTrigger>
+              <TabsTrigger value="responses">Responses</TabsTrigger>
+            </TabsList>
+            <TabsContent value="report"><PlacementReportView report={placement} /></TabsContent>
+            <TabsContent value="responses"><AdminAssessmentResponses sections={responses} /></TabsContent>
+          </Tabs>
+        ) : <PlacementReportView report={placement} />}
       </>
     );
   }
 
   const report = await loadEmployeeReport(id, viewer);
   if (!report) notFound();
+  const assignmentIds = [report.skill?.assignment.id, report.behaviour?.assignment.id].filter((value): value is string => Boolean(value));
+  const responses = viewer.role === "admin" ? await loadAdminAssessmentResponses(assignmentIds, viewer) : [];
 
   return (
     <>
@@ -61,7 +76,16 @@ export default async function AssessmentReportPage(props: PageProps<"/assessment
           </Link>
         }
       />
-      <AssessmentReport report={report} />
+      {viewer.role === "admin" ? (
+        <Tabs defaultValue="report">
+          <TabsList variant="line" className="mb-4">
+            <TabsTrigger value="report">Report</TabsTrigger>
+            <TabsTrigger value="responses">Responses</TabsTrigger>
+          </TabsList>
+          <TabsContent value="report"><AssessmentReport report={report} /></TabsContent>
+          <TabsContent value="responses"><AdminAssessmentResponses sections={responses} /></TabsContent>
+        </Tabs>
+      ) : <AssessmentReport report={report} />}
     </>
   );
 }

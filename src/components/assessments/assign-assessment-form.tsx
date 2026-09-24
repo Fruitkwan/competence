@@ -98,24 +98,29 @@ export function AssignAssessmentForm({
     if (!employeeId) return toast.error("Select an employee.");
     if (selected.size === 0) return toast.error("Select at least one assessment.");
     setSaving(true);
-    const result = await assignAssessments({
-      employee_id: employeeId,
-      template_ids: [...selected],
-      wave: wave.trim() || null,
-      due_date: dueDate || null,
-      include_line_manager: includeManager,
-      cross_dept_user_ids: crossDept,
-      peer_user_ids: peers,
-    });
-    setSaving(false);
-    if (result.error) return toast.error(result.error);
-    if (result.created?.length) toast.success(`Assigned: ${result.created.join(", ")}`);
-    if (result.skipped?.length) toast.warning(`Skipped: ${result.skipped.join(", ")}`);
-    if (result.warning) toast.warning(result.warning);
-    chooseEmployee("");
-    setCrossDept([]);
-    setPeers([]);
-    router.refresh();
+    try {
+      const result = await assignAssessments({
+        employee_id: employeeId,
+        template_ids: [...selected],
+        wave: wave.trim() || null,
+        due_date: dueDate || null,
+        include_line_manager: includeManager,
+        cross_dept_user_ids: crossDept,
+        peer_user_ids: peers,
+      });
+      if (result.error) return toast.error(result.error);
+      if (result.created?.length) toast.success(`Assigned: ${result.created.join(", ")}`);
+      if (result.skipped?.length) toast.warning(`Skipped: ${result.skipped.join(", ")}`);
+      if (result.warning) toast.warning(result.warning);
+      chooseEmployee("");
+      setCrossDept([]);
+      setPeers([]);
+      router.refresh();
+    } catch {
+      toast.error("The assignment could not be created. Refresh the page and try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function toggleRelease(row: AssignmentRow) {

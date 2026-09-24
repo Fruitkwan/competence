@@ -288,13 +288,17 @@ export function AssessmentForm({
 
   async function start() {
     if (!isTimed) return;
-    const result = mode.kind === "self" ? await startSelfAssessment(mode.assignmentId) : await startPeerAssessment(mode.raterId);
-    if (result.error || !result.started_at) {
-      toast.error(result.error ?? "Could not start the assessment.");
-      return;
+    try {
+      const result = mode.kind === "self" ? await startSelfAssessment(mode.assignmentId) : await startPeerAssessment(mode.raterId);
+      if (result.error || !result.started_at) {
+        toast.error(result.error ?? "Could not start the assessment.");
+        return;
+      }
+      setSession({ startedAt: result.started_at, serverNow: result.server_now });
+      toast.success(`Started. You have ${minutes} minutes.`);
+    } catch {
+      toast.error("The assessment could not be started. Refresh the page and try again.");
     }
-    setSession({ startedAt: result.started_at, serverNow: result.server_now });
-    toast.success(`Started. You have ${minutes} minutes.`);
   }
 
   if (isTimed && !session) {
