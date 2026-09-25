@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { RecycleBinActions } from "./recycle-bin-actions";
-import type { RecyclableTable } from "@/lib/actions/recycle-bin";
+import type { RecyclableTable } from "@/lib/recycle-bin";
 
 const TYPE_LABELS: Record<RecyclableTable, string> = {
   employees: "Employee",
