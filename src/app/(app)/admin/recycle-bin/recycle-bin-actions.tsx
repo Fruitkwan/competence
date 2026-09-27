@@ -15,7 +15,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { permanentlyDeleteItem, restoreDeletedItem, type RecyclableTable } from "@/lib/actions/recycle-bin";
+import { permanentlyDeleteItem, restoreDeletedItem } from "@/lib/actions/recycle-bin";
+import type { RecyclableTable } from "@/lib/recycle-bin";
 
 export function RecycleBinActions({ table, recordId, label }: { table: RecyclableTable; recordId: string; label: string }) {
   const router = useRouter();
