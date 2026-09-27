@@ -149,7 +149,8 @@ export default async function DashboardPage() {
       { data: performanceAppraisals },
       { data: skillGaps },
       { data: notifications },
-      { count: pendingAssessmentCount, error: assessmentCountError },
+      { count: pendingAssessmentCount, error: pendingAssessmentCountError },
+      { count: completedAssessmentCount, error: completedAssessmentCountError },
     ] = await Promise.all([
       supabase
         .from("employees")
@@ -201,6 +202,13 @@ export default async function DashboardPage() {
           ? `employee_user_id.eq.${user?.id},employee_id.eq.${employeeId}`
           : `employee_user_id.eq.${user?.id}`)
         .in("status", ["assigned", "in_progress"]),
+      supabase
+        .from("assessment_assignments")
+        .select("id", { count: "exact", head: true })
+        .or(employeeId
+          ? `employee_user_id.eq.${user?.id},employee_id.eq.${employeeId}`
+          : `employee_user_id.eq.${user?.id}`)
+        .in("status", ["submitted", "closed"]),
     ]);
 
     return (
@@ -214,7 +222,8 @@ export default async function DashboardPage() {
         performanceAppraisals={(performanceAppraisals ?? []) as PerformanceSummaryRow[]}
         skillGaps={(skillGaps ?? []) as SkillGapSummaryRow[]}
         notifications={(notifications ?? []) as NotificationSummaryRow[]}
-        pendingAssessmentCount={assessmentCountError ? null : pendingAssessmentCount ?? 0}
+        pendingAssessmentCount={pendingAssessmentCountError ? null : pendingAssessmentCount ?? 0}
+        completedAssessmentCount={completedAssessmentCountError ? null : completedAssessmentCount ?? 0}
       />
     );
   }
@@ -508,6 +517,7 @@ function EmployeeDashboard({
   skillGaps,
   notifications,
   pendingAssessmentCount,
+  completedAssessmentCount,
 }: {
   employee: EmployeeProfileRow | null;
   userName: string;
@@ -519,10 +529,10 @@ function EmployeeDashboard({
   skillGaps: SkillGapSummaryRow[];
   notifications: NotificationSummaryRow[];
   pendingAssessmentCount: number | null;
+  completedAssessmentCount: number | null;
 }) {
   const displayName = employee?.full_name ?? userName ?? "Employee";
   const activeCourses = courses.filter((course) => !["Completed", "Dropped"].includes(course.status));
-  const completedCourses = courses.filter((course) => course.status === "Completed");
   const objectivesNeedingWork = objectives.filter((objective) =>
     ["draft", "revision_requested"].includes(objective.status)
   );
@@ -554,7 +564,9 @@ function EmployeeDashboard({
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
             <EmployeeStatCard label="Active courses" value={activeCourses.length.toString()} icon={BookOpen} tone="blue" />
-            <EmployeeStatCard label="Completed" value={completedCourses.length.toString()} icon={ClipboardCheck} tone="green" />
+            <Link href="/assessments" className="rounded-xl transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={completedAssessmentCount == null ? "View my completed assessments. Count unavailable." : `View my completed assessments: ${completedAssessmentCount}`}>
+              <EmployeeStatCard label="Completed assessments" value={completedAssessmentCount?.toString() ?? "—"} icon={ClipboardCheck} tone="green" />
+            </Link>
             <EmployeeStatCard label="Objectives" value={objectivesNeedingWork.length.toString()} icon={Target} tone="amber" />
             <EmployeeStatCard label="High gaps" value={highSkillGaps.length.toString()} icon={AlertTriangle} tone="red" />
             <Link href="/assessments" className="rounded-xl transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={pendingAssessmentCount == null ? "View my assessments. Count unavailable." : `View my assessments: ${pendingAssessmentCount} pending`}>

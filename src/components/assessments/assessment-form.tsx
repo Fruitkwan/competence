@@ -3,9 +3,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { AlarmClock, ArrowLeft, ArrowRight, Check, ClipboardCheck, Clock3, Loader2, Play, Save, Send } from "lucide-react";
+import { AlarmClock, ArrowLeft, ArrowRight, Check, ClipboardCheck, Clock3, Loader2, LockKeyhole, Play, Save, Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogMedia,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { saveRaterAssessment, saveSelfAssessment, startSelfAssessment, startPeerAssessment, type RaterAnswer, type SelfAnswer } from "@/lib/actions/assessments";
@@ -234,13 +245,13 @@ export function AssessmentForm({
   });
   const [aspiration, setAspiration] = useState<Record<string, string>>(mode.kind === "self" ? mode.aspiration : {});
   const [busy, setBusy] = useState<"save" | "submit" | null>(null);
+  const [submitDialogOpen, setSubmitDialogOpen] = useState(false);
 
   const update = (id: string, patch: Partial<Draft>) => setDrafts((d) => ({ ...d, [id]: { ...d[id], ...patch } }));
 
   const progress = { done: items.filter(complete).length, total: items.length };
 
-  async function persist(submit: boolean, opts: { auto?: boolean } = {}) {
-    if (submit && !opts.auto && !confirm("Submit now? You will not be able to change your answers afterwards.")) return;
+  async function persist(submit: boolean) {
     setBusy(submit ? "submit" : "save");
     try {
       let result: { error?: string; success?: boolean; finalised?: boolean; timedOut?: boolean };
@@ -283,7 +294,7 @@ export function AssessmentForm({
   });
   const onExpire = useCallback(() => {
     setTimedOut(true);
-    void persistRef.current(true, { auto: true });
+    void persistRef.current(true);
   }, []);
 
   async function start() {
@@ -513,7 +524,7 @@ export function AssessmentForm({
             <div role="alert" className="flex items-center gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900 dark:border-red-900 dark:bg-red-950/30 dark:text-red-100">
               {busy ? <Loader2 className="size-4 shrink-0 animate-spin" /> : <AlarmClock className="size-4 shrink-0" />}
               {busy ? "Time is up. Submitting your answers…" : "Time is up. If submission failed, retry below."}
-              {!busy && <Button variant="outline" onClick={() => persist(true, { auto: true })}>Retry submission</Button>}
+              {!busy && <Button variant="outline" onClick={() => persist(true)}>Retry submission</Button>}
             </div>
           )}
           <div className="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-background/95 p-3 backdrop-blur sm:p-4">
@@ -525,11 +536,43 @@ export function AssessmentForm({
               <Button variant="outline" disabled={locked} onClick={() => persist(false)}>
                 {busy === "save" ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} Save draft
               </Button>
-              {step < reviewStep ? <Button disabled={locked} onClick={() => goTo(step + 1)}>{step + 1 === reviewStep ? "Review" : "Continue"}<ArrowRight className="size-4" /></Button> : <Button disabled={locked || progress.total === 0 || progress.done < progress.total} onClick={() => persist(true)}>{busy === "submit" ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />} Submit</Button>}
+              {step < reviewStep ? <Button disabled={locked} onClick={() => goTo(step + 1)}>{step + 1 === reviewStep ? "Review" : "Continue"}<ArrowRight className="size-4" /></Button> : <Button disabled={locked || progress.total === 0 || progress.done < progress.total} onClick={() => setSubmitDialogOpen(true)}>{busy === "submit" ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />} Submit</Button>}
             </div>
           </div>
         </div>
       </div>
+      <AlertDialog open={submitDialogOpen} onOpenChange={setSubmitDialogOpen}>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogMedia className="bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300">
+              <LockKeyhole className="size-5" />
+            </AlertDialogMedia>
+            <AlertDialogTitle>Submit your assessment?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have completed all {progress.total} {progress.total === 1 ? "item" : "items"}. After submission, your answers are final and cannot be changed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex items-center gap-3 rounded-xl border border-teal-200 bg-teal-50/70 p-3 text-sm text-teal-900 dark:border-teal-900 dark:bg-teal-950/40 dark:text-teal-100">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-teal-600 text-white">
+              <Check className="size-4" />
+            </span>
+            <span><strong>{progress.done} of {progress.total}</strong> items answered and ready to submit.</span>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={busy != null}>Continue reviewing</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={busy != null}
+              onClick={() => {
+                setSubmitDialogOpen(false);
+                void persist(true);
+              }}
+            >
+              <Send className="size-4" />
+              Submit assessment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
