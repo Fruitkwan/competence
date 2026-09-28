@@ -6,7 +6,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
 import { formatPct, priorityColor } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { BookOpen, ClipboardCheck, ClipboardList, Target, AlertTriangle } from "lucide-react";
+import { BookOpen, ClipboardCheck, ClipboardList, Target, AlertTriangle, UsersRound } from "lucide-react";
 import { DashboardCharts } from "./charts";
 import { CompanyHighlights } from "@/components/company/company-highlights";
 import type { CompanyPost } from "@/lib/company-engagement";
@@ -153,6 +153,7 @@ export default async function DashboardPage() {
       { data: notifications },
       { count: pendingAssessmentCount, error: pendingAssessmentCountError },
       { count: completedAssessmentCount, error: completedAssessmentCountError },
+      { count: pendingPeerRatingCount, error: pendingPeerRatingCountError },
       { data: companyPosts },
     ] = await Promise.all([
       supabase
@@ -213,6 +214,12 @@ export default async function DashboardPage() {
           : `employee_user_id.eq.${user?.id}`)
         .in("status", ["submitted", "closed"]),
       supabase
+        .from("assessment_raters")
+        .select("id", { count: "exact", head: true })
+        .eq("rater_user_id", user?.id ?? "")
+        .neq("rater_type", "self")
+        .eq("status", "pending"),
+      supabase
         .from("company_engagement_posts")
         .select("id, kind, title, summary, details, recipient_name, starts_on, ends_on, cta_label, cta_url, published, created_at, updated_at")
         .eq("published", true)
@@ -233,6 +240,7 @@ export default async function DashboardPage() {
         notifications={(notifications ?? []) as NotificationSummaryRow[]}
         pendingAssessmentCount={pendingAssessmentCountError ? null : pendingAssessmentCount ?? 0}
         completedAssessmentCount={completedAssessmentCountError ? null : completedAssessmentCount ?? 0}
+        pendingPeerRatingCount={pendingPeerRatingCountError ? null : pendingPeerRatingCount ?? 0}
         companyPosts={(companyPosts ?? []) as CompanyPost[]}
       />
     );
@@ -528,6 +536,7 @@ function EmployeeDashboard({
   notifications,
   pendingAssessmentCount,
   completedAssessmentCount,
+  pendingPeerRatingCount,
   companyPosts,
 }: {
   employee: EmployeeProfileRow | null;
@@ -541,6 +550,7 @@ function EmployeeDashboard({
   notifications: NotificationSummaryRow[];
   pendingAssessmentCount: number | null;
   completedAssessmentCount: number | null;
+  pendingPeerRatingCount: number | null;
   companyPosts: CompanyPost[];
 }) {
   const displayName = userName || employee?.full_name || "Employee";
@@ -574,7 +584,7 @@ function EmployeeDashboard({
         </Card>
       ) : (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
             <EmployeeStatCard label="Active courses" value={activeCourses.length.toString()} icon={BookOpen} tone="blue" />
             <Link href="/assessments" className="rounded-xl transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={completedAssessmentCount == null ? "View my completed assessments. Count unavailable." : `View my completed assessments: ${completedAssessmentCount}`}>
               <EmployeeStatCard label="Completed assessments" value={completedAssessmentCount?.toString() ?? "—"} icon={ClipboardCheck} tone="green" />
@@ -583,6 +593,9 @@ function EmployeeDashboard({
             <EmployeeStatCard label="High gaps" value={highSkillGaps.length.toString()} icon={AlertTriangle} tone="red" />
             <Link href="/assessments" className="rounded-xl transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={pendingAssessmentCount == null ? "View my assessments. Count unavailable." : `View my assessments: ${pendingAssessmentCount} pending`}>
               <EmployeeStatCard label="Pending assessments" value={pendingAssessmentCount?.toString() ?? "—"} icon={ClipboardList} tone="blue" />
+            </Link>
+            <Link href="/assessments" className="rounded-xl transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={pendingPeerRatingCount == null ? "View pending peer ratings. Count unavailable." : `View pending peer ratings: ${pendingPeerRatingCount}`}>
+              <EmployeeStatCard label="Pending peer ratings" value={pendingPeerRatingCount?.toString() ?? "—"} icon={UsersRound} tone="amber" />
             </Link>
           </div>
 
