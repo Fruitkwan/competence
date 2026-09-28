@@ -6,7 +6,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { PageHeader } from "@/components/page-header";
 import { formatPct, priorityColor } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import { BookOpen, ClipboardCheck, ClipboardList, Target, AlertTriangle, UsersRound } from "lucide-react";
+import { AlertTriangle, BookOpen, CheckCircle2, ClipboardCheck, ClipboardList, Clock3, Target, UserCheck, UsersRound } from "lucide-react";
 import { DashboardCharts } from "./charts";
 import { CompanyHighlights } from "@/components/company/company-highlights";
 import type { CompanyPost } from "@/lib/company-engagement";
@@ -36,9 +36,34 @@ type ProfileDepartmentRow = {
 
 type EmployeeDirectoryRow = {
   employee_id: string;
+  full_name: string;
   job_title: string | null;
   department?: string | null;
   country_code: string | null;
+};
+
+type AssessmentDashboardAssignment = {
+  id: string;
+  employee_id: string;
+  status: string;
+  due_date: string | null;
+  created_at: string;
+};
+
+type AssessmentDashboardRater = {
+  assignment_id: string;
+  rater_type: "self" | "line_manager" | "cross_dept" | "peer";
+  status: "pending" | "submitted";
+};
+
+type AssessmentProgressRow = {
+  name: string;
+  employees: number;
+  assigned: number;
+  submitted: number;
+  pending: number;
+  overdue: number;
+  completion: number;
 };
 
 type JobProfileRow = {
@@ -246,47 +271,56 @@ export default async function DashboardPage() {
     );
   }
 
-  // Fetch appraisals — employees only see their own
-  let query = supabase
-    .from("appraisal_full")
-    .select("id,employee_id,priority,gap,current_avg,cluster,country_code,status,overdue");
-  if (isEmployee && employeeId) {
-    query = query.eq("employee_id", employeeId);
-  }
-  let employeeQuery = supabase
-    .from("employees")
-    .select("*")
-    .eq("active", true);
-  if (isEmployee && employeeId) {
-    employeeQuery = employeeQuery.eq("employee_id", employeeId);
-  }
-  const [{ data: rows }, { data: departments }, { data: profiles }, { data: employees }, { data: jobProfiles }] = await Promise.all([
-    query,
+  const [
+    { data: assignments },
+    { data: assignmentRaters },
+    { data: departments },
+    { data: profiles },
+    { data: employees },
+    { data: jobProfiles },
+  ] = await Promise.all([
+    supabase
+      .from("assessment_assignments")
+      .select("id, employee_id, status, due_date, created_at")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false }),
+    supabase.from("assessment_raters").select("assignment_id, rater_type, status"),
     supabase.from("departments").select("id, name").order("name"),
     supabase.from("profiles").select("employee_id, department_id, cluster"),
-    employeeQuery,
+    supabase
+      .from("employees")
+      .select("employee_id, full_name, job_title, department, country_code")
+      .eq("active", true),
     supabase.from("job_profiles").select("title, department"),
   ]);
 
-  const all = (rows ?? []) as AppraisalFullRow[];
-  const byEmp = new Map<string, AppraisalFullRow>();
-  for (const r of all) byEmp.set(r.employee_id, r);
-  const allLatest = Array.from(byEmp.values());
   const allEmployeeRows = (employees ?? []) as EmployeeDirectoryRow[];
   const employeeById = new Map(allEmployeeRows.map((employee) => [employee.employee_id, employee]));
-
   const departmentRows = (departments ?? []) as DepartmentRow[];
-  const departmentNameById = new Map(departmentRows.map((d) => [d.id, d.name]));
+  const departmentNameById = new Map(departmentRows.map((department) => [department.id, department.name]));
   const profileByEmployeeId = new Map(
     ((profiles ?? []) as ProfileDepartmentRow[])
-      .filter((p): p is ProfileDepartmentRow & { employee_id: string } => Boolean(p.employee_id))
-      .map((p) => [p.employee_id, p])
+      .filter((profile): profile is ProfileDepartmentRow & { employee_id: string } => Boolean(profile.employee_id))
+      .map((profile) => [profile.employee_id, profile]),
   );
   const jobProfileDepartmentByTitle = new Map(
     ((jobProfiles ?? []) as JobProfileRow[])
       .filter((profile) => Boolean(profile.title && profile.department))
-      .map((profile) => [profile.title, profile.department as string])
+      .map((profile) => [profile.title, profile.department as string]),
   );
+
+  function departmentForEmployee(employeeIdValue: string) {
+    const employee = employeeById.get(employeeIdValue);
+    const profile = profileByEmployeeId.get(employeeIdValue);
+    return (
+      cleanDepartment(employee?.department) ??
+      (profile?.department_id ? departmentNameById.get(profile.department_id) : null) ??
+      cleanDepartment(profile?.cluster) ??
+      cleanDepartment(employee?.job_title ? jobProfileDepartmentByTitle.get(employee.job_title) : null) ??
+      "Unassigned"
+    );
+  }
+
   const userDepartmentName = userDepartmentId ? departmentNameById.get(userDepartmentId) : null;
   const managerDepartmentName = isManager && employeeId
     ? userDepartmentName ?? cleanDepartment(userCluster) ?? departmentForEmployee(employeeId)
@@ -295,230 +329,106 @@ export default async function DashboardPage() {
     ? allEmployeeRows.filter((employee) => departmentForEmployee(employee.employee_id) === managerDepartmentName)
     : allEmployeeRows;
   const employeeIds = new Set(employeeRows.map((employee) => employee.employee_id));
-  const latest = managerDepartmentName
-    ? allLatest.filter((row) => employeeIds.has(row.employee_id) || departmentForEmployee(row.employee_id, row) === managerDepartmentName)
-    : allLatest;
-  const latestByEmployeeId = new Map(latest.map((r) => [r.employee_id, r]));
-  const total = latest.length;
-  const high = latest.filter((r) => r.priority === "HIGH").length;
-  const medium = latest.filter((r) => r.priority === "MEDIUM").length;
-  const low = latest.filter((r) => r.priority === "LOW").length;
-  const overdue = latest.filter((r) => r.overdue).length;
-  const completed = latest.filter((r) => r.status === "Completed").length;
-  const completion = total > 0 ? completed / total : 0;
-  const seededDepartmentNames = isEmployee || managerDepartmentName
-    ? [managerDepartmentName ?? userDepartmentName ?? userCluster ?? (employeeId ? departmentForEmployee(employeeId) : null)].filter(
-        (name): name is string => Boolean(name)
-      )
-    : departmentRows.map((d) => d.name);
+  const scopedAssignments = ((assignments ?? []) as AssessmentDashboardAssignment[]).filter((assignment) => employeeIds.has(assignment.employee_id));
+  const assignmentIds = new Set(scopedAssignments.map((assignment) => assignment.id));
+  const scopedRaters = ((assignmentRaters ?? []) as AssessmentDashboardRater[]).filter((rater) => assignmentIds.has(rater.assignment_id));
+  const today = new Date().toISOString().slice(0, 10);
+  const isSubmitted = (assignment: AssessmentDashboardAssignment) => assignment.status === "submitted" || assignment.status === "closed";
+  const isPending = (assignment: AssessmentDashboardAssignment) => assignment.status === "assigned" || assignment.status === "in_progress";
+  const isOverdue = (assignment: AssessmentDashboardAssignment) => isPending(assignment) && Boolean(assignment.due_date && assignment.due_date < today);
 
-  const clusterMap = new Map<
-    string,
-    { count: number; assessed: number; sumScore: number; sumGap: number; high: number; medium: number; low: number }
-  >();
-  for (const name of seededDepartmentNames) {
-    clusterMap.set(name, { count: 0, assessed: 0, sumScore: 0, sumGap: 0, high: 0, medium: 0, low: 0 });
-  }
-  for (const employee of employeeRows) {
-    const k = departmentForEmployee(employee.employee_id);
-    const c = clusterMap.get(k) ?? { count: 0, assessed: 0, sumScore: 0, sumGap: 0, high: 0, medium: 0, low: 0 };
-    c.count++;
-    clusterMap.set(k, c);
-  }
-  for (const r of latest) {
-    const k = departmentForEmployee(r.employee_id, r);
-    const c = clusterMap.get(k) ?? { count: 0, assessed: 0, sumScore: 0, sumGap: 0, high: 0, medium: 0, low: 0 };
-    if (!employeeIds.has(r.employee_id)) c.count++;
-    c.assessed++;
-    c.sumScore += Number(r.current_avg ?? 0);
-    c.sumGap += Number(r.gap ?? 0);
-    if (r.priority === "HIGH") c.high++;
-    else if (r.priority === "MEDIUM") c.medium++;
-    else c.low++;
-    clusterMap.set(k, c);
-  }
-  const clusterRows = Array.from(clusterMap.entries()).map(([name, c]) => ({
-    name,
-    count: c.count,
-    avgScore: c.assessed ? c.sumScore / c.assessed : 0,
-    avgGap: c.assessed ? c.sumGap / c.assessed : 0,
-    high: c.high,
-    medium: c.medium,
-    low: c.low,
-  }));
+  const submittedAssignments = scopedAssignments.filter(isSubmitted);
+  const pendingAssignments = scopedAssignments.filter(isPending);
+  const overdueAssignments = pendingAssignments.filter(isOverdue);
+  const assignedEmployeeIds = new Set(scopedAssignments.map((assignment) => assignment.employee_id));
+  const assessedEmployeeIds = new Set(submittedAssignments.map((assignment) => assignment.employee_id));
+  const nonSelfRaters = scopedRaters.filter((rater) => rater.rater_type !== "self");
+  const submittedRaters = nonSelfRaters.filter((rater) => rater.status === "submitted");
+  const pendingRaters = nonSelfRaters.filter((rater) => rater.status === "pending");
+  const assignmentCompletion = scopedAssignments.length ? submittedAssignments.length / scopedAssignments.length : 0;
+  const raterCompletion = nonSelfRaters.length ? submittedRaters.length / nonSelfRaters.length : 0;
 
-  const countryMap = new Map<
-    string,
-    { count: number; assessed: number; sumGap: number; high: number; completed: number }
-  >();
-  for (const employee of employeeRows) {
-    const appraisal = latestByEmployeeId.get(employee.employee_id);
-    const k = employee.country_code ?? appraisal?.country_code ?? "—";
-    const c = countryMap.get(k) ?? { count: 0, assessed: 0, sumGap: 0, high: 0, completed: 0 };
-    c.count++;
-    if (appraisal) {
-      c.assessed++;
-      c.sumGap += Number(appraisal.gap ?? 0);
-      if (appraisal.priority === "HIGH") c.high++;
-      if (appraisal.status === "Completed") c.completed++;
+  function progressRows(groupForEmployee: (employee: EmployeeDirectoryRow) => string): AssessmentProgressRow[] {
+    const groups = new Map<string, { employees: number; assigned: number; submitted: number; pending: number; overdue: number }>();
+    for (const employee of employeeRows) {
+      const name = groupForEmployee(employee);
+      const group = groups.get(name) ?? { employees: 0, assigned: 0, submitted: 0, pending: 0, overdue: 0 };
+      group.employees += 1;
+      groups.set(name, group);
     }
-    countryMap.set(k, c);
+    for (const assignment of scopedAssignments) {
+      const employee = employeeById.get(assignment.employee_id);
+      if (!employee) continue;
+      const name = groupForEmployee(employee);
+      const group = groups.get(name) ?? { employees: 0, assigned: 0, submitted: 0, pending: 0, overdue: 0 };
+      group.assigned += 1;
+      if (isSubmitted(assignment)) group.submitted += 1;
+      if (isPending(assignment)) group.pending += 1;
+      if (isOverdue(assignment)) group.overdue += 1;
+      groups.set(name, group);
+    }
+    return [...groups.entries()]
+      .map(([name, group]) => ({ ...group, name, completion: group.assigned ? group.submitted / group.assigned : 0 }))
+      .filter((row) => row.assigned > 0 || row.employees > 0)
+      .sort((a, b) => b.assigned - a.assigned || a.name.localeCompare(b.name));
   }
-  for (const r of latest) {
-    if (employeeIds.has(r.employee_id)) continue;
-    const k = r.country_code ?? "—";
-    const c = countryMap.get(k) ?? { count: 0, assessed: 0, sumGap: 0, high: 0, completed: 0 };
-    c.count++;
-    c.assessed++;
-    c.sumGap += Number(r.gap ?? 0);
-    if (r.priority === "HIGH") c.high++;
-    if (r.status === "Completed") c.completed++;
-    countryMap.set(k, c);
-  }
-  const countryRows = Array.from(countryMap.entries()).map(([name, c]) => ({
-    name,
-    count: c.count,
-    avgGap: c.assessed ? c.sumGap / c.assessed : 0,
-    high: c.high,
-    completion: c.count ? c.completed / c.count : 0,
-  }));
 
-  function departmentForEmployee(employeeIdValue: string, appraisal?: AppraisalFullRow) {
-    const employee = employeeById.get(employeeIdValue);
-    const profile = profileByEmployeeId.get(employeeIdValue);
-    return (
-      cleanDepartment(employee?.department) ??
-      (profile?.department_id ? departmentNameById.get(profile.department_id) : null) ??
-      cleanDepartment(profile?.cluster) ??
-      cleanDepartment(employee?.job_title ? jobProfileDepartmentByTitle.get(employee.job_title) : null) ??
-      cleanDepartment(appraisal?.cluster) ??
-      "-"
-    );
-  }
+  const departmentProgress = progressRows((employee) => departmentForEmployee(employee.employee_id));
+  const countryProgress = progressRows((employee) => employee.country_code?.trim() || "Unassigned");
+  const recentOverdue = overdueAssignments
+    .slice()
+    .sort((a, b) => (a.due_date ?? "").localeCompare(b.due_date ?? ""))
+    .slice(0, 5);
 
   return (
     <>
       <PageHeader
-        title={isEmployee ? `My Dashboard` : "Dashboard"}
-        description={
-          isEmployee
-            ? `Personal competency overview for ${userName || "you"}.`
-            : "Live view of gaps and priorities."
-        }
+        title="Assessment Dashboard"
+        description={managerDepartmentName ? `Live assessment progress for ${managerDepartmentName}.` : "Live assessment completion, rating progress, and overdue work."}
+        actions={<Link href="/assessments/results" className={buttonVariants({ variant: "outline" })}>Open assessment results</Link>}
       />
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
-        <StatCard label="Assessed" value={total.toString()} />
-        <StatCard label="High priority" value={high.toString()} tone="red" />
-        <StatCard label="Medium priority" value={medium.toString()} tone="amber" />
-        <StatCard label="Completion" value={formatPct(completion)} tone="green" />
-        <StatCard label="Overdue" value={overdue.toString()} tone={overdue ? "red" : "neutral"} />
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <OperationsStatCard icon={UserCheck} label="Assessed employees" value={assessedEmployeeIds.size.toString()} detail={`${assignedEmployeeIds.size} employees assigned`} tone="blue" />
+        <OperationsStatCard icon={CheckCircle2} label="Assignment completion" value={formatPct(assignmentCompletion)} detail={`${submittedAssignments.length} of ${scopedAssignments.length} submitted`} tone="green" />
+        <OperationsStatCard icon={ClipboardList} label="Pending assignments" value={pendingAssignments.length.toString()} detail="Employee responses outstanding" tone="amber" />
+        <OperationsStatCard icon={UsersRound} label="Pending ratings" value={pendingRaters.length.toString()} detail={`${formatPct(raterCompletion)} rater completion`} tone="violet" />
+        <OperationsStatCard icon={Clock3} label="Overdue" value={overdueAssignments.length.toString()} detail="Past due and still pending" tone={overdueAssignments.length ? "red" : "green"} />
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <Card>
+      <div className="mt-6 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
+        <DashboardCharts
+          submitted={submittedAssignments.length}
+          pending={pendingAssignments.length}
+          countryRows={countryProgress}
+        />
+
+        <Card className={overdueAssignments.length ? "border-red-200 dark:border-red-900" : undefined}>
           <CardHeader>
-            <CardTitle>Priority breakdown</CardTitle>
+            <CardTitle className="flex items-center gap-2"><Clock3 className="size-5 text-red-600" /> Attention required</CardTitle>
           </CardHeader>
           <CardContent>
-            <table className="w-full text-sm">
-              <thead className="text-left text-muted-foreground">
-                <tr>
-                  <th className="pb-2 font-medium">Priority</th>
-                  <th className="pb-2 font-medium">Count</th>
-                  <th className="pb-2 font-medium">% of Total</th>
-                  <th className="pb-2 font-medium">Action window</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  { p: "HIGH", n: high, w: "Immediate (≤ 30 days)" },
-                  { p: "MEDIUM", n: medium, w: "Current quarter" },
-                  { p: "LOW", n: low, w: "Self-directed" },
-                ].map((r) => (
-                  <tr key={r.p} className="border-t">
-                    <td className="py-2">
-                      <Badge variant="outline" className={priorityColor[r.p]}>
-                        {r.p}
-                      </Badge>
-                    </td>
-                    <td>{r.n}</td>
-                    <td>{total ? formatPct(r.n / total) : "—"}</td>
-                    <td className="text-muted-foreground">{r.w}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            {recentOverdue.length ? (
+              <div className="space-y-3">
+                {recentOverdue.map((assignment) => {
+                  const employee = employeeById.get(assignment.employee_id);
+                  return <div key={assignment.id} className="flex items-center justify-between gap-4 rounded-lg border p-3">
+                    <div className="min-w-0"><p className="truncate text-sm font-medium">{employee?.full_name ?? assignment.employee_id}</p><p className="text-xs text-muted-foreground">{departmentForEmployee(assignment.employee_id)}</p></div>
+                    <div className="shrink-0 text-right"><Badge variant="outline" className="border-red-200 bg-red-50 text-red-700">Overdue</Badge><p className="mt-1 text-xs text-muted-foreground">Due {fmtShortDate(assignment.due_date)}</p></div>
+                  </div>;
+                })}
+                <Link href="/assessments/results" className={buttonVariants({ variant: "outline", size: "sm", className: "w-full" })}>View tracker</Link>
+              </div>
+            ) : (
+              <div className="flex min-h-48 flex-col items-center justify-center rounded-xl border border-dashed text-center"><CheckCircle2 className="mb-3 size-9 text-emerald-600" /><p className="font-medium">Nothing overdue</p><p className="mt-1 text-sm text-muted-foreground">All active assignments are within their due dates.</p></div>
+            )}
           </CardContent>
         </Card>
-
-        <DashboardCharts clusterRows={clusterRows} countryRows={countryRows} />
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>By department</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <table className="w-full text-sm">
-              <thead className="text-left text-muted-foreground">
-                <tr>
-                  <th className="pb-2">Department</th>
-                  <th className="pb-2">Emp.</th>
-                  <th className="pb-2">Avg score</th>
-                  <th className="pb-2">Avg gap</th>
-                  <th className="pb-2">H</th>
-                  <th className="pb-2">M</th>
-                  <th className="pb-2">L</th>
-                </tr>
-              </thead>
-              <tbody>
-                {clusterRows.map((r) => (
-                  <tr key={r.name} className="border-t">
-                    <td className="py-2 font-medium">{r.name}</td>
-                    <td>{r.count}</td>
-                    <td>{r.avgScore.toFixed(2)}</td>
-                    <td>{r.avgGap.toFixed(2)}</td>
-                    <td>{r.high}</td>
-                    <td>{r.medium}</td>
-                    <td>{r.low}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>By country</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <table className="w-full text-sm">
-              <thead className="text-left text-muted-foreground">
-                <tr>
-                  <th className="pb-2">Country</th>
-                  <th className="pb-2">Emp.</th>
-                  <th className="pb-2">Avg gap</th>
-                  <th className="pb-2">High</th>
-                  <th className="pb-2">Completion</th>
-                </tr>
-              </thead>
-              <tbody>
-                {countryRows.map((r) => (
-                  <tr key={r.name} className="border-t">
-                    <td className="py-2 font-medium">{r.name}</td>
-                    <td>{r.count}</td>
-                    <td>{r.avgGap.toFixed(2)}</td>
-                    <td>{r.high}</td>
-                    <td>{formatPct(r.completion)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
+      <div className="mt-6 grid gap-6 xl:grid-cols-2">
+        <ProgressTable title="Progress by department" firstColumn="Department" rows={departmentProgress} />
+        <ProgressTable title="Progress by country" firstColumn="Country" rows={countryProgress} />
       </div>
     </>
   );
@@ -987,31 +897,42 @@ function fmtShortDate(iso: string | null | undefined) {
   return new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "short" });
 }
 
-function StatCard({
-  label,
-  value,
-  tone = "neutral",
-}: {
+function OperationsStatCard({ icon: Icon, label, value, detail, tone }: {
+  icon: React.ComponentType<{ className?: string }>;
   label: string;
   value: string;
-  tone?: "neutral" | "red" | "amber" | "green";
+  detail: string;
+  tone: "red" | "amber" | "green" | "blue" | "violet";
 }) {
   const toneClass = {
-    neutral: "text-foreground",
-    red: "text-red-600 dark:text-red-400",
-    amber: "text-amber-600 dark:text-amber-400",
-    green: "text-emerald-600 dark:text-emerald-400",
+    red: "bg-red-50 text-red-600 dark:bg-red-950/50 dark:text-red-300",
+    amber: "bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-300",
+    green: "bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-300",
+    blue: "bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-300",
+    violet: "bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300",
   }[tone];
   return (
-    <Card>
+    <Card className="overflow-hidden">
       <CardContent className="p-4">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">
-          {label}
-        </div>
-        <div className={`mt-1 text-2xl font-semibold ${toneClass}`}>{value}</div>
+        <div className={cn("mb-4 flex size-10 items-center justify-center rounded-xl", toneClass)}><Icon className="size-5" /></div>
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+        <p className="mt-1 text-2xl font-semibold">{value}</p>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{detail}</p>
       </CardContent>
     </Card>
   );
+}
+
+function ProgressTable({ title, firstColumn, rows }: { title: string; firstColumn: string; rows: AssessmentProgressRow[] }) {
+  return <Card>
+    <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
+    <CardContent className="overflow-x-auto">
+      <table className="w-full min-w-[620px] text-sm">
+        <thead className="text-left text-muted-foreground"><tr><th className="pb-3 font-medium">{firstColumn}</th><th className="pb-3 font-medium">Employees</th><th className="pb-3 font-medium">Assigned</th><th className="pb-3 font-medium">Submitted</th><th className="pb-3 font-medium">Pending</th><th className="pb-3 font-medium">Overdue</th><th className="pb-3 text-right font-medium">Completion</th></tr></thead>
+        <tbody>{rows.map((row) => <tr key={row.name} className="border-t"><td className="py-3 font-medium">{row.name}</td><td>{row.employees}</td><td>{row.assigned}</td><td className="text-emerald-700 dark:text-emerald-300">{row.submitted}</td><td>{row.pending}</td><td className={row.overdue ? "font-medium text-red-600" : undefined}>{row.overdue}</td><td className="text-right"><div className="flex items-center justify-end gap-2"><div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.round(row.completion * 100)}%` }} /></div><span className="w-10 tabular-nums">{formatPct(row.completion)}</span></div></td></tr>)}</tbody>
+      </table>
+    </CardContent>
+  </Card>;
 }
 
 function cleanDepartment(value: string | null | undefined) {
