@@ -15,66 +15,52 @@ import {
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-type ClusterRow = {
-  name: string;
-  count: number;
-  avgScore: number;
-  avgGap: number;
-  high: number;
-  medium: number;
-  low: number;
-};
-
 type CountryRow = {
   name: string;
-  count: number;
-  avgGap: number;
-  high: number;
+  assigned: number;
   completion: number;
 };
 
-const PRIORITY_COLORS: Record<string, string> = {
-  HIGH: "#dc2626",
-  MEDIUM: "#d97706",
-  LOW: "#059669",
-};
+const STATUS_COLORS = ["#059669", "#d97706"];
 
 export function DashboardCharts({
-  clusterRows,
+  submitted,
+  pending,
   countryRows,
 }: {
-  clusterRows: ClusterRow[];
+  submitted: number;
+  pending: number;
   countryRows: CountryRow[];
 }) {
-  const priorityData = [
-    { name: "HIGH", value: clusterRows.reduce((s, r) => s + r.high, 0) },
-    { name: "MEDIUM", value: clusterRows.reduce((s, r) => s + r.medium, 0) },
-    { name: "LOW", value: clusterRows.reduce((s, r) => s + r.low, 0) },
+  const statusData = [
+    { name: "Submitted", value: submitted },
+    { name: "Pending", value: pending },
   ];
-  const hasPriorityData = priorityData.some((d) => d.value > 0);
+  const hasStatusData = statusData.some((item) => item.value > 0);
+  const countryChartRows = countryRows
+    .filter((row) => row.assigned > 0)
+    .map((row) => ({ ...row, completionPercent: Math.round(row.completion * 100) }));
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle>Gap distribution</CardTitle>
-      </CardHeader>
+      <CardHeader><CardTitle>Assessment progress</CardTitle></CardHeader>
       <CardContent>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="h-56">
-            <div className="mb-1 text-xs text-muted-foreground">Priority mix</div>
-            {hasPriorityData ? (
+            <div className="mb-1 text-xs text-muted-foreground">Assignment status</div>
+            {hasStatusData ? (
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={priorityData}
+                    data={statusData}
                     dataKey="value"
                     nameKey="name"
                     innerRadius={40}
                     outerRadius={70}
                     paddingAngle={2}
                   >
-                    {priorityData.map((entry) => (
-                      <Cell key={entry.name} fill={PRIORITY_COLORS[entry.name]} />
+                    {statusData.map((entry, index) => (
+                      <Cell key={entry.name} fill={STATUS_COLORS[index]} />
                     ))}
                   </Pie>
                   <Tooltip />
@@ -86,15 +72,15 @@ export function DashboardCharts({
             )}
           </div>
           <div className="h-56">
-            <div className="mb-1 text-xs text-muted-foreground">Avg gap by country</div>
-            {countryRows.length ? (
+            <div className="mb-1 text-xs text-muted-foreground">Completion by country</div>
+            {countryChartRows.length ? (
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={countryRows}>
+                <BarChart data={countryChartRows}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
                   <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis tick={{ fontSize: 12 }} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} unit="%" />
                   <Tooltip />
-                  <Bar dataKey="avgGap" fill="#2563eb" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="completionPercent" name="Completion" fill="#2563eb" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             ) : (
