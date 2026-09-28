@@ -86,7 +86,7 @@ function OrgBranch({ id, nodeById, childrenById, collapsed, visible, selectedId,
   if (!node || (visible && !visible.has(id))) return null;
   const children = (childrenById.get(id) ?? []).filter((childId) => !visible || visible.has(childId));
   const closed = !visible && collapsed.has(id);
-  return <div className={styles.branch}>
+  return <div className={cn(styles.branch, node.placeholder && styles.placeholderBranch)}>
     <EmployeeCard node={node} selected={selectedId === id} current={currentEmployeeId === id} closed={closed} hasChildren={children.length > 0} showAssessments={showAssessments} onSelect={() => onSelect(id)} onToggle={() => onToggle(id)} />
     {!closed && children.length > 0 && <div className={styles.children}>{children.map((childId) => <OrgBranch key={childId} id={childId} nodeById={nodeById} childrenById={childrenById} collapsed={collapsed} visible={visible} selectedId={selectedId} currentEmployeeId={currentEmployeeId} showAssessments={showAssessments} onToggle={onToggle} onSelect={onSelect} />)}</div>}
   </div>;
