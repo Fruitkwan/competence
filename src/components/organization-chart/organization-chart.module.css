@@ -10,6 +10,12 @@
 .children .children .children { padding-left: 0; }
 .children .children .children::before { display: none; }
 .children .children .children > .branch::before { left: 50%; top: -26px; width: 0; height: 26px; border-top: 0; border-left: 1px dashed #9b79f1; }
+/* A missing external manager adds a placeholder level above the real company
+   leader. Keep the leader's direct reports as a horizontal executive tier. */
+.placeholderBranch > .children > .branch > .children { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); gap: 32px 24px; padding: 34px 0 0; }
+.placeholderBranch > .children > .branch > .children::before { display: block; content: ""; position: absolute; top: 16px; left: 0; right: 0; bottom: auto; border-top: 1px dashed #9b79f1; border-left: 0; }
+.placeholderBranch > .children > .branch > .children::after { content: ""; position: absolute; top: 0; left: 50%; height: 16px; border-left: 1px dashed #9b79f1; }
+.placeholderBranch > .children > .branch > .children > .branch::before { top: -18px; left: 50%; width: 0; height: 18px; border-top: 0; border-left: 1px dashed #9b79f1; }
 .personCard { position: relative; z-index: 1; width: 100%; max-width: 340px; border: 1px solid #bda8fb; border-radius: 11px; background: rgba(255,255,255,.96); box-shadow: 0 5px 14px rgba(70,45,120,.10); transition: border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
 .personCard:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(70,45,120,.15); }
 .selected { border-color: #7c3aed; box-shadow: 0 0 0 2px rgba(124,58,237,.16), 0 8px 20px rgba(70,45,120,.16); }

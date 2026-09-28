@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, CalendarDays, HeartPulse, Sparkles, Trophy } from "lucide-react";
+import { ArrowUpRight, Award, CalendarDays, HeartPulse, Sparkles, Trophy } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CompanyPost } from "@/lib/company-engagement";
 
@@ -22,7 +22,7 @@ export function CompanyHighlights({ posts }: { posts: CompanyPost[] }) {
             <CardDescription>Activities that help us build healthy habits together.</CardDescription>
           </CardHeader>
           <CardContent>
-            {challenges.length ? <div className="space-y-3">{challenges.slice(0, 3).map((post) => <Highlight key={post.id} post={post} tone="emerald" />)}</div> : <EmptyHighlight icon={HeartPulse} text="New company health challenges will appear here." />}
+            {challenges.length ? <div className="space-y-3">{challenges.slice(0, 3).map((post) => <Highlight key={post.id} post={post} tone="emerald" />)}</div> : <EmptyHighlight icon={HeartPulse} tone="emerald" text="New company health challenges will appear here." />}
           </CardContent>
         </Card>
 
@@ -33,7 +33,7 @@ export function CompanyHighlights({ posts }: { posts: CompanyPost[] }) {
             <CardDescription>Celebrate career milestones, achievements, and company recognition.</CardDescription>
           </CardHeader>
           <CardContent>
-            {celebrations.length ? <div className="space-y-3">{celebrations.slice(0, 4).map((post) => <Highlight key={post.id} post={post} tone="amber" />)}</div> : <EmptyHighlight icon={Sparkles} text="Promotions, prizes, and recognition will appear here." />}
+            {celebrations.length ? <div className="space-y-3">{celebrations.slice(0, 4).map((post) => <Highlight key={post.id} post={post} tone="amber" />)}</div> : <EmptyHighlight icon={Award} tone="amber" text="Promotions, prizes, and recognition will appear here." />}
           </CardContent>
         </Card>
       </div>
@@ -64,8 +64,11 @@ function Highlight({ post, tone }: { post: CompanyPost; tone: "emerald" | "amber
   return <div className={className}>{content}</div>;
 }
 
-function EmptyHighlight({ icon: Icon, text }: { icon: typeof HeartPulse; text: string }) {
-  return <div className="flex min-h-28 flex-col items-center justify-center rounded-xl border border-dashed bg-background/50 p-6 text-center text-sm text-muted-foreground"><Icon className="mb-2 size-5 opacity-60" />{text}</div>;
+function EmptyHighlight({ icon: Icon, tone, text }: { icon: typeof HeartPulse; tone: "emerald" | "amber"; text: string }) {
+  const iconClass = tone === "emerald"
+    ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-200"
+    : "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-200";
+  return <div className="flex min-h-28 flex-col items-center justify-center rounded-xl border border-dashed bg-background/50 p-6 text-center text-sm text-muted-foreground"><span className={`mb-3 flex size-10 items-center justify-center rounded-full ${iconClass}`}><Icon className="size-5" /></span>{text}</div>;
 }
 
 function safeLink(value: string) {
