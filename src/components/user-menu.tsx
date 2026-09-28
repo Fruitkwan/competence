@@ -1,6 +1,7 @@
 "use client";
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import Link from "next/link";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { LogOut } from "lucide-react";
+import { LogOut, UserRoundPen } from "lucide-react";
 
 function initials(name: string) {
   return name
@@ -25,16 +26,19 @@ export function UserMenu({
   email,
   fullName,
   role,
+  avatarUrl,
 }: {
   email: string;
   fullName: string | null;
   role: string;
+  avatarUrl: string | null;
 }) {
   const display = fullName || email;
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent">
         <Avatar className="h-8 w-8">
+          {avatarUrl && <AvatarImage src={avatarUrl} alt="" />}
           <AvatarFallback className="text-xs">{initials(display)}</AvatarFallback>
         </Avatar>
         <div className="hidden text-left sm:block">
@@ -49,6 +53,10 @@ export function UserMenu({
             <span className="text-xs font-normal text-muted-foreground">{email}</span>
           </DropdownMenuLabel>
         </DropdownMenuGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem render={<Link href="/profile" className="w-full" />}>
+          <UserRoundPen className="mr-2 h-4 w-4" /> Edit profile
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <form action="/auth/signout" method="post">
           <DropdownMenuItem

@@ -24,6 +24,7 @@ import {
   MessageSquareWarning,
   Network,
   Trash2,
+  PartyPopper,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
@@ -279,6 +280,13 @@ const NAV: NavItem[] = [
     label: "Recycle Bin",
     icon: Trash2,
     iconColor: "#f97316",
+    roles: ["admin"],
+  },
+  {
+    href: "/admin/engagement",
+    label: "Company Highlights",
+    icon: PartyPopper,
+    iconColor: "#f59e0b",
     roles: ["admin"],
   },
   {

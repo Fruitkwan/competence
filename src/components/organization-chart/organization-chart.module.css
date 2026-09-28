@@ -16,6 +16,7 @@
 .placeholder { border-style: dashed; background: #fffbeb; }
 .personMain { display: flex; width: 100%; align-items: center; gap: 10px; padding: 10px 12px; text-align: left; }
 .avatar { display: flex; width: 42px; height: 42px; flex: 0 0 42px; align-items: center; justify-content: center; border-radius: 999px; background: #ede9fe; color: #6d28d9; font-size: 12px; font-weight: 700; }
+.avatar img { object-fit: cover; }
 .personText { min-width: 0; flex: 1; }
 .personName { display: block; overflow: hidden; color: #514963; font-size: 14px; font-weight: 600; line-height: 1.2; overflow-wrap: anywhere; }
 .personTitle { display: block; overflow: hidden; margin-top: 4px; color: #24202b; font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
@@ -25,7 +26,9 @@
 .detailPanel { display: grid; gap: 22px; border: 1px solid #bda8fb; border-radius: 14px; background: #fff; padding: 22px; box-shadow: 0 7px 18px rgba(70,45,120,.11); }
 .detailIdentity { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 4px 14px; }
 .detailIdentity > :last-child { grid-column: 1 / -1; }
-.detailAvatar { position: relative; display: grid; width: 72px; height: 72px; grid-row: span 2; place-items: center; border-radius: 999px; background: #ede9fe; color: #6d28d9; font-size: 20px; font-weight: 700; }
+.detailAvatarWrap { position: relative; width: 72px; height: 72px; grid-row: span 2; }
+.detailAvatar { width: 72px; height: 72px; background: #ede9fe; color: #6d28d9; font-size: 20px; font-weight: 700; }
+.detailAvatar img { object-fit: cover; }
 .verified { position: absolute; right: -1px; bottom: 2px; display: grid; width: 20px; height: 20px; place-items: center; border: 2px solid white; border-radius: 999px; background: #8b5cf6; color: white; font-size: 10px; }
 .metrics { display: grid; gap: 8px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .metric { display: flex; min-width: 0; align-items: center; gap: 10px; border: 1px solid #ddd6fe; border-radius: 8px; background: #fcfbff; padding: 10px 12px; }
