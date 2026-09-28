@@ -14,6 +14,7 @@ export type OrgEmployee = {
   department: string | null;
   country_code: string | null;
   manager_name: string | null;
+  avatar_url?: string | null;
   assessments?: OrgAssessment[];
 };
 

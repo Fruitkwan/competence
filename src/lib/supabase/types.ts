@@ -364,6 +364,9 @@ export type Database = {
           job_title: string | null;
           country_code: string | null;
           cluster: string | null;
+          avatar_path: string | null;
+          phone: string | null;
+          bio: string | null;
           is_active: boolean;
           created_at: string;
           updated_at: string;
@@ -379,9 +382,48 @@ export type Database = {
           job_title?: string | null;
           country_code?: string | null;
           cluster?: string | null;
+          avatar_path?: string | null;
+          phone?: string | null;
+          bio?: string | null;
           is_active?: boolean;
         };
         Update: Partial<Database["public"]["Tables"]["profiles"]["Insert"]>;
+        Relationships: [];
+      };
+      company_engagement_posts: {
+        Row: {
+          id: string;
+          kind: "health_challenge" | "promotion" | "prize";
+          title: string;
+          summary: string;
+          details: string | null;
+          recipient_name: string | null;
+          starts_on: string | null;
+          ends_on: string | null;
+          cta_label: string | null;
+          cta_url: string | null;
+          published: boolean;
+          created_by: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          kind: "health_challenge" | "promotion" | "prize";
+          title: string;
+          summary: string;
+          details?: string | null;
+          recipient_name?: string | null;
+          starts_on?: string | null;
+          ends_on?: string | null;
+          cta_label?: string | null;
+          cta_url?: string | null;
+          published?: boolean;
+          created_by?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["company_engagement_posts"]["Insert"]>;
         Relationships: [];
       };
       audit_log: {

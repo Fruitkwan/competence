@@ -5,13 +5,14 @@ import { useMemo, useState } from "react";
 import { Building2, ChevronDown, ChevronRight, CircleAlert, Expand, MapPin, Search, Shrink, UserRound, UsersRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import type { OrgNode } from "@/lib/organization-chart";
 import { cn } from "@/lib/utils";
 import styles from "./organization-chart.module.css";
 
-type Props = { nodes: OrgNode[]; roots: string[]; unresolvedManagers: number; currentEmployeeId: string | null };
+type Props = { nodes: OrgNode[]; roots: string[]; unresolvedManagers: number; currentEmployeeId: string | null; showAssessments: boolean };
 
-export function OrganizationChart({ nodes, roots, unresolvedManagers, currentEmployeeId }: Props) {
+export function OrganizationChart({ nodes, roots, unresolvedManagers, currentEmployeeId, showAssessments }: Props) {
   const [query, setQuery] = useState("");
   const [department, setDepartment] = useState("");
   const [country, setCountry] = useState("");
@@ -70,7 +71,7 @@ export function OrganizationChart({ nodes, roots, unresolvedManagers, currentEmp
 
       <section className={styles.canvas} aria-label="Company organization chart">
         <div className={styles.canvasInner}>
-          {roots.filter((id) => !visible || visible.has(id)).map((id) => <OrgBranch key={id} id={id} nodeById={nodeById} childrenById={childrenById} collapsed={collapsed} visible={visible} selectedId={selectedId} currentEmployeeId={currentEmployeeId} onToggle={toggle} onSelect={setSelectedId} />)}
+          {roots.filter((id) => !visible || visible.has(id)).map((id) => <OrgBranch key={id} id={id} nodeById={nodeById} childrenById={childrenById} collapsed={collapsed} visible={visible} selectedId={selectedId} currentEmployeeId={currentEmployeeId} showAssessments={showAssessments} onToggle={toggle} onSelect={setSelectedId} />)}
           {visible && visible.size === 0 && <div className="py-24 text-center text-sm text-muted-foreground">No positions match the current filters.</div>}
         </div>
       </section>
@@ -80,25 +81,28 @@ export function OrganizationChart({ nodes, roots, unresolvedManagers, currentEmp
   );
 }
 
-function OrgBranch({ id, nodeById, childrenById, collapsed, visible, selectedId, currentEmployeeId, onToggle, onSelect }: { id: string; nodeById: Map<string, OrgNode>; childrenById: Map<string, string[]>; collapsed: Set<string>; visible: Set<string> | null; selectedId: string | null; currentEmployeeId: string | null; onToggle: (id: string) => void; onSelect: (id: string) => void }) {
+function OrgBranch({ id, nodeById, childrenById, collapsed, visible, selectedId, currentEmployeeId, showAssessments, onToggle, onSelect }: { id: string; nodeById: Map<string, OrgNode>; childrenById: Map<string, string[]>; collapsed: Set<string>; visible: Set<string> | null; selectedId: string | null; currentEmployeeId: string | null; showAssessments: boolean; onToggle: (id: string) => void; onSelect: (id: string) => void }) {
   const node = nodeById.get(id);
   if (!node || (visible && !visible.has(id))) return null;
   const children = (childrenById.get(id) ?? []).filter((childId) => !visible || visible.has(childId));
   const closed = !visible && collapsed.has(id);
   return <div className={styles.branch}>
-    <EmployeeCard node={node} selected={selectedId === id} current={currentEmployeeId === id} closed={closed} hasChildren={children.length > 0} onSelect={() => onSelect(id)} onToggle={() => onToggle(id)} />
-    {!closed && children.length > 0 && <div className={styles.children}>{children.map((childId) => <OrgBranch key={childId} id={childId} nodeById={nodeById} childrenById={childrenById} collapsed={collapsed} visible={visible} selectedId={selectedId} currentEmployeeId={currentEmployeeId} onToggle={onToggle} onSelect={onSelect} />)}</div>}
+    <EmployeeCard node={node} selected={selectedId === id} current={currentEmployeeId === id} closed={closed} hasChildren={children.length > 0} showAssessments={showAssessments} onSelect={() => onSelect(id)} onToggle={() => onToggle(id)} />
+    {!closed && children.length > 0 && <div className={styles.children}>{children.map((childId) => <OrgBranch key={childId} id={childId} nodeById={nodeById} childrenById={childrenById} collapsed={collapsed} visible={visible} selectedId={selectedId} currentEmployeeId={currentEmployeeId} showAssessments={showAssessments} onToggle={onToggle} onSelect={onSelect} />)}</div>}
   </div>;
 }
 
-function EmployeeCard({ node, selected, current, closed, hasChildren, onSelect, onToggle }: { node: OrgNode; selected: boolean; current: boolean; closed: boolean; hasChildren: boolean; onSelect: () => void; onToggle: () => void }) {
+function EmployeeCard({ node, selected, current, closed, hasChildren, showAssessments, onSelect, onToggle }: { node: OrgNode; selected: boolean; current: boolean; closed: boolean; hasChildren: boolean; showAssessments: boolean; onSelect: () => void; onToggle: () => void }) {
   return <div className={cn(styles.personCard, selected && styles.selected, node.placeholder && styles.placeholder)}>
     <button type="button" className={styles.personMain} onClick={onSelect} aria-label={`View ${node.full_name}`}>
-      <span className={styles.avatar}>{initials(node.full_name)}</span>
+      <Avatar className={styles.avatar}>
+        {node.avatar_url && <AvatarImage src={node.avatar_url} alt="" />}
+        <AvatarFallback>{initials(node.full_name)}</AvatarFallback>
+      </Avatar>
       <span className={styles.personText}><span className={styles.personName}>{node.full_name}</span><span className={styles.personTitle}>{node.job_title}</span></span>
       {current && <span className={styles.you}>You</span>}
     </button>
-    {!node.placeholder && <div className={styles.assessments}>
+    {showAssessments && !node.placeholder && <div className={styles.assessments}>
       {node.assessments === undefined ? <p className={styles.assessmentEmpty}>Assessment details are private</p> : node.assessments.length === 0 ? <p className={styles.assessmentEmpty}>No completed assessments</p> : node.assessments.map((assessment) => <div key={assessment.id} className={styles.assessment}>
         <div className={styles.scoreRow}><Link href={`/assessments/${assessment.id}/report`}>{assessment.name}</Link><strong>{assessment.score == null ? "Pending" : `${assessment.score}%`}</strong></div>
         {assessment.wave && <p className={styles.assessmentEmpty}>{assessment.wave}</p>}
@@ -113,7 +117,13 @@ function EmployeeCard({ node, selected, current, closed, hasChildren, onSelect, 
 function EmployeeDetails({ node, current }: { node: OrgNode; current: boolean }) {
   return <section className={styles.detailPanel} aria-label={`${node.full_name} details`}>
     <div className={styles.detailIdentity}>
-      <div className={styles.detailAvatar}>{initials(node.full_name)}{current && <span className={styles.verified}>✓</span>}</div>
+      <div className={styles.detailAvatarWrap}>
+        <Avatar className={styles.detailAvatar}>
+          {node.avatar_url && <AvatarImage src={node.avatar_url} alt="" />}
+          <AvatarFallback>{initials(node.full_name)}</AvatarFallback>
+        </Avatar>
+        {current && <span className={styles.verified}>✓</span>}
+      </div>
       <div className="min-w-0"><p className="truncate text-lg font-semibold">{node.full_name}</p><p className="truncate text-sm text-muted-foreground">{node.job_title}</p></div>
       {!node.placeholder && <Link href={`/employees/${node.employee_id}`} className="mt-3 inline-flex h-8 w-full items-center justify-center rounded-md bg-violet-600 px-3 text-sm font-medium text-white transition-colors hover:bg-violet-700 sm:w-fit">View profile</Link>}
     </div>

@@ -8,6 +8,8 @@ import { formatPct, priorityColor } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { BookOpen, ClipboardCheck, ClipboardList, Target, AlertTriangle } from "lucide-react";
 import { DashboardCharts } from "./charts";
+import { CompanyHighlights } from "@/components/company/company-highlights";
+import type { CompanyPost } from "@/lib/company-engagement";
 
 type AppraisalFullRow = {
   id: string;
@@ -151,6 +153,7 @@ export default async function DashboardPage() {
       { data: notifications },
       { count: pendingAssessmentCount, error: pendingAssessmentCountError },
       { count: completedAssessmentCount, error: completedAssessmentCountError },
+      { data: companyPosts },
     ] = await Promise.all([
       supabase
         .from("employees")
@@ -209,6 +212,12 @@ export default async function DashboardPage() {
           ? `employee_user_id.eq.${user?.id},employee_id.eq.${employeeId}`
           : `employee_user_id.eq.${user?.id}`)
         .in("status", ["submitted", "closed"]),
+      supabase
+        .from("company_engagement_posts")
+        .select("id, kind, title, summary, details, recipient_name, starts_on, ends_on, cta_label, cta_url, published, created_at, updated_at")
+        .eq("published", true)
+        .order("created_at", { ascending: false })
+        .limit(12),
     ]);
 
     return (
@@ -224,6 +233,7 @@ export default async function DashboardPage() {
         notifications={(notifications ?? []) as NotificationSummaryRow[]}
         pendingAssessmentCount={pendingAssessmentCountError ? null : pendingAssessmentCount ?? 0}
         completedAssessmentCount={completedAssessmentCountError ? null : completedAssessmentCount ?? 0}
+        companyPosts={(companyPosts ?? []) as CompanyPost[]}
       />
     );
   }
@@ -518,6 +528,7 @@ function EmployeeDashboard({
   notifications,
   pendingAssessmentCount,
   completedAssessmentCount,
+  companyPosts,
 }: {
   employee: EmployeeProfileRow | null;
   userName: string;
@@ -530,8 +541,9 @@ function EmployeeDashboard({
   notifications: NotificationSummaryRow[];
   pendingAssessmentCount: number | null;
   completedAssessmentCount: number | null;
+  companyPosts: CompanyPost[];
 }) {
-  const displayName = employee?.full_name ?? userName ?? "Employee";
+  const displayName = userName || employee?.full_name || "Employee";
   const activeCourses = courses.filter((course) => !["Completed", "Dropped"].includes(course.status));
   const objectivesNeedingWork = objectives.filter((objective) =>
     ["draft", "revision_requested"].includes(objective.status)
@@ -573,6 +585,8 @@ function EmployeeDashboard({
               <EmployeeStatCard label="Pending assessments" value={pendingAssessmentCount?.toString() ?? "—"} icon={ClipboardList} tone="blue" />
             </Link>
           </div>
+
+          <CompanyHighlights posts={companyPosts} />
 
           <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
             <Card>

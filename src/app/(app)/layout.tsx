@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { AppNav } from "@/components/app-nav";
 import { UserMenu } from "@/components/user-menu";
 import { NotificationBell } from "@/components/notification-bell";
+import { signedProfileImageUrls } from "@/lib/profile-images";
 
 export default async function AppLayout({
   children,
@@ -17,7 +18,7 @@ export default async function AppLayout({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("email, full_name, role, is_active")
+    .select("email, full_name, role, is_active, avatar_path")
     .eq("id", user.id)
     .single();
 
@@ -40,6 +41,8 @@ export default async function AppLayout({
   }
 
   const role = profile?.role ?? "employee";
+  const avatarUrls = await signedProfileImageUrls(supabase, [profile?.avatar_path]);
+  const avatarUrl = profile?.avatar_path ? avatarUrls.get(profile.avatar_path) ?? null : null;
 
   // Fetch notifications for bell
   const { data: notifications } = await supabase
@@ -70,6 +73,7 @@ export default async function AppLayout({
             email={profile?.email ?? user.email ?? ""}
             fullName={profile?.full_name ?? null}
             role={role}
+            avatarUrl={avatarUrl}
           />
         </header>
         <main className="flex-1 p-6">{children}</main>
