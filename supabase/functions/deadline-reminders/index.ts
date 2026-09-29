@@ -25,6 +25,9 @@ const CLIENT_ID = Deno.env.get("AZURE_CLIENT_ID") ?? "";
 const CLIENT_SECRET = Deno.env.get("AZURE_CLIENT_SECRET") ?? "";
 const SENDER = Deno.env.get("MAIL_SENDER") ?? "";
 const APP_URL = (Deno.env.get("APP_URL") ?? "").replace(/\/$/, "");
+const LOGO_URL =
+  Deno.env.get("LOGO_URL") ??
+  `${Deno.env.get("SUPABASE_URL")}/storage/v1/object/public/public-assets/logo.png`;
 const CRON_SECRET = Deno.env.get("CRON_SECRET") ?? "";
 const DRY_RUN = ["1", "true"].includes((Deno.env.get("DRY_RUN") ?? "").toLowerCase());
 
@@ -85,6 +88,12 @@ async function graphToken(): Promise<string> {
   return cachedToken.token;
 }
 
+function fmtDate(iso: string): string {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", {
+    weekday: "short", day: "numeric", month: "short", year: "numeric", timeZone: "UTC",
+  });
+}
+
 function renderEmail(recipientName: string, items: DueItem[]): { subject: string; html: string } {
   const anyOverdue = items.some((i) => i.stage.startsWith("overdue"));
   const subject = anyOverdue
@@ -92,31 +101,74 @@ function renderEmail(recipientName: string, items: DueItem[]): { subject: string
     : `Reminder: assessment deadline approaching`;
   const esc = (s: string) =>
     s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const rows = items
+
+  const cards = items
     .map((i) => {
       const overdue = i.stage.startsWith("overdue");
-      return `<tr>
-        <td style="padding:10px 12px;border-bottom:1px solid #eee">${esc(i.assessmentName)}<br><span style="color:#64748b;font-size:12px">${esc(i.employeeName)}</span></td>
-        <td style="padding:10px 12px;border-bottom:1px solid #eee;white-space:nowrap;${overdue ? "color:#dc2626;font-weight:600" : ""}">${esc(i.dueDate)}<br><span style="font-size:12px;color:#64748b">${stageLabel(i.stage)}</span></td>
-        <td style="padding:10px 12px;border-bottom:1px solid #eee"><a href="${i.link}" style="color:#2563eb">Open</a></td>
-      </tr>`;
+      const dueColor = overdue ? "#dc2626" : i.stage === "t_minus_1" ? "#d97706" : "#334155";
+      const dueBg = overdue ? "#fef2f2" : i.stage === "t_minus_1" ? "#fffbeb" : "#f8fafc";
+      return `
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:10px;margin:0 0 12px">
+        <tr>
+          <td style="padding:16px">
+            <div style="font-size:15px;font-weight:600;color:#0f172a">${esc(i.assessmentName)}</div>
+            <div style="font-size:13px;color:#64748b;margin-top:2px">Employee: ${esc(i.employeeName)}</div>
+            <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:12px;width:100%">
+              <tr>
+                <td>
+                  <span style="display:inline-block;background:${dueBg};color:${dueColor};font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px">
+                    ${overdue ? "Overdue — was due" : "Due"} ${esc(fmtDate(i.dueDate))}
+                  </span>
+                </td>
+                <td align="right">
+                  <a href="${i.link}" style="display:inline-block;background:#0f172a;color:#ffffff;text-decoration:none;font-size:13px;font-weight:600;padding:8px 18px;border-radius:8px">
+                    ${i.raterId ? "Give rating" : "Take assessment"}
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+      </table>`;
     })
     .join("");
-  const html = `
-  <div style="font-family:Segoe UI,Arial,sans-serif;max-width:560px;color:#0f172a">
-    <h2 style="margin:0 0 8px">Assessment deadline${items.length > 1 ? "s" : ""}</h2>
-    <p style="margin:0 0 16px;color:#475569">Hi ${esc(recipientName)}, the following assessment${items.length > 1 ? "s are" : " is"} waiting on you:</p>
-    <table style="border-collapse:collapse;width:100%;font-size:14px">
-      <tr style="text-align:left;color:#64748b;font-size:12px">
-        <th style="padding:8px 12px;border-bottom:2px solid #e2e8f0">Assessment</th>
-        <th style="padding:8px 12px;border-bottom:2px solid #e2e8f0">Due</th>
-        <th style="padding:8px 12px;border-bottom:2px solid #e2e8f0"></th>
-      </tr>${rows}
-    </table>
-    <p style="margin:16px 0 0;font-size:12px;color:#94a3b8">
-      You are receiving this because you have an outstanding assessment in the Competence Hub.
-    </p>
-  </div>`;
+
+  const html = `<!doctype html>
+<html><body style="margin:0;padding:0;background:#f1f5f9">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9;padding:24px 12px">
+    <tr><td align="center">
+      <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%">
+        <tr>
+          <td style="background:#ffffff;border-radius:12px 12px 0 0;padding:20px 24px;border-bottom:1px solid #e2e8f0">
+            <table role="presentation" cellpadding="0" cellspacing="0"><tr>
+              <td><img src="${LOGO_URL}" width="36" height="36" alt="" style="display:block;border-radius:8px" /></td>
+              <td style="padding-left:12px">
+                <span style="color:#0f172a;font-family:Segoe UI,Arial,sans-serif;font-size:16px;font-weight:700;letter-spacing:.3px">Performance Hub</span>
+                <div style="color:#64748b;font-family:Segoe UI,Arial,sans-serif;font-size:12px">Assessment reminders</div>
+              </td>
+            </tr></table>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#ffffff;padding:24px;font-family:Segoe UI,Arial,sans-serif">
+            <div style="font-size:18px;font-weight:700;color:#0f172a;margin:0 0 6px">
+              ${anyOverdue ? "You have overdue assessments" : "Upcoming assessment deadline" + (items.length > 1 ? "s" : "")}
+            </div>
+            <div style="font-size:14px;color:#475569;margin:0 0 20px">
+              Hi ${esc(recipientName)}, ${items.length > 1 ? "these items are" : "this item is"} waiting on you:
+            </div>
+            ${cards}
+          </td>
+        </tr>
+        <tr>
+          <td style="border-radius:0 0 12px 12px;background:#f8fafc;border-top:1px solid #e2e8f0;padding:16px 24px;font-family:Segoe UI,Arial,sans-serif;font-size:12px;color:#94a3b8">
+            You are receiving this because you have an outstanding assessment in the Performance Hub. Questions? Contact HR.
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body></html>`;
   return { subject, html };
 }
 
@@ -271,7 +323,7 @@ Deno.serve(async (req: Request) => {
           assessmentName,
           dueDate: a.due_date,
           stage: a.stage,
-          link: `${APP_URL}/assessments`,
+          link: `${APP_URL}/assessments/rate/${r.id}`,
         });
       }
     }
