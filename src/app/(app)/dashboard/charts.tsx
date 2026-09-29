@@ -27,10 +27,14 @@ export function DashboardCharts({
   submitted,
   pending,
   countryRows,
+  className,
+  style,
 }: {
   submitted: number;
   pending: number;
   countryRows: CountryRow[];
+  className?: string;
+  style?: React.CSSProperties;
 }) {
   const statusData = [
     { name: "Submitted", value: submitted },
@@ -42,7 +46,7 @@ export function DashboardCharts({
     .map((row) => ({ ...row, completionPercent: Math.round(row.completion * 100) }));
 
   return (
-    <Card>
+    <Card className={className} style={style}>
       <CardHeader><CardTitle>Assessment progress</CardTitle></CardHeader>
       <CardContent>
         <div className="grid gap-4 md:grid-cols-2">
