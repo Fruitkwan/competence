@@ -8,6 +8,7 @@ import { formatPct, priorityColor } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, BookOpen, CheckCircle2, ClipboardCheck, ClipboardList, Clock3, Target, UserCheck, UsersRound } from "lucide-react";
 import { DashboardCharts } from "./charts";
+import { CountUp } from "@/components/count-up";
 import { CompanyHighlights } from "@/components/company/company-highlights";
 import type { CompanyPost } from "@/lib/company-engagement";
 
@@ -388,7 +389,7 @@ export default async function DashboardPage() {
         actions={<Link href="/assessments/results" className={buttonVariants({ variant: "outline" })}>Open assessment results</Link>}
       />
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+      <div className="t-dash-stagger grid grid-cols-2 gap-4 lg:grid-cols-5">
         <OperationsStatCard icon={UserCheck} label="Assessed employees" value={assessedEmployeeIds.size.toString()} detail={`${assignedEmployeeIds.size} employees assigned`} tone="blue" />
         <OperationsStatCard icon={CheckCircle2} label="Assignment completion" value={formatPct(assignmentCompletion)} detail={`${submittedAssignments.length} of ${scopedAssignments.length} submitted`} tone="green" />
         <OperationsStatCard icon={ClipboardList} label="Pending assignments" value={pendingAssignments.length.toString()} detail="Employee responses outstanding" tone="amber" />
@@ -401,9 +402,14 @@ export default async function DashboardPage() {
           submitted={submittedAssignments.length}
           pending={pendingAssignments.length}
           countryRows={countryProgress}
+          className="t-dash-rise t-dash-lift"
+          style={{ animationDelay: "240ms" }}
         />
 
-        <Card className={overdueAssignments.length ? "border-red-200 dark:border-red-900" : undefined}>
+        <Card
+          className={cn("t-dash-rise t-dash-lift", overdueAssignments.length && "border-red-200 dark:border-red-900")}
+          style={{ animationDelay: "300ms" }}
+        >
           <CardHeader>
             <CardTitle className="flex items-center gap-2"><Clock3 className="size-5 text-red-600" /> Attention required</CardTitle>
           </CardHeader>
@@ -427,8 +433,8 @@ export default async function DashboardPage() {
       </div>
 
       <div className="mt-6 grid gap-6 xl:grid-cols-2">
-        <ProgressTable title="Progress by department" firstColumn="Department" rows={departmentProgress} />
-        <ProgressTable title="Progress by country" firstColumn="Country" rows={countryProgress} />
+        <ProgressTable title="Progress by department" firstColumn="Department" rows={departmentProgress} className="t-dash-rise t-dash-lift" style={{ animationDelay: "360ms" }} />
+        <ProgressTable title="Progress by country" firstColumn="Country" rows={countryProgress} className="t-dash-rise t-dash-lift" style={{ animationDelay: "420ms" }} />
       </div>
     </>
   );
@@ -494,25 +500,27 @@ function EmployeeDashboard({
         </Card>
       ) : (
         <div className="space-y-6">
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
+          <div className="t-dash-stagger grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
             <EmployeeStatCard label="Active courses" value={activeCourses.length.toString()} icon={BookOpen} tone="blue" />
-            <Link href="/assessments" className="rounded-xl transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={completedAssessmentCount == null ? "View my completed assessments. Count unavailable." : `View my completed assessments: ${completedAssessmentCount}`}>
+            <Link href="/assessments" className="t-dash-lift rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={completedAssessmentCount == null ? "View my completed assessments. Count unavailable." : `View my completed assessments: ${completedAssessmentCount}`}>
               <EmployeeStatCard label="Completed assessments" value={completedAssessmentCount?.toString() ?? "—"} icon={ClipboardCheck} tone="green" />
             </Link>
             <EmployeeStatCard label="Objectives" value={objectivesNeedingWork.length.toString()} icon={Target} tone="amber" />
             <EmployeeStatCard label="High gaps" value={highSkillGaps.length.toString()} icon={AlertTriangle} tone="red" />
-            <Link href="/assessments" className="rounded-xl transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={pendingAssessmentCount == null ? "View my assessments. Count unavailable." : `View my assessments: ${pendingAssessmentCount} pending`}>
+            <Link href="/assessments" className="t-dash-lift rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={pendingAssessmentCount == null ? "View my assessments. Count unavailable." : `View my assessments: ${pendingAssessmentCount} pending`}>
               <EmployeeStatCard label="Pending assessments" value={pendingAssessmentCount?.toString() ?? "—"} icon={ClipboardList} tone="blue" />
             </Link>
-            <Link href="/assessments" className="rounded-xl transition-shadow hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={pendingPeerRatingCount == null ? "View pending peer ratings. Count unavailable." : `View pending peer ratings: ${pendingPeerRatingCount}`}>
+            <Link href="/assessments" className="t-dash-lift rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" aria-label={pendingPeerRatingCount == null ? "View pending peer ratings. Count unavailable." : `View pending peer ratings: ${pendingPeerRatingCount}`}>
               <EmployeeStatCard label="Pending peer ratings" value={pendingPeerRatingCount?.toString() ?? "—"} icon={UsersRound} tone="amber" />
             </Link>
           </div>
 
-          <CompanyHighlights posts={companyPosts} />
+          <div className="t-dash-rise" style={{ animationDelay: "240ms" }}>
+            <CompanyHighlights posts={companyPosts} />
+          </div>
 
           <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-            <Card>
+            <Card className="t-dash-rise t-dash-lift" style={{ animationDelay: "300ms" }}>
               <CardHeader>
                 <CardTitle>Next actions</CardTitle>
               </CardHeader>
@@ -557,7 +565,7 @@ function EmployeeDashboard({
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="t-dash-rise t-dash-lift" style={{ animationDelay: "360ms" }}>
               <CardHeader>
                 <CardTitle>Profile</CardTitle>
               </CardHeader>
@@ -577,16 +585,18 @@ function EmployeeDashboard({
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">
-            <CourseList courses={courses} />
-            <ObjectiveList objectives={objectives} />
+            <div className="t-dash-rise" style={{ animationDelay: "400ms" }}><CourseList courses={courses} /></div>
+            <div className="t-dash-rise" style={{ animationDelay: "460ms" }}><ObjectiveList objectives={objectives} /></div>
           </div>
 
           <div className="grid gap-6 lg:grid-cols-2">
-            <PerformanceList appraisals={performanceAppraisals} latestAppraisal={latestAppraisal} />
-            <SkillGapList gaps={skillGaps} />
+            <div className="t-dash-rise" style={{ animationDelay: "520ms" }}><PerformanceList appraisals={performanceAppraisals} latestAppraisal={latestAppraisal} /></div>
+            <div className="t-dash-rise" style={{ animationDelay: "580ms" }}><SkillGapList gaps={skillGaps} /></div>
           </div>
 
-          <NotificationList notifications={notifications} />
+          <div className="t-dash-rise" style={{ animationDelay: "640ms" }}>
+            <NotificationList notifications={notifications} />
+          </div>
         </div>
       )}
     </>
@@ -613,12 +623,12 @@ function EmployeeStatCard({
   }[tone];
 
   return (
-    <Card>
+    <Card className="t-dash-lift h-full">
       <CardContent className="flex min-h-24 items-center gap-3 p-4">
         <Icon className={cn("h-7 w-7", toneClass)} />
         <div>
           <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
-          <div className={cn("mt-1 text-2xl font-semibold", toneClass)}>{value}</div>
+          <div className={cn("mt-1 text-2xl font-semibold", toneClass)}><CountUp value={value} /></div>
         </div>
       </CardContent>
     </Card>
@@ -912,24 +922,24 @@ function OperationsStatCard({ icon: Icon, label, value, detail, tone }: {
     violet: "bg-violet-50 text-violet-600 dark:bg-violet-950/50 dark:text-violet-300",
   }[tone];
   return (
-    <Card className="overflow-hidden">
+    <Card className="t-dash-lift overflow-hidden">
       <CardContent className="p-4">
         <div className={cn("mb-4 flex size-10 items-center justify-center rounded-xl", toneClass)}><Icon className="size-5" /></div>
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-        <p className="mt-1 text-2xl font-semibold">{value}</p>
+        <p className="mt-1 text-2xl font-semibold"><CountUp value={value} /></p>
         <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{detail}</p>
       </CardContent>
     </Card>
   );
 }
 
-function ProgressTable({ title, firstColumn, rows }: { title: string; firstColumn: string; rows: AssessmentProgressRow[] }) {
-  return <Card>
+function ProgressTable({ title, firstColumn, rows, className, style }: { title: string; firstColumn: string; rows: AssessmentProgressRow[]; className?: string; style?: React.CSSProperties }) {
+  return <Card className={className} style={style}>
     <CardHeader><CardTitle>{title}</CardTitle></CardHeader>
     <CardContent className="overflow-x-auto">
       <table className="w-full min-w-[620px] text-sm">
         <thead className="text-left text-muted-foreground"><tr><th className="pb-3 font-medium">{firstColumn}</th><th className="pb-3 font-medium">Employees</th><th className="pb-3 font-medium">Assigned</th><th className="pb-3 font-medium">Submitted</th><th className="pb-3 font-medium">Pending</th><th className="pb-3 font-medium">Overdue</th><th className="pb-3 text-right font-medium">Completion</th></tr></thead>
-        <tbody>{rows.map((row) => <tr key={row.name} className="border-t"><td className="py-3 font-medium">{row.name}</td><td>{row.employees}</td><td>{row.assigned}</td><td className="text-emerald-700 dark:text-emerald-300">{row.submitted}</td><td>{row.pending}</td><td className={row.overdue ? "font-medium text-red-600" : undefined}>{row.overdue}</td><td className="text-right"><div className="flex items-center justify-end gap-2"><div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${Math.round(row.completion * 100)}%` }} /></div><span className="w-10 tabular-nums">{formatPct(row.completion)}</span></div></td></tr>)}</tbody>
+        <tbody>{rows.map((row, index) => <tr key={row.name} className="border-t"><td className="py-3 font-medium">{row.name}</td><td>{row.employees}</td><td>{row.assigned}</td><td className="text-emerald-700 dark:text-emerald-300">{row.submitted}</td><td>{row.pending}</td><td className={row.overdue ? "font-medium text-red-600" : undefined}>{row.overdue}</td><td className="text-right"><div className="flex items-center justify-end gap-2"><div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted"><div className="t-dash-bar h-full rounded-full bg-emerald-500" style={{ width: `${Math.round(row.completion * 100)}%`, animationDelay: `${500 + index * 40}ms` }} /></div><span className="w-10 tabular-nums">{formatPct(row.completion)}</span></div></td></tr>)}</tbody>
       </table>
     </CardContent>
   </Card>;

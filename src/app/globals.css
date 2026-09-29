@@ -276,3 +276,56 @@
 @media (prefers-reduced-motion: reduce) {
   .t-tabs-indicator { transition: none !important; }
 }
+
+:root {
+  --dash-rise-dur: 450ms;
+  --dash-rise-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --dash-stagger: 60ms;
+  --dash-lift-dur: 200ms;
+  --dash-bar-dur: 600ms;
+}
+
+@keyframes t-dash-rise {
+  from { opacity: 0; transform: translateY(14px); filter: blur(3px); }
+  to   { opacity: 1; transform: translateY(0);    filter: blur(0); }
+}
+
+.t-dash-rise {
+  animation: t-dash-rise var(--dash-rise-dur) var(--dash-rise-ease) backwards;
+  will-change: opacity, transform, filter;
+}
+
+.t-dash-stagger > * {
+  animation: t-dash-rise var(--dash-rise-dur) var(--dash-rise-ease) backwards;
+  will-change: opacity, transform, filter;
+}
+.t-dash-stagger > :nth-child(1) { animation-delay: 0ms; }
+.t-dash-stagger > :nth-child(2) { animation-delay: calc(1 * var(--dash-stagger)); }
+.t-dash-stagger > :nth-child(3) { animation-delay: calc(2 * var(--dash-stagger)); }
+.t-dash-stagger > :nth-child(4) { animation-delay: calc(3 * var(--dash-stagger)); }
+.t-dash-stagger > :nth-child(5) { animation-delay: calc(4 * var(--dash-stagger)); }
+.t-dash-stagger > :nth-child(6) { animation-delay: calc(5 * var(--dash-stagger)); }
+
+.t-dash-lift {
+  transition:
+    transform var(--dash-lift-dur) var(--dash-rise-ease),
+    box-shadow var(--dash-lift-dur) var(--dash-rise-ease);
+}
+.t-dash-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px -14px rgb(0 0 0 / 0.28);
+}
+
+@keyframes t-dash-bar-grow {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
+}
+.t-dash-bar {
+  transform-origin: left;
+  animation: t-dash-bar-grow var(--dash-bar-dur) var(--dash-rise-ease) backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .t-dash-rise, .t-dash-stagger > *, .t-dash-bar { animation: none !important; }
+  .t-dash-lift { transition: none !important; transform: none !important; }
+}

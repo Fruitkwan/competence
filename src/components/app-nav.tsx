@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
+import { version } from "../../package.json";
 
 type NavItem = {
   href: string;
@@ -325,7 +326,7 @@ function isActive(pathname: string, href: string): boolean {
 export function AppNav({ role }: { role: string }) {
   const pathname = usePathname();
   return (
-    <nav className="flex flex-col gap-1 p-3">
+    <nav className="flex flex-col gap-1 p-3 pb-16">
       <div className="flex items-center gap-2 px-2 py-3">
         <Image src="/logo.jpg" alt="Dhofar Global" width={28} height={28} />
         <div className="leading-tight">
@@ -363,6 +364,10 @@ export function AppNav({ role }: { role: string }) {
           </div>
         );
       })}
+      <div className="fixed bottom-0 left-0 hidden w-60 border-t bg-card px-5 py-3 text-[11px] leading-relaxed text-muted-foreground md:block">
+        <div className="font-medium text-foreground/70">Performance Hub v{version}</div>
+        <div>© {new Date().getFullYear()} Dhofar Global</div>
+      </div>
     </nav>
   );
 }
