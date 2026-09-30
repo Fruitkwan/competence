@@ -2,7 +2,7 @@ import { Document, Page, View, Text, Svg, Circle, Path, Polygon, Line, StyleShee
 import type { AssignmentResult, EmployeeReport, ReportSignature } from "@/lib/assessments/results";
 import type { Warning } from "@/lib/assessments/scoring";
 import { ASSESSMENT_PURPOSE } from "@/lib/assessments/copy";
-import { BAND_COLOR, GROUP_COLOR, STANDARD, bandOf, indexText, initials, selfAwarenessText, shortName } from "./assessment-report";
+import { BAND_COLOR, GROUP_COLOR, STANDARD, bandOf, indexText, initials, selfAwarenessText, shortName } from "./assessment-report-utils";
 
 const C = {
   ink: "#0f172a",
