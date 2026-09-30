@@ -85,7 +85,7 @@ export default async function MyAssessmentsPage() {
                   Results
                 </Link>
               )}
-              {role !== "executive" && (
+              {role === "admin" && (
                 <Link href="/assessments/assign" className={buttonVariants()}>
                   Assign
                 </Link>

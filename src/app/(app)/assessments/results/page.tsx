@@ -110,7 +110,7 @@ export default async function AssessmentResultsPage() {
         title="Assessment Results"
         description="Scored from self, line manager, cross-departmental / peer and scenario inputs. Open a report for the full profile."
         actions={
-          viewer.role !== "executive" ? (
+          viewer.role === "admin" ? (
             <Link href="/assessments/assign" className={buttonVariants()}>
               Assign
             </Link>
