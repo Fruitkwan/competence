@@ -102,7 +102,7 @@ export default async function AssessmentResultsPage() {
     };
   });
 
-  const resultsCard = <ResultsList rows={resultRows} />;
+  const resultsCard = <ResultsList rows={resultRows} canExportDepartment={viewer.role === "admin"} />;
 
   return (
     <>
