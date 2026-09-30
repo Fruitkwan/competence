@@ -23,7 +23,7 @@ function filePart(value: string) {
 export async function GET(request: Request) {
   const viewer = await getViewer();
   if (!viewer) return new NextResponse("Unauthorized", { status: 401 });
-  if (viewer.role === "employee") return new NextResponse("Forbidden", { status: 403 });
+  if (viewer.role !== "admin" && viewer.role !== "executive") return new NextResponse("Forbidden", { status: 403 });
 
   const requestedDepartment = new URL(request.url).searchParams.get("department")?.trim() ?? "";
   if (requestedDepartment && viewer.role !== "admin") {

@@ -84,7 +84,7 @@ export async function loadPlacementReport(
   const isSelf =
     assignment.employee_user_id === viewer.userId ||
     (viewer.employeeId != null && assignment.employee_id === viewer.employeeId);
-  const isStaff = viewer.role !== "employee";
+  const isStaff = viewer.role === "admin" || viewer.role === "executive";
   if (!isStaff && !(isSelf && assignment.results_released)) return null;
 
   const admin = createAdminClient() ?? user;
