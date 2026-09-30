@@ -312,8 +312,10 @@
     box-shadow var(--dash-lift-dur) var(--dash-rise-ease);
 }
 .t-dash-lift:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 28px -14px rgb(0 0 0 / 0.28);
+  transform: translateY(-5px);
+  box-shadow:
+    0 18px 36px -12px rgb(0 0 0 / 0.3),
+    0 4px 10px -4px rgb(0 0 0 / 0.12);
 }
 
 @keyframes t-dash-bar-grow {
