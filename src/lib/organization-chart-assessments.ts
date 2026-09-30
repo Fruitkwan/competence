@@ -6,7 +6,7 @@ import type { OrgAssessment } from "./organization-chart";
 
 /** Uses the same row visibility and score/release gate as assessment reports. */
 export async function loadOrgAssessments(client: SupabaseClient<Database>, viewer: Viewer) {
-  const staff = viewer.role !== "employee";
+  const staff = viewer.role === "admin" || viewer.role === "executive";
   let query = client.from("assessment_assignments")
     .select("id, employee_id, template_id, wave, submitted_at, results_released")
     .not("submitted_at", "is", null).order("submitted_at", { ascending: false });

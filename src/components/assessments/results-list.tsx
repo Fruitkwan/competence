@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Download, Search } from "lucide-react";
+import { AlertTriangle, Archive, Download, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -200,13 +200,23 @@ export function ResultsList({ rows, canExportDepartment = false }: { rows: Resul
         )}
         <span className="ml-auto text-xs text-muted-foreground">Showing {filtered.length} of {rows.length}</span>
         {canExportDepartment && (department === "all" ? (
-          <button type="button" disabled className={buttonVariants({ variant: "outline", size: "sm", className: "cursor-not-allowed opacity-50" })} title="Select a department first">
-            <Download className="size-3.5" /> Department Excel
-          </button>
+          <>
+            <button type="button" disabled className={buttonVariants({ variant: "outline", size: "sm", className: "cursor-not-allowed opacity-50" })} title="Select a department first">
+              <Download className="size-3.5" /> Department Excel
+            </button>
+            <button type="button" disabled className={buttonVariants({ variant: "outline", size: "sm", className: "cursor-not-allowed opacity-50" })} title="Select a department first">
+              <Archive className="size-3.5" /> Department PDFs
+            </button>
+          </>
         ) : (
-          <a href={`/api/export/assessment-results?department=${encodeURIComponent(department)}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
-            <Download className="size-3.5" /> Download {department}
-          </a>
+          <>
+            <a href={`/api/export/assessment-results?department=${encodeURIComponent(department)}`} className={buttonVariants({ variant: "outline", size: "sm" })} title={`Download ${department} results as Excel`}>
+              <Download className="size-3.5" /> Department Excel
+            </a>
+            <a href={`/api/export/assessment-reports?department=${encodeURIComponent(department)}`} className={buttonVariants({ variant: "outline", size: "sm" })} title={`Download submitted ${department} individual reports in one ZIP`}>
+              <Archive className="size-3.5" /> Department PDFs
+            </a>
+          </>
         ))}
         <a href="/api/export/assessment-results" className={buttonVariants({ variant: "outline", size: "sm" })}>
           <Download className="size-3.5" /> Export all Excel

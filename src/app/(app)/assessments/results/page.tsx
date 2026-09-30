@@ -13,7 +13,7 @@ import { ResultsList, type ResultListRow } from "@/components/assessments/result
 export default async function AssessmentResultsPage() {
   const viewer = await getViewer();
   if (!viewer) redirect("/login");
-  if (viewer.role === "employee") redirect("/assessments");
+  if (viewer.role !== "admin" && viewer.role !== "executive") redirect("/assessments");
 
   const supabase = await createClient();
   const { data: assignments } = await supabase

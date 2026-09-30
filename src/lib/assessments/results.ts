@@ -85,7 +85,7 @@ export async function loadAssignmentResult(assignmentId: string, viewer: Viewer,
   if (!assignment) return null;
 
   const isSelf = assignment.employee_user_id === viewer.userId || (viewer.employeeId != null && assignment.employee_id === viewer.employeeId);
-  const isStaff = viewer.role !== "employee";
+  const isStaff = viewer.role === "admin" || viewer.role === "executive";
   if (!isStaff && !(isSelf && assignment.results_released)) return null;
 
   return scoreAssignment(assignment, user);

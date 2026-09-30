@@ -386,7 +386,7 @@ export default async function DashboardPage() {
       <PageHeader
         title="Assessment Dashboard"
         description={managerDepartmentName ? `Live assessment progress for ${managerDepartmentName}.` : "Live assessment completion, rating progress, and overdue work."}
-        actions={<Link href="/assessments/results" className={buttonVariants({ variant: "outline" })}>Open assessment results</Link>}
+        actions={role !== "manager" ? <Link href="/assessments/results" className={buttonVariants({ variant: "outline" })}>Open assessment results</Link> : undefined}
       />
 
       <div className="t-dash-stagger grid grid-cols-2 gap-4 lg:grid-cols-5">
@@ -423,7 +423,9 @@ export default async function DashboardPage() {
                     <div className="shrink-0 text-right"><Badge variant="outline" className="border-red-200 bg-red-50 text-red-700">Overdue</Badge><p className="mt-1 text-xs text-muted-foreground">Due {fmtShortDate(assignment.due_date)}</p></div>
                   </div>;
                 })}
-                <Link href="/assessments/results" className={buttonVariants({ variant: "outline", size: "sm", className: "w-full" })}>View tracker</Link>
+                {role !== "manager" && (
+                  <Link href="/assessments/results" className={buttonVariants({ variant: "outline", size: "sm", className: "w-full" })}>View tracker</Link>
+                )}
               </div>
             ) : (
               <div className="flex min-h-48 flex-col items-center justify-center rounded-xl border border-dashed text-center"><CheckCircle2 className="mb-3 size-9 text-emerald-600" /><p className="font-medium">Nothing overdue</p><p className="mt-1 text-sm text-muted-foreground">All active assignments are within their due dates.</p></div>
