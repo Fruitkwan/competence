@@ -31,7 +31,7 @@ export default async function AssignAssessmentsPage() {
   const assignments = asgRes.data ?? [];
   const ids = assignments.map((a) => a.id);
   const { data: raters } = ids.length
-    ? await supabase.from("assessment_raters").select("assignment_id, rater_user_id, rater_type, status").in("assignment_id", ids)
+    ? await supabase.from("assessment_raters").select("id, assignment_id, rater_user_id, rater_type, status").in("assignment_id", ids)
     : { data: [] };
 
   const templates = tplRes.data ?? [];
@@ -58,7 +58,7 @@ export default async function AssignAssessmentsPage() {
       raters_done: rs.filter((r) => r.rater_type !== "self" && r.status === "submitted").length,
       raters: rs
         .filter((r) => r.rater_type !== "self")
-        .map((r) => ({ user_id: r.rater_user_id, type: r.rater_type, status: r.status })),
+        .map((r) => ({ id: r.id, user_id: r.rater_user_id, type: r.rater_type, status: r.status })),
       manager_user_id:
         profRes.data?.find((p) => p.full_name === empByIds.get(a.employee_id)?.manager_name)?.id ?? null,
     };

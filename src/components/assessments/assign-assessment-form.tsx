@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { CheckCircle2, Eye, EyeOff, Loader2, Send, Settings2, Trash2, X } from "lucide-react";
+import { CheckCircle2, Eye, EyeOff, Loader2, RotateCcw, Send, Settings2, Trash2, X } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EmployeePicker } from "@/components/ui/employee-picker";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { assignAssessments, deleteAssignment, releaseResults, suggestTemplatesForEmployee, updateAssignmentRaters } from "@/lib/actions/assessments";
+import { assignAssessments, deleteAssignment, releaseResults, resetRaterRating, suggestTemplatesForEmployee, updateAssignmentRaters } from "@/lib/actions/assessments";
 import { formatDate } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { DepartmentAssignPanel } from "./department-assign-panel";
@@ -36,7 +36,7 @@ export type AssignmentRow = {
   self_done: boolean;
   raters_total: number;
   raters_done: number;
-  raters: { user_id: string; type: "self" | "line_manager" | "cross_dept" | "peer"; status: "pending" | "submitted" }[];
+  raters: { id: string; user_id: string; type: "self" | "line_manager" | "cross_dept" | "peer"; status: "pending" | "submitted" }[];
   manager_user_id: string | null;
 };
 
@@ -426,9 +426,22 @@ function ManageRatersDialog({
     () => assignment?.raters.filter((r) => r.type !== "line_manager").map((r) => r.user_id) ?? []
   );
   const [saving, setSaving] = useState(false);
+  const [resettingId, setResettingId] = useState<string | null>(null);
 
   function initialise(open: boolean) {
     onOpenChange(open);
+  }
+
+  async function resetRating(rater: { id: string; user_id: string }) {
+    if (!assignment) return;
+    const name = users.find((u) => u.id === rater.user_id)?.label ?? "this rater";
+    if (!confirm(`Reset the submitted rating from ${name}? Their answers will be deleted and they will be asked to rate again.`)) return;
+    setResettingId(rater.id);
+    const result = await resetRaterRating(rater.id);
+    setResettingId(null);
+    if (result.error) return toast.error(result.error);
+    toast.success(`Rating reset — ${name} has been asked to rate again.`);
+    onSaved();
   }
 
   async function save() {
@@ -485,6 +498,31 @@ function ManageRatersDialog({
               setOthers([...new Set([...ids, ...submittedIds])]);
             }}
           />
+          {submitted.length > 0 && (
+            <div className="grid gap-2 rounded-lg border p-3">
+              <Label>Submitted ratings</Label>
+              <p className="text-xs text-muted-foreground">
+                Reset a rating when someone rated the wrong person — their answers are deleted and they are notified to rate again.
+              </p>
+              {submitted.map((r) => (
+                <div key={r.id} className="flex items-center justify-between gap-2">
+                  <span className="text-sm">
+                    {users.find((u) => u.id === r.user_id)?.label ?? "Unknown rater"}
+                    <span className="ml-1 text-xs capitalize text-muted-foreground">({r.type.replace("_", " ")})</span>
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={resettingId === r.id}
+                    onClick={() => resetRating(r)}
+                  >
+                    {resettingId === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RotateCcw className="h-3.5 w-3.5" />}
+                    Reset
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => initialise(false)} disabled={saving}>Cancel</Button>

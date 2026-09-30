@@ -663,6 +663,62 @@ export async function updateAssignmentRaters(input: UpdateAssignmentRatersInput)
   };
 }
 
+/**
+ * HR resets a submitted rating back to pending — e.g. a rater rated the wrong
+ * employee by mistake. Deletes their answers so they start fresh.
+ */
+export async function resetRaterRating(raterId: string) {
+  const { error: authError } = await requireAdmin();
+  if (authError) return { error: authError };
+  const supabase = createAdminClient();
+  if (!supabase) return { error: "Server administration is not configured." };
+
+  const { data: rater } = await supabase
+    .from("assessment_raters")
+    .select("id, assignment_id, rater_user_id, rater_type, status")
+    .eq("id", raterId)
+    .maybeSingle();
+  if (!rater) return { error: "Rating not found." };
+  if (rater.rater_type === "self") return { error: "Self assessments cannot be reset." };
+  if (rater.status !== "submitted") return { error: "Only submitted ratings can be reset." };
+
+  const { data: assignment } = await supabase
+    .from("assessment_assignments")
+    .select("id, employee_id, template_id, status")
+    .eq("id", rater.assignment_id)
+    .maybeSingle();
+  if (!assignment || assignment.status === "closed") return { error: "The assessment is closed." };
+
+  const { error: responsesError } = await supabase.from("assessment_responses").delete().eq("rater_id", raterId);
+  if (responsesError) return { error: responsesError.message };
+
+  const { error } = await supabase
+    .from("assessment_raters")
+    .update({ status: "pending", submitted_at: null, started_at: null })
+    .eq("id", raterId)
+    .eq("status", "submitted");
+  if (error) return { error: error.message };
+
+  if (rater.rater_user_id) {
+    const { data: employee } = await supabase
+      .from("employees")
+      .select("full_name")
+      .eq("employee_id", assignment.employee_id)
+      .maybeSingle();
+    await createNotification({
+      user_id: rater.rater_user_id,
+      type: NOTIFICATION_TYPES.ASSESSMENT_RATING_REQUESTED,
+      title: `Your rating for ${employee?.full_name ?? assignment.employee_id} was reset`,
+      body: "HR reset your previous rating. Please review the names carefully and submit it again.",
+      link: `/assessments/rate/${raterId}`,
+      metadata: { assignment_id: assignment.id, rater_type: rater.rater_type, reset: true },
+    });
+  }
+
+  revalidateAll();
+  return { success: true };
+}
+
 // ---------------------------------------------------------------------------
 // Taking the assessment (employee / raters)
 // ---------------------------------------------------------------------------
