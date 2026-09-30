@@ -11,7 +11,7 @@ export default async function AssignAssessmentsPage() {
   if (!user) redirect("/login");
 
   const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
-  if (!profile || !["admin", "manager"].includes(profile.role)) redirect("/dashboard");
+  if (!profile || profile.role !== "admin") redirect("/dashboard");
 
   const [empRes, tplRes, profRes, asgRes] = await Promise.all([
     supabase.from("employees").select("employee_id, full_name, job_title, manager_name, department").eq("active", true).order("full_name"),

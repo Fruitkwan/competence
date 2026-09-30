@@ -238,6 +238,6 @@ export async function loadPlacementReport(
         viewer.role === "admin" || Boolean(managesByName || managesByProfile),
       hr: viewer.role === "admin",
     },
-    canEnterRecord: isStaff,
+    canEnterRecord: viewer.role === "admin",
   };
 }

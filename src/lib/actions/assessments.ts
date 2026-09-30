@@ -49,13 +49,6 @@ async function requireAdmin() {
   return { error: null, profile: p };
 }
 
-async function requireStaff() {
-  const p = await currentProfile();
-  if (!p) return { error: "Not authenticated" as const, profile: null };
-  if (p.role === "employee") return { error: "Manager or HR access required." as const, profile: null };
-  return { error: null, profile: p };
-}
-
 function revalidateAll() {
   for (const p of ["/assessments", "/assessments/assign", "/assessments/results", "/admin/assessments", "/notifications"]) {
     revalidatePath(p);
@@ -365,7 +358,7 @@ async function createAssignmentsForEmployee(opts: {
 }
 
 export async function assignAssessments(input: AssignInput) {
-  const { error: authError, profile } = await requireStaff();
+  const { error: authError, profile } = await requireAdmin();
   if (authError) return { error: authError };
   if (!input.employee_id) return { error: "Select an employee." };
   if (!input.template_ids.length) return { error: "Select at least one assessment." };
@@ -527,7 +520,7 @@ const RATER_LABELS: Record<RaterType, string> = {
 };
 
 export async function releaseResults(assignmentId: string, released: boolean) {
-  const { error: authError } = await requireStaff();
+  const { error: authError } = await requireAdmin();
   if (authError) return { error: authError };
   const supabase = await createClient();
   const { data: assignment, error } = await supabase
@@ -554,7 +547,7 @@ export async function releaseResults(assignmentId: string, released: boolean) {
 }
 
 export async function closeAssignment(assignmentId: string) {
-  const { error: authError } = await requireStaff();
+  const { error: authError } = await requireAdmin();
   if (authError) return { error: authError };
   const supabase = await createClient();
   const { error } = await supabase.from("assessment_assignments").update({ status: "closed" }).eq("id", assignmentId);
@@ -576,7 +569,7 @@ export type UpdateAssignmentRatersInput = {
 };
 
 export async function updateAssignmentRaters(input: UpdateAssignmentRatersInput) {
-  const { error: authError } = await requireStaff();
+  const { error: authError } = await requireAdmin();
   if (authError) return { error: authError };
   if (!input.assignment_id) return { error: "Assignment is required." };
 
@@ -926,7 +919,7 @@ export async function saveRecordScores(
   assignmentId: string,
   scores: { commercial: number | null; account: number | null; leadership: number | null }
 ) {
-  const { error: authError } = await requireStaff();
+  const { error: authError } = await requireAdmin();
   if (authError) return { error: authError };
 
   const clean = (v: number | null) => (v == null ? null : Math.min(100, Math.max(0, Math.round(v))));
