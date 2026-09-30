@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Search } from "lucide-react";
+import { AlertTriangle, Download, Search } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -80,7 +80,7 @@ function isOverdue(row: ResultListRow) {
   return new Date(`${row.dueDate}T00:00:00`).getTime() < today.getTime();
 }
 
-export function ResultsList({ rows }: { rows: ResultListRow[] }) {
+export function ResultsList({ rows, canExportDepartment = false }: { rows: ResultListRow[]; canExportDepartment?: boolean }) {
   const [query, setQuery] = useState("");
   const [department, setDepartment] = useState("all");
   const [wave, setWave] = useState("all");
@@ -199,8 +199,17 @@ export function ResultsList({ rows }: { rows: ResultListRow[] }) {
           </button>
         )}
         <span className="ml-auto text-xs text-muted-foreground">Showing {filtered.length} of {rows.length}</span>
+        {canExportDepartment && (department === "all" ? (
+          <button type="button" disabled className={buttonVariants({ variant: "outline", size: "sm", className: "cursor-not-allowed opacity-50" })} title="Select a department first">
+            <Download className="size-3.5" /> Department Excel
+          </button>
+        ) : (
+          <a href={`/api/export/assessment-results?department=${encodeURIComponent(department)}`} className={buttonVariants({ variant: "outline", size: "sm" })}>
+            <Download className="size-3.5" /> Download {department}
+          </a>
+        ))}
         <a href="/api/export/assessment-results" className={buttonVariants({ variant: "outline", size: "sm" })}>
-          Export all
+          <Download className="size-3.5" /> Export all Excel
         </a>
       </div>
 
